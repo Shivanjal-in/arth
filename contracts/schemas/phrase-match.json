@@ -2,12 +2,14 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://arth.app/contracts/phrase-match.json",
   "title": "PhraseMatch",
-  "description": "Result of POST /phrases/match when a multi-word phrase covers the tapped token.",
+  "description": "Result of POST /phrases/match when a multi-word phrase covers the tapped token. `start` + `tokenCount` tell the app which tokens to highlight.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["phrase", "lemma"],
+  "required": ["phrase", "lemma", "start", "tokenCount"],
   "properties": {
     "phrase": { "type": "string", "description": "The matched phrase as it appears in `phrases._id`." },
-    "lemma": { "type": "string", "description": "Key into `entries`." }
+    "lemma": { "type": "string", "description": "Key into `entries`." },
+    "start": { "type": "integer", "minimum": 0, "description": "Index of the first matched token in the submitted `tokens` array." },
+    "tokenCount": { "type": "integer", "minimum": 2, "maximum": 4, "description": "Number of consecutive tokens the phrase covers." }
   }
 }

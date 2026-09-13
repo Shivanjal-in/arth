@@ -73,4 +73,4 @@ export type TranslationResult = {
   difficultWords: BilingualPair[];
 };
 
-export type PhraseMatch = { phrase: string; lemma: string };
+export type PhraseMatch = { phrase: string; lemma: string; start: number; tokenCount: number };
