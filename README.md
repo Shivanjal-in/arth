@@ -20,14 +20,13 @@ contracts/  JSON Schemas, normalization spec + test vectors shared by all three
 
 ## Setup
 
-Prereqs: Node ≥ 20.6, Docker (for a local Mongo 7), Flutter 3.x, Python 3.11+.
+Prereqs: Node ≥ 20.6, a MongoDB Atlas cluster, Flutter 3.x, Python 3.11.
 
 ### API
 
 ```sh
 cd api
-cp .env.example .env          # defaults point at the docker-compose Mongo
-docker compose up -d          # Mongo 7 on localhost:27017
+cp .env.example .env          # set MONGODB_URI to the Atlas connection string (database: arth)
 npm install
 npm run seed                  # loads seed/seed.json (idempotent upserts)
 npm run dev                   # http://localhost:3000
@@ -44,14 +43,14 @@ npm test          # normalize vectors, lemma resolution, /lookup route, seed val
 npm run typecheck
 ```
 
-For Atlas, set `MONGODB_URI` in `.env` to the connection string. Nothing else changes.
+Both `api/` and `pipeline/` read the same `MONGODB_URI`; the database name is the path segment of the URI and should be `arth`.
 
 ### Pipeline
 
 ```sh
 cd pipeline
 python3.11 -m venv .venv && .venv/bin/pip install -e '.[dev]'
-cp .env.example .env          # add OPENAI_API_KEY
+cp .env.example .env          # add OPENAI_API_KEY and the same MONGODB_URI as api/
 .venv/bin/pytest              # 69 tests: normalize vectors, generation validation + retry
 .venv/bin/python 01_download.py && .venv/bin/python 02_select.py --n 500 && .venv/bin/python 03_extract.py
 ```

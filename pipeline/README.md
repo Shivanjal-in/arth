@@ -5,7 +5,7 @@ standalone, run by hand. Not part of the API deploy.
 
 ```sh
 python3.11 -m venv .venv && .venv/bin/pip install -e '.[dev]'
-cp .env.example .env            # add OPENAI_API_KEY; MONGODB_URI defaults to the api/ docker Mongo
+cp .env.example .env            # add OPENAI_API_KEY and MONGODB_URI (same Atlas cluster as api/)
 .venv/bin/pytest                # normalize vectors + generation validation/retry
 .venv/bin/ruff check .
 ```
