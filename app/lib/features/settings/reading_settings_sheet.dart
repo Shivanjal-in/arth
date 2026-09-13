@@ -2,6 +2,7 @@
 
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/settings.dart';
+import 'package:arth/app/strings.dart';
 import 'package:arth/app/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,41 +17,60 @@ Future<void> showReadingSettingsSheet(BuildContext context) => showModalBottomSh
     );
 
 class ReadingSettings extends ConsumerWidget {
-  const ReadingSettings({super.key});
+  const ReadingSettings({super.key, this.showLanguage = false});
+
+  /// The language switch lives on the Settings tab, not in the reader sheet.
+  final bool showLanguage;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
     final s = ref.watch(settingsProvider);
+    final t = ref.watch(stringsProvider);
     final n = ref.read(settingsProvider.notifier);
+    final rowText = uiBody(hindi: t.isHindi, color: c.ink, scale: s.hindiScale, size: 16);
+    final helpText = uiBody(hindi: t.isHindi, color: c.inkMuted, scale: s.hindiScale, size: 13);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (showLanguage)
+          _Row(
+            label: t.language,
+            child: SegmentedButton<UiLanguage>(
+              segments: const [
+                ButtonSegment(value: UiLanguage.en, label: Text('English')),
+                ButtonSegment(value: UiLanguage.hi, label: Text('हिंदी')),
+              ],
+              selected: {s.language},
+              onSelectionChanged: (v) => n.update((s) => s.copyWith(language: v.first)),
+            ),
+          ),
         _Row(
-          label: 'रंग',
+          label: t.theme,
           child: SegmentedButton<ThemeMode>(
-            segments: const [
-              ButtonSegment(value: ThemeMode.light, label: Text('कागज़')),
-              ButtonSegment(value: ThemeMode.dark, label: Text('रात')),
-              ButtonSegment(value: ThemeMode.system, label: Text('फ़ोन')),
+            segments: [
+              ButtonSegment(value: ThemeMode.light, label: Text(t.themePaper)),
+              ButtonSegment(value: ThemeMode.dark, label: Text(t.themeNight)),
+              ButtonSegment(value: ThemeMode.system, label: Text(t.themeSystem)),
             ],
             selected: {s.themeMode},
             onSelectionChanged: (v) => n.update((s) => s.copyWith(themeMode: v.first)),
           ),
         ),
         _Row(
-          label: 'टूलटिप',
+          label: t.tooltipDetail,
           child: SegmentedButton<TooltipDetail>(
-            segments: const [
-              ButtonSegment(value: TooltipDetail.compact, label: Text('छोटा')),
-              ButtonSegment(value: TooltipDetail.detailed, label: Text('विस्तार से')),
+            segments: [
+              ButtonSegment(value: TooltipDetail.compact, label: Text(t.tooltipCompact)),
+              ButtonSegment(value: TooltipDetail.detailed, label: Text(t.tooltipDetailed)),
             ],
             selected: {s.tooltipDetail},
             onSelectionChanged: (v) => n.update((s) => s.copyWith(tooltipDetail: v.first)),
           ),
         ),
         _Row(
-          label: 'हिंदी का आकार',
+          label: t.hindiSize,
           child: SegmentedButton<HindiSize>(
             segments: const [
               ButtonSegment(value: HindiSize.small, label: Text('अ', style: TextStyle(fontSize: 13))),
@@ -63,10 +83,18 @@ class ReadingSettings extends ConsumerWidget {
         ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          title: Text('उच्चारण सुनें (TTS)', style: HindiText(s.hindiScale).meaning(context.colors.ink)),
+          title: Text(t.tts, style: rowText),
           value: s.ttsEnabled,
-          activeThumbColor: context.colors.accent,
+          activeThumbColor: c.accent,
           onChanged: (v) => n.update((s) => s.copyWith(ttsEnabled: v)),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(t.prefetch, style: rowText),
+          subtitle: Text(t.prefetchHelp, style: helpText),
+          value: s.prefetch,
+          activeThumbColor: c.accent,
+          onChanged: (v) => n.update((s) => s.copyWith(prefetch: v)),
         ),
       ],
     );
@@ -82,13 +110,14 @@ class _Row extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
-    final h = HindiText(ref.watch(settingsProvider).hindiScale);
+    final s = ref.watch(settingsProvider);
+    final t = ref.watch(stringsProvider);
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: h.label(c.inkMuted)),
+          Text(label, style: uiLabel(hindi: t.isHindi, color: c.inkMuted, scale: s.hindiScale)),
           const SizedBox(height: 6),
           SizedBox(width: double.infinity, child: child),
         ],

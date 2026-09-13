@@ -30,7 +30,9 @@ class WordTooltip extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
     final settings = ref.watch(settingsProvider);
-    final h = HindiText(settings.hindiScale);
+    final t = ref.watch(stringsProvider);
+    final body = uiBody(hindi: t.isHindi, color: c.inkMuted, scale: settings.hindiScale);
+    final label = uiLabel(hindi: t.isHindi, color: c.inkMuted, scale: settings.hindiScale);
     final outcome = state.outcome;
 
     if (outcome == null) {
@@ -53,15 +55,10 @@ class WordTooltip extends ConsumerWidget {
           children: [
             Text(word.isEmpty ? state.token : word, style: EnglishText.word(c.ink)),
             const SizedBox(height: 6),
-            Text(
-              offline
-                  ? 'और अर्थ देखने के लिए इंटरनेट चाहिए'
-                  : 'यह शब्द शब्दकोश में नहीं मिला।',
-              style: h.body(c.inkMuted),
-            ),
+            Text(offline ? t.offline : t.notFound, style: body),
             if (suggestions.isNotEmpty) ...[
               const SizedBox(height: 8),
-              Text('क्या आपका मतलब था:', style: h.label(c.inkMuted)),
+              Text(t.didYouMean, style: label),
               const SizedBox(height: 4),
               Wrap(
                 spacing: 8,
@@ -92,7 +89,7 @@ class WordTooltip extends ConsumerWidget {
             if (phrase != null)
               Padding(
                 padding: const EdgeInsets.only(top: 2),
-                child: Text('मुहावरा · ${phrase.phrase}', style: h.small(c.inkMuted)),
+                child: Text('${t.phrase} · ${phrase.phrase}', style: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: settings.hindiScale, size: 13)),
               ),
             InContextBlock(
               result: state.context,
@@ -111,7 +108,7 @@ class WordTooltip extends ConsumerWidget {
               child: TextButton(
                 onPressed: onShowDetails,
                 style: TextButton.styleFrom(foregroundColor: c.accent),
-                child: Text('पूरा अर्थ देखें  ›', style: h.label(c.accent)),
+                child: Text(t.seeFullEntry, style: uiLabel(hindi: t.isHindi, color: c.accent, scale: settings.hindiScale)),
               ),
             ),
           ],

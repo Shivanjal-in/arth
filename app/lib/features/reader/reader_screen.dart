@@ -53,7 +53,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   PageTextCache? _cache;
   Timer? _selectionDebounce;
   bool _selectionHaptic = false;
+  bool _warnedNoText = false;
   int? _page;
+
+  /// Prefetch (Section 7): sentences already sent for /context this session.
+  final Set<String> _prefetched = {};
+  static const _prefetchRankThreshold = 8000;
+  static const _prefetchMaxPerPage = 12;
 
   @override
   void initState() {
@@ -160,6 +166,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       return;
     }
     final idx = await cache.page(page);
+    if (idx.words.isEmpty && mounted && !_warnedNoText) {
+      _warnedNoText = true;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ref.read(stringsProvider).noTextLayer)));
+    }
     final word = idx.wordAt(docPos, margin: 3);
     if (word == null || word.key.isEmpty) {
       rc.dismiss();
@@ -246,6 +256,43 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         );
   }
 
+  // ---- prefetch ----
+
+  /// Quietly resolve /context for rare or unknown words on this page and the
+  /// next, so the tooltip's "इस वाक्य में" is a cache hit when tapped.
+  /// Fire-and-forget: no retries, never blocks rendering, errors ignored.
+  Future<void> _prefetch(int page) async {
+    if (!ref.read(settingsProvider).prefetch) return;
+    final cache = _cache;
+    if (cache == null) return;
+    final store = ref.read(localStoreProvider);
+    final repo = ref.read(dictionaryRepoProvider);
+    for (final p in [page, page + 1]) {
+      if (p < 1 || p > _controller.pageCount) continue;
+      final PageTextIndex idx;
+      try {
+        idx = await cache.page(p);
+      } on Exception {
+        continue;
+      }
+      var sent = 0;
+      for (final w in idx.words) {
+        if (sent >= _prefetchMaxPerPage || !mounted) break;
+        final key = w.key;
+        if (key.length < 3) continue;
+        final rank = await store.rankOf(key);
+        if (rank != null && rank <= _prefetchRankThreshold) continue;
+        final sentence = await cache.sentenceFor(p, idx, w);
+        final id = '$key|$sentence';
+        if (!_prefetched.add(id)) continue;
+        sent++;
+        unawaited(
+          repo.contextFor(word: key, sentence: sentence).then((_) {}, onError: (Object _) {}),
+        );
+      }
+    }
+  }
+
   // ---- helpers ----
 
   Future<void> _lookupTyped(String word) async {
@@ -293,6 +340,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final t = ref.watch(stringsProvider);
     final tooltip = ref.watch(readerControllerProvider);
     if (tooltip == null && _portal.isShowing) _portal.hide();
 
@@ -312,7 +360,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             ),
           IconButton(
             icon: const Icon(Icons.text_fields_rounded),
-            tooltip: 'पढ़ने की सेटिंग',
+            tooltip: t.readingSettings,
             onPressed: () => showReadingSettingsSheet(context),
           ),
         ],
@@ -336,8 +384,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(32),
                   child: Text(
-                    'यह PDF खोली नहीं जा सकी। फ़ाइल हट गई हो सकती है — किताब को दोबारा जोड़ें।',
-                    style: const HindiText(1).body(c.inkMuted),
+                    t.pdfOpenFailed,
+                    style: uiBody(hindi: t.isHindi, color: c.inkMuted),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -349,11 +397,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   ref.read(libraryProvider.notifier).touch(widget.book.id, pageCount: doc.pages.length),
                 );
                 setState(() => _page = controller.pageNumber);
+                unawaited(_prefetch(controller.pageNumber ?? 1));
               },
               onPageChanged: (p) {
                 if (p == null) return;
                 setState(() => _page = p);
                 unawaited(ref.read(libraryProvider.notifier).touch(widget.book.id, lastPage: p));
+                unawaited(_prefetch(p));
               },
               viewerOverlayBuilder: (ctx, size, _) => _overlays(tooltip),
             ),

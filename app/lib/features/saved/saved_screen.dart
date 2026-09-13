@@ -10,20 +10,22 @@ class SavedScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
-    final h = HindiText(ref.watch(settingsProvider).hindiScale);
+    final scale = ref.watch(settingsProvider).hindiScale;
+    final h = HindiText(scale);
+    final t = ref.watch(stringsProvider);
     final saved = ref.watch(savedWordsProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('सहेजे शब्द')),
+      appBar: AppBar(title: Text(t.savedTitle)),
       body: saved.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
+        error: (_, _) => Center(child: Text(t.somethingWrong, style: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: scale))),
         data: (list) => list.isEmpty
             ? Center(
                 child: Padding(
                   padding: const EdgeInsets.all(32),
                   child: Text(
-                    'किसी शब्द के पास 🔖 दबाकर उसे यहाँ सहेजें।',
-                    style: h.body(c.inkMuted),
+                    t.savedEmpty,
+                    style: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: scale),
                     textAlign: TextAlign.center,
                   ),
                 ),

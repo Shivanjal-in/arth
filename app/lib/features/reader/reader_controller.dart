@@ -80,6 +80,7 @@ class SentenceTooltipState extends ReaderTooltip {
     this.simpleMeaning,
     this.difficultWords,
     this.error,
+    this.errorCode,
     this.done = false,
   });
 
@@ -87,7 +88,9 @@ class SentenceTooltipState extends ReaderTooltip {
   final String? hindi;
   final String? simpleMeaning;
   final List<BilingualPair>? difficultWords;
+  /// Server (Hindi) message; the widget localizes via [errorCode].
   final String? error;
+  final String? errorCode;
   final bool done;
 
   SentenceTooltipState copyWith({
@@ -95,6 +98,7 @@ class SentenceTooltipState extends ReaderTooltip {
     String? simpleMeaning,
     List<BilingualPair>? difficultWords,
     String? error,
+    String? errorCode,
     bool? done,
   }) =>
       SentenceTooltipState(
@@ -105,6 +109,7 @@ class SentenceTooltipState extends ReaderTooltip {
         simpleMeaning: simpleMeaning ?? this.simpleMeaning,
         difficultWords: difficultWords ?? this.difficultWords,
         error: error ?? this.error,
+        errorCode: errorCode ?? this.errorCode,
         done: done ?? this.done,
       );
 }
@@ -233,6 +238,7 @@ class ReaderController extends AutoDisposeNotifier<ReaderTooltip?> {
           case 'error':
             state = s.copyWith(
               error: (ev.data['message'] as String?) ?? 'अनुवाद नहीं हो पाया।',
+              errorCode: (ev.data['code'] as String?) ?? 'UPSTREAM_FAILED',
               done: true,
             );
         }
@@ -243,6 +249,7 @@ class ReaderController extends AutoDisposeNotifier<ReaderTooltip?> {
         if (s is! SentenceTooltipState) return;
         state = s.copyWith(
           error: e is ApiFailure ? e.message : 'अनुवाद नहीं हो पाया।',
+          errorCode: e is ApiFailure ? e.code : 'INTERNAL',
           done: true,
         );
       },

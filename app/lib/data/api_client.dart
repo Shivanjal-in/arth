@@ -42,14 +42,17 @@ class SseEvent {
 }
 
 class ApiClient {
-  ApiClient({Dio? dio, String baseUrl = kApiBaseUrl})
+  ApiClient({Dio? dio, String baseUrl = kApiBaseUrl, String? deviceId})
       : _dio = dio ??
             Dio(
               BaseOptions(
                 baseUrl: '$baseUrl/v1',
                 connectTimeout: const Duration(seconds: 6),
                 receiveTimeout: const Duration(seconds: 20),
-                headers: {'accept': 'application/json'},
+                headers: {
+                  'accept': 'application/json',
+                  'x-device-id': ?deviceId,
+                },
               ),
             );
 

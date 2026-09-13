@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:arth/app/providers.dart';
+import 'package:arth/app/strings.dart';
 import 'package:arth/app/theme.dart';
 import 'package:arth/data/local_store.dart';
 import 'package:file_picker/file_picker.dart';
@@ -34,26 +35,35 @@ class LibraryScreen extends ConsumerWidget {
     if (context.mounted) unawaited(context.push('/read/${book.id}'));
   }
 
+  Future<void> _importSafely(BuildContext context, WidgetRef ref) async {
+    try {
+      await _import(context, ref);
+    } on Exception catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ref.read(stringsProvider).importFailed)));
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
     final s = ref.watch(settingsProvider);
-    final h = HindiText(s.hindiScale);
+    final t = ref.watch(stringsProvider);
     final books = ref.watch(libraryProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('किताबें')),
+      appBar: AppBar(title: Text(t.tabLibrary)),
       floatingActionButton: FloatingActionButton(
         backgroundColor: c.accent,
         foregroundColor: c.paper,
-        onPressed: () => _import(context, ref),
+        onPressed: () => _importSafely(context, ref),
         child: const Icon(Icons.add_rounded),
       ),
       body: books.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
+        error: (_, _) => Center(child: Text(t.somethingWrong, style: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: s.hindiScale))),
         data: (list) => list.isEmpty
-            ? _Empty(h: h)
+            ? _Empty(t: t, scale: s.hindiScale)
             : ListView.separated(
                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 96),
                 itemCount: list.length,
@@ -66,9 +76,10 @@ class LibraryScreen extends ConsumerWidget {
 }
 
 class _Empty extends StatelessWidget {
-  const _Empty({required this.h});
+  const _Empty({required this.t, required this.scale});
 
-  final HindiText h;
+  final AppStrings t;
+  final double scale;
 
   @override
   Widget build(BuildContext context) {
@@ -81,11 +92,11 @@ class _Empty extends StatelessWidget {
           children: [
             Icon(Icons.menu_book_rounded, size: 48, color: c.rule),
             const SizedBox(height: 16),
-            Text('अभी कोई किताब नहीं है', style: h.headline(c.ink), textAlign: TextAlign.center),
+            Text(t.libraryEmptyTitle, style: uiHeadline(hindi: t.isHindi, color: c.ink, scale: scale), textAlign: TextAlign.center),
             const SizedBox(height: 6),
             Text(
-              'नीचे + दबाकर कोई अंग्रेज़ी PDF जोड़ें। पढ़ते हुए किसी भी शब्द पर टैप करें।',
-              style: h.body(c.inkMuted),
+              t.libraryEmptyBody,
+              style: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: scale),
               textAlign: TextAlign.center,
             ),
           ],
@@ -103,7 +114,9 @@ class _BookTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
-    final h = HindiText(ref.watch(settingsProvider).hindiScale);
+    final scale = ref.watch(settingsProvider).hindiScale;
+    final t = ref.watch(stringsProvider);
+    final small = uiBody(hindi: t.isHindi, color: c.inkMuted, scale: scale, size: 13);
     final pages = book.pageCount;
     final progress = pages == null || pages == 0 ? null : book.lastPage / pages;
     return ListTile(
@@ -124,9 +137,9 @@ class _BookTile extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              Text('पृष्ठ ${book.lastPage} / $pages', style: h.small(c.inkMuted)),
+              Text(t.page(book.lastPage, pages!), style: small),
             ] else
-              Text('अभी शुरू नहीं किया', style: h.small(c.inkMuted)),
+              Text(t.notStarted, style: small),
           ],
         ),
       ),
@@ -136,11 +149,11 @@ class _BookTile extends ConsumerWidget {
         final ok = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: Text('किताब हटाएँ?', style: h.headline(c.ink)),
+            title: Text(t.removeBook, style: uiHeadline(hindi: t.isHindi, color: c.ink, scale: scale)),
             content: Text(book.title, style: EnglishText.body(c.ink)),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('नहीं')),
-              TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('हटाएँ')),
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.no)),
+              TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.remove)),
             ],
           ),
         );

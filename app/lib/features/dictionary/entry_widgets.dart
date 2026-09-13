@@ -5,31 +5,27 @@ import 'dart:async';
 
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/settings.dart';
+import 'package:arth/app/strings.dart';
 import 'package:arth/app/theme.dart';
 import 'package:arth/core/models/contracts.dart';
 import 'package:arth/data/local_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class SectionLabel extends StatelessWidget {
-  const SectionLabel(this.text, {super.key, this.hindi = false});
+class SectionLabel extends ConsumerWidget {
+  const SectionLabel(this.text, {super.key});
 
   final String text;
-  final bool hindi;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
-    final scale = ProviderScope.containerOf(context, listen: false)
-        .read(settingsProvider)
-        .hindiScale;
+    final settings = ref.watch(settingsProvider);
     return Padding(
       padding: const EdgeInsets.only(top: 18, bottom: 6),
       child: Text(
         text,
-        style: hindi
-            ? HindiText(scale).label(c.inkMuted)
-            : EnglishText.caps(c.inkMuted),
+        style: uiLabel(hindi: settings.language == UiLanguage.hi, color: c.inkMuted, scale: settings.hindiScale),
       ),
     );
   }
@@ -57,6 +53,7 @@ class EntryHeader extends ConsumerWidget {
     final c = context.colors;
     final settings = ref.watch(settingsProvider);
     final tts = ref.watch(ttsProvider);
+    final t = ref.watch(stringsProvider);
     final saved = ref.watch(savedWordsProvider).valueOrNull?.any((w) => w.lemma == entry.word) ?? false;
     final showTts = settings.ttsEnabled && tts.hasEnglish;
 
@@ -87,12 +84,12 @@ class EntryHeader extends ConsumerWidget {
         ),
         if (showTts)
           IconButton(
-            tooltip: 'सुनें',
+            tooltip: t.listen,
             icon: Icon(Icons.volume_up_rounded, color: c.accent),
             onPressed: () => tts.speakEnglish(entry.word),
           ),
         IconButton(
-          tooltip: saved ? 'हटाएँ' : 'सहेजें',
+          tooltip: saved ? t.unsave : t.save,
           icon: Icon(
             saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
             color: c.accent,
@@ -137,7 +134,9 @@ class InContextBlock extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
-    final h = HindiText(ref.watch(settingsProvider).hindiScale);
+    final settings = ref.watch(settingsProvider);
+    final h = HindiText(settings.hindiScale);
+    final t = ref.watch(stringsProvider);
     final r = result;
     final content = r == null
         ? const SizedBox(height: 48)
@@ -165,7 +164,7 @@ class InContextBlock extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('इस वाक्य में', style: h.label(c.accent)),
+          Text(t.inThisSentence, style: uiLabel(hindi: t.isHindi, color: c.accent, scale: settings.hindiScale)),
           const SizedBox(height: 4),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 220),
@@ -197,7 +196,9 @@ class SenseList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
-    final h = HindiText(ref.watch(settingsProvider).hindiScale);
+    final settings = ref.watch(settingsProvider);
+    final h = HindiText(settings.hindiScale);
+    final t = ref.watch(stringsProvider);
     var ordered = [...senses];
     if (pinnedIndex != null && pinnedIndex! < ordered.length) {
       final p = ordered.removeAt(pinnedIndex!);
@@ -265,8 +266,8 @@ class SenseList extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.only(top: 6, left: 22),
             child: Text(
-              '+${ordered.length - max!} और अर्थ',
-              style: h.small(c.inkMuted),
+              t.moreSenses(ordered.length - max!),
+              style: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: settings.hindiScale, size: 13),
             ),
           ),
       ],
@@ -330,7 +331,9 @@ class EntryDetails extends ConsumerWidget {
   @override
   Widget build(BuildContext ctx, WidgetRef ref) {
     final c = ctx.colors;
-    final h = HindiText(ref.watch(settingsProvider).hindiScale);
+    final settings = ref.watch(settingsProvider);
+    final h = HindiText(settings.hindiScale);
+    final t = ref.watch(stringsProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -342,18 +345,18 @@ class EntryDetails extends ConsumerWidget {
         ),
         if (context != null || contextLoading)
           InContextBlock(result: context, loading: contextLoading, entry: entry),
-        const SectionLabel('अर्थ', hindi: true),
+        SectionLabel(t.meanings),
         SenseList(senses: entry.senses, pinnedIndex: context?.senseIndex),
         if (entry.synonyms.isNotEmpty) ...[
-          const SectionLabel('समानार्थी', hindi: true),
+          SectionLabel(t.synonyms),
           PairWrap(entry.synonyms, onTapWord: onTapWord),
         ],
         if (entry.antonyms.isNotEmpty) ...[
-          const SectionLabel('विलोम', hindi: true),
+          SectionLabel(t.antonyms),
           PairWrap(entry.antonyms, onTapWord: onTapWord),
         ],
         if (entry.forms.isNotEmpty) ...[
-          const SectionLabel('रूप', hindi: true),
+          SectionLabel(t.forms),
           Wrap(
             spacing: 14,
             runSpacing: 6,
@@ -372,8 +375,8 @@ class EntryDetails extends ConsumerWidget {
         ],
         const SizedBox(height: 24),
         Text(
-          'Wiktionary (CC BY-SA) के आधार पर',
-          style: h.small(c.inkMuted),
+          t.attribution,
+          style: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: settings.hindiScale, size: 12.5),
         ),
       ],
     );

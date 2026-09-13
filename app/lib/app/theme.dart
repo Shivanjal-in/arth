@@ -218,3 +218,14 @@ ThemeData arthTheme(Brightness brightness) {
 extension ArthThemeContext on BuildContext {
   ArthColors get colors => Theme.of(this).extension<ArthColors>()!;
 }
+
+/// Section/tab label style: tracked serif caps in English, Mukta in Hindi.
+TextStyle uiLabel({required bool hindi, required Color color, double scale = 1}) =>
+    hindi ? HindiText(scale).label(color) : EnglishText.caps(color);
+
+/// Body-ish UI copy (empty states, helper text) in the interface language.
+TextStyle uiBody({required bool hindi, required Color color, double scale = 1, double size = 15.5}) =>
+    hindi ? HindiText(scale).body(color) : EnglishText.body(color, size: size);
+
+TextStyle uiHeadline({required bool hindi, required Color color, double scale = 1}) =>
+    hindi ? HindiText(scale).headline(color) : EnglishText.word(color);

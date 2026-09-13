@@ -15,22 +15,21 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
     final s = ref.watch(settingsProvider);
-    final h = HindiText(s.hindiScale);
+    final t = ref.watch(stringsProvider);
+    final body = uiBody(hindi: t.isHindi, color: c.ink, scale: s.hindiScale);
+    final help = uiBody(hindi: t.isHindi, color: c.inkMuted, scale: s.hindiScale, size: 13);
     final count = ref.watch(localEntryCountProvider).valueOrNull;
     final seed = ref.watch(seedProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('आप')),
+      appBar: AppBar(title: Text(t.settingsTitle)),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
         children: [
-          const SectionLabel('पढ़ना', hindi: true),
-          const ReadingSettings(),
-          const SectionLabel('शब्दकोश', hindi: true),
-          Text(
-            count == null ? '…' : 'फ़ोन पर $count शब्द सहेजे हैं — बिना इंटरनेट भी काम करते हैं।',
-            style: h.body(c.ink),
-          ),
+          SectionLabel(t.sectionReading),
+          const ReadingSettings(showLanguage: true),
+          SectionLabel(t.sectionDictionary),
+          Text(count == null ? '…' : t.wordsOnDevice(count), style: body),
           const SizedBox(height: 8),
           if (seed.phase == SeedPhase.downloading)
             LinearProgressIndicator(value: seed.fraction, color: c.accent, backgroundColor: c.rule)
@@ -39,13 +38,13 @@ class SettingsScreen extends ConsumerWidget {
               alignment: Alignment.centerLeft,
               child: OutlinedButton.icon(
                 icon: const Icon(Icons.sync_rounded, size: 18),
-                label: Text('शब्दकोश अपडेट करें', style: h.label(c.accent)),
+                label: Text(t.updateDictionary, style: uiLabel(hindi: t.isHindi, color: c.accent, scale: s.hindiScale)),
                 style: OutlinedButton.styleFrom(foregroundColor: c.accent, side: BorderSide(color: c.rule)),
                 onPressed: () async {
                   final r = await ref.read(seedProvider.notifier).run(delta: count != 0);
                   ref.invalidate(localEntryCountProvider);
                   if (context.mounted && r.phase == SeedPhase.failed) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r.message ?? '')));
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r.message ?? t.downloadFailed)));
                   }
                 },
               ),
@@ -53,27 +52,28 @@ class SettingsScreen extends ConsumerWidget {
           if (seed.phase == SeedPhase.failed && seed.message != null)
             Padding(
               padding: const EdgeInsets.only(top: 6),
-              child: Text(seed.message!, style: h.small(c.accent)),
+              child: Text(seed.message!, style: help.copyWith(color: c.accent)),
             ),
-          const SectionLabel('सर्वर', hindi: true),
+          SectionLabel(t.sectionServer),
           TextFormField(
             initialValue: s.apiBaseUrl ?? '',
             style: EnglishText.body(c.ink),
             decoration: InputDecoration(
               hintText: kApiBaseUrl,
               hintStyle: EnglishText.body(c.inkMuted),
-              helperText: 'खाली छोड़ें तो बिल्ड का डिफ़ॉल्ट इस्तेमाल होगा',
-              helperStyle: h.small(c.inkMuted),
+              helperText: t.serverHelp,
+              helperStyle: help,
             ),
             keyboardType: TextInputType.url,
             autocorrect: false,
-            onFieldSubmitted: (v) =>
-                ref.read(settingsProvider.notifier).update((s) => s.copyWith(apiBaseUrl: () => v.trim().isEmpty ? null : v.trim())),
+            onFieldSubmitted: (v) => ref
+                .read(settingsProvider.notifier)
+                .update((s) => s.copyWith(apiBaseUrl: () => v.trim().isEmpty ? null : v.trim())),
           ),
-          const SectionLabel('जानकारी', hindi: true),
+          SectionLabel(t.sectionInfo),
           ListTile(
             contentPadding: EdgeInsets.zero,
-            title: Text('Arth के बारे में', style: h.meaning(c.ink)),
+            title: Text(t.about, style: body.copyWith(fontSize: 17)),
             trailing: Icon(Icons.chevron_right_rounded, color: c.inkMuted),
             onTap: () => context.push('/about'),
           ),

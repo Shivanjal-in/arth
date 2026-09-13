@@ -19,17 +19,19 @@ class WordScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
-    final h = HindiText(ref.watch(settingsProvider).hindiScale);
+    final scale = ref.watch(settingsProvider).hindiScale;
+    final t = ref.watch(stringsProvider);
+    final body = uiBody(hindi: t.isHindi, color: c.inkMuted, scale: scale);
     final outcome = ref.watch(wordLookupProvider(word));
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back_rounded), onPressed: () => context.pop()),
-        title: Text('BACK', style: EnglishText.caps(c.ink)),
+        title: Text(t.back, style: uiLabel(hindi: t.isHindi, color: c.ink, scale: scale)),
         titleSpacing: 0,
       ),
       body: outcome.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e', style: h.body(c.inkMuted))),
+        error: (_, _) => Center(child: Text(t.somethingWrong, style: body)),
         data: (o) => switch (o) {
           LookupFound(:final entry) => SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
@@ -42,12 +44,9 @@ class WordScreen extends ConsumerWidget {
                 children: [
                   Text(word, style: EnglishText.word(c.ink, size: 30)),
                   const SizedBox(height: 8),
-                  Text(
-                    offline ? 'और अर्थ देखने के लिए इंटरनेट चाहिए' : 'यह शब्द शब्दकोश में नहीं मिला।',
-                    style: h.body(c.inkMuted),
-                  ),
+                  Text(offline ? t.offline : t.notFound, style: body),
                   if (suggestions.isNotEmpty) ...[
-                    const SectionLabel('क्या आपका मतलब था', hindi: true),
+                    SectionLabel(t.didYouMean),
                     Wrap(
                       spacing: 8,
                       children: [

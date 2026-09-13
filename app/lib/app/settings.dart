@@ -1,5 +1,6 @@
 // Reading settings, persisted in the kv table.
 
+import 'package:arth/app/strings.dart';
 import 'package:arth/data/local_store.dart';
 import 'package:flutter/material.dart';
 
@@ -13,6 +14,8 @@ class Settings {
     this.tooltipDetail = TooltipDetail.compact,
     this.hindiSize = HindiSize.medium,
     this.ttsEnabled = true,
+    this.prefetch = true,
+    this.language = UiLanguage.en,
     this.apiBaseUrl,
   });
 
@@ -20,6 +23,12 @@ class Settings {
   final TooltipDetail tooltipDetail;
   final HindiSize hindiSize;
   final bool ttsEnabled;
+
+  /// Resolve hard words on the current and next page in the background.
+  final bool prefetch;
+
+  /// Interface language. Dictionary content is always Hindi.
+  final UiLanguage language;
 
   /// Runtime override of the API base URL (Settings → सर्वर), for testing on a
   /// phone without rebuilding with --dart-define.
@@ -36,6 +45,8 @@ class Settings {
     TooltipDetail? tooltipDetail,
     HindiSize? hindiSize,
     bool? ttsEnabled,
+    bool? prefetch,
+    UiLanguage? language,
     String? Function()? apiBaseUrl,
   }) =>
       Settings(
@@ -43,6 +54,8 @@ class Settings {
         tooltipDetail: tooltipDetail ?? this.tooltipDetail,
         hindiSize: hindiSize ?? this.hindiSize,
         ttsEnabled: ttsEnabled ?? this.ttsEnabled,
+        prefetch: prefetch ?? this.prefetch,
+        language: language ?? this.language,
         apiBaseUrl: apiBaseUrl == null ? this.apiBaseUrl : apiBaseUrl(),
       );
 
@@ -53,6 +66,8 @@ class Settings {
         ),
         hindiSize: HindiSize.values.byName(await store.get('hindi_size') ?? 'medium'),
         ttsEnabled: (await store.get('tts') ?? 'true') == 'true',
+        prefetch: (await store.get('prefetch') ?? 'true') == 'true',
+        language: UiLanguage.values.byName(await store.get('language') ?? 'en'),
         apiBaseUrl: await store.get('api_base_url'),
       );
 
@@ -61,6 +76,8 @@ class Settings {
     await store.set('tooltip_detail', tooltipDetail.name);
     await store.set('hindi_size', hindiSize.name);
     await store.set('tts', ttsEnabled.toString());
+    await store.set('prefetch', prefetch.toString());
+    await store.set('language', language.name);
     await store.set('api_base_url', apiBaseUrl);
   }
 }

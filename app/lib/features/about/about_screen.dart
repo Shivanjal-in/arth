@@ -9,7 +9,8 @@ class AboutScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
-    final h = HindiText(ref.watch(settingsProvider).hindiScale);
+    final scale = ref.watch(settingsProvider).hindiScale;
+    final t = ref.watch(stringsProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Arth')),
       body: ListView(
@@ -17,10 +18,7 @@ class AboutScreen extends ConsumerWidget {
         children: [
           Text('अर्थ', style: EnglishText.word(c.accent, size: 40)),
           const SizedBox(height: 8),
-          Text(
-            'अंग्रेज़ी किताबें पढ़ते हुए किसी भी शब्द पर टैप करें — उसका मतलब, इसी वाक्य में, आसान हिंदी में।',
-            style: h.body(c.ink),
-          ),
+          Text(t.aboutTagline, style: uiBody(hindi: t.isHindi, color: c.ink, scale: scale)),
           const SizedBox(height: 28),
           Text('DATA SOURCES', style: EnglishText.caps(c.inkMuted)),
           const SizedBox(height: 10),

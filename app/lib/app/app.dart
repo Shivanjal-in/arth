@@ -1,6 +1,7 @@
 import 'package:arth/app/dev_hooks.dart';
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/router.dart';
+import 'package:arth/app/strings.dart';
 import 'package:arth/app/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,7 +23,13 @@ class _ArthAppState extends ConsumerState<ArthApp> {
   void initState() {
     super.initState();
     DevHooks.on('nav', (p) async {
-      router.go(p['to'] ?? '/');
+      final lang = p['lang'];
+      if (lang != null) {
+        await ref.read(settingsProvider.notifier).update(
+              (s) => s.copyWith(language: lang == 'hi' ? UiLanguage.hi : UiLanguage.en),
+            );
+      }
+      if (p['to'] != null) router.go(p['to']!);
       return {'ok': true};
     });
   }

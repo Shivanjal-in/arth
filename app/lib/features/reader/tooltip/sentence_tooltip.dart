@@ -24,6 +24,8 @@ class SentenceTooltip extends ConsumerWidget {
     final settings = ref.watch(settingsProvider);
     final h = HindiText(settings.hindiScale);
     final tts = ref.watch(ttsProvider);
+    final t = ref.watch(stringsProvider);
+    TextStyle label(Color color) => uiLabel(hindi: t.isHindi, color: color, scale: settings.hindiScale);
 
     Widget fade(Widget child, {required bool show}) => AnimatedSwitcher(
           duration: const Duration(milliseconds: 220),
@@ -35,7 +37,7 @@ class SentenceTooltip extends ConsumerWidget {
       children: [
         Row(
           children: [
-            Text('अनुवाद', style: h.label(c.accent)),
+            Text(t.translation, style: label(c.accent)),
             const Spacer(),
             if (settings.ttsEnabled && tts.hasHindi && state.hindi != null)
               IconButton(
@@ -59,7 +61,10 @@ class SentenceTooltip extends ConsumerWidget {
         ),
         const SizedBox(height: 8),
         if (state.error != null && state.hindi == null)
-          Text(state.error!, style: h.body(c.inkMuted))
+          Text(
+            state.errorCode == null ? state.error! : t.errorFor(state.errorCode!, state.error!),
+            style: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: settings.hindiScale),
+          )
         else ...[
           fade(
             Text(state.hindi ?? '', style: h.meaning(c.ink)),
@@ -71,7 +76,7 @@ class SentenceTooltip extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('भावार्थ', style: h.label(c.inkMuted)),
+                  Text(t.simpleMeaning, style: label(c.inkMuted)),
                   Text(state.simpleMeaning ?? '', style: h.body(c.ink)),
                 ],
               ),
@@ -84,7 +89,7 @@ class SentenceTooltip extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('कठिन शब्द', style: h.label(c.inkMuted)),
+                  Text(t.difficultWords, style: label(c.inkMuted)),
                   const SizedBox(height: 4),
                   Wrap(
                     spacing: 8,

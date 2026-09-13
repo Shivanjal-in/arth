@@ -20,10 +20,12 @@ Future<void> main() async {
   await pdfrxFlutterInitialize();
   final store = await LocalStore.open();
   final docsDir = (await getApplicationDocumentsDirectory()).path;
+  final deviceId = await loadDeviceId(store);
   final container = ProviderContainer(
     overrides: [
       localStoreProvider.overrideWithValue(store),
       documentsDirProvider.overrideWithValue(docsDir),
+      deviceIdProvider.overrideWithValue(deviceId),
     ],
   );
   await container.read(settingsProvider.notifier).load();

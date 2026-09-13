@@ -42,27 +42,38 @@ GoRouter buildRouter({required bool needsSeed}) => GoRouter(
       ],
     );
 
-class _Shell extends StatelessWidget {
+class _Shell extends ConsumerWidget {
   const _Shell({required this.shell});
 
   final StatefulNavigationShell shell;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
+    final t = ref.watch(stringsProvider);
     return Scaffold(
       body: shell,
       bottomNavigationBar: Container(
         decoration: BoxDecoration(border: Border(top: BorderSide(color: c.rule))),
-        child: NavigationBar(
+        child: NavigationBarTheme(
+          data: NavigationBarTheme.of(context).copyWith(
+            labelTextStyle: WidgetStateProperty.resolveWith(
+              (states) => uiLabel(
+                hindi: t.isHindi,
+                color: states.contains(WidgetState.selected) ? c.accent : c.inkMuted,
+              ),
+            ),
+          ),
+          child: NavigationBar(
           selectedIndex: shell.currentIndex,
           onDestinationSelected: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),
-          destinations: const [
-            NavigationDestination(icon: Icon(Icons.menu_book_outlined), selectedIcon: Icon(Icons.menu_book_rounded), label: 'किताबें'),
-            NavigationDestination(icon: Icon(Icons.search_rounded), label: 'शब्दकोश'),
-            NavigationDestination(icon: Icon(Icons.bookmark_border_rounded), selectedIcon: Icon(Icons.bookmark_rounded), label: 'सहेजे'),
-            NavigationDestination(icon: Icon(Icons.person_outline_rounded), selectedIcon: Icon(Icons.person_rounded), label: 'आप'),
+          destinations: [
+            NavigationDestination(icon: const Icon(Icons.menu_book_outlined), selectedIcon: const Icon(Icons.menu_book_rounded), label: t.tabLibrary),
+            NavigationDestination(icon: const Icon(Icons.search_rounded), label: t.tabDictionary),
+            NavigationDestination(icon: const Icon(Icons.bookmark_border_rounded), selectedIcon: const Icon(Icons.bookmark_rounded), label: t.tabSaved),
+            NavigationDestination(icon: const Icon(Icons.person_outline_rounded), selectedIcon: const Icon(Icons.person_rounded), label: t.tabYou),
           ],
+        ),
         ),
       ),
     );

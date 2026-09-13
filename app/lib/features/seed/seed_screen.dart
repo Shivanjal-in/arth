@@ -30,8 +30,10 @@ class _SeedScreenState extends ConsumerState<SeedScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final h = HindiText(ref.watch(settingsProvider).hindiScale);
+    final scale = ref.watch(settingsProvider).hindiScale;
+    final t = ref.watch(stringsProvider);
     final p = ref.watch(seedProvider);
+    final body = uiBody(hindi: t.isHindi, color: c.inkMuted, scale: scale);
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -42,12 +44,9 @@ class _SeedScreenState extends ConsumerState<SeedScreen> {
             children: [
               Text('अर्थ', style: EnglishText.word(c.accent, size: 44)),
               const SizedBox(height: 24),
-              Text('शब्दकोश तैयार हो रहा है', style: h.headline(c.ink)),
+              Text(t.seedTitle, style: uiHeadline(hindi: t.isHindi, color: c.ink, scale: scale)),
               const SizedBox(height: 6),
-              Text(
-                'एक बार डाउनलोड होने के बाद आम शब्द बिना इंटरनेट भी मिलेंगे।',
-                style: h.body(c.inkMuted),
-              ),
+              Text(t.seedBody, style: body),
               const SizedBox(height: 24),
               LinearProgressIndicator(
                 value: p.phase == SeedPhase.downloading ? p.fraction : (p.phase == SeedPhase.done ? 1 : 0),
@@ -58,11 +57,11 @@ class _SeedScreenState extends ConsumerState<SeedScreen> {
               const SizedBox(height: 8),
               Text(
                 p.phase == SeedPhase.failed
-                    ? (p.message ?? 'डाउनलोड नहीं हो पाया।')
+                    ? (p.message ?? t.downloadFailed)
                     : p.total == 0
-                        ? 'जुड़ रहा है…'
+                        ? t.connecting
                         : '${p.done} / ${p.total}',
-                style: h.small(p.phase == SeedPhase.failed ? c.accent : c.inkMuted),
+                style: uiBody(hindi: t.isHindi, color: p.phase == SeedPhase.failed ? c.accent : c.inkMuted, scale: scale, size: 13),
               ),
               if (p.phase == SeedPhase.failed) ...[
                 const SizedBox(height: 20),
@@ -71,12 +70,12 @@ class _SeedScreenState extends ConsumerState<SeedScreen> {
                     FilledButton(
                       style: FilledButton.styleFrom(backgroundColor: c.accent),
                       onPressed: _start,
-                      child: const Text('फिर कोशिश करें'),
+                      child: Text(t.retry),
                     ),
                     const SizedBox(width: 12),
                     TextButton(
                       onPressed: () => context.go('/'),
-                      child: Text('अभी छोड़ें', style: h.label(c.inkMuted)),
+                      child: Text(t.skipForNow, style: uiLabel(hindi: t.isHindi, color: c.inkMuted, scale: scale)),
                     ),
                   ],
                 ),

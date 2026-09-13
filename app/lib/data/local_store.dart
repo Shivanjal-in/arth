@@ -158,6 +158,15 @@ class LocalStore {
     return rows.isEmpty ? null : rows.first['freq_rank']! as int;
   }
 
+  /// freqRank of a key, following the forms table (wives → wife). Null when
+  /// the word isn't on the device at all.
+  Future<int?> rankOf(String key) async {
+    final direct = await freqRank(key);
+    if (direct != null) return direct;
+    final lemma = await formLemma(key);
+    return lemma == null ? null : freqRank(lemma);
+  }
+
   Future<String?> formLemma(String form) async {
     final rows = await _db.query(
       'forms',

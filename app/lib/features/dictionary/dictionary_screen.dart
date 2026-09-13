@@ -62,16 +62,17 @@ class _DictionaryScreenState extends ConsumerState<DictionaryScreen> {
         ref.invalidate(recentLookupsProvider);
         unawaited(context.push('/word/$lemma'));
       case LookupMissing(:final suggestions, :final offline):
-        final h = HindiText(ref.read(settingsProvider).hindiScale);
+        final t = ref.read(stringsProvider);
+        final scale = ref.read(settingsProvider).hindiScale;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               offline
-                  ? 'और अर्थ देखने के लिए इंटरनेट चाहिए'
+                  ? t.offline
                   : suggestions.isEmpty
-                      ? 'यह शब्द शब्दकोश में नहीं मिला।'
-                      : 'नहीं मिला। क्या आपका मतलब था: ${suggestions.join(', ')}',
-              style: h.small(context.colors.paper),
+                      ? t.notFound
+                      : '${t.notFound} ${t.didYouMean}: ${suggestions.join(', ')}',
+              style: uiBody(hindi: t.isHindi, color: context.colors.paper, scale: scale, size: 13.5),
             ),
           ),
         );
@@ -81,7 +82,9 @@ class _DictionaryScreenState extends ConsumerState<DictionaryScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final h = HindiText(ref.watch(settingsProvider).hindiScale);
+    final settings = ref.watch(settingsProvider);
+    final h = HindiText(settings.hindiScale);
+    final t = ref.watch(stringsProvider);
     final recent = ref.watch(recentLookupsProvider).valueOrNull ?? const [];
     final wotd = ref.watch(wordOfTheDayProvider).valueOrNull;
 
@@ -90,7 +93,7 @@ class _DictionaryScreenState extends ConsumerState<DictionaryScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
           children: [
-            Text('शब्दकोश', style: EnglishText.italic(c.inkMuted, size: 22)),
+            Text(t.dictionaryTitle, style: t.isHindi ? h.body(c.inkMuted).copyWith(fontSize: 20) : EnglishText.italic(c.inkMuted, size: 22)),
             const SizedBox(height: 14),
             TextField(
               controller: _text,
@@ -98,8 +101,8 @@ class _DictionaryScreenState extends ConsumerState<DictionaryScreen> {
               autocorrect: false,
               textInputAction: TextInputAction.search,
               decoration: InputDecoration(
-                hintText: 'कोई अंग्रेज़ी शब्द',
-                hintStyle: h.body(c.inkMuted).copyWith(fontSize: 20),
+                hintText: t.searchHint,
+                hintStyle: t.isHindi ? h.body(c.inkMuted).copyWith(fontSize: 20) : EnglishText.body(c.inkMuted, size: 20),
                 suffixIcon: _busy
                     ? const Padding(
                         padding: EdgeInsets.all(14),
@@ -124,15 +127,15 @@ class _DictionaryScreenState extends ConsumerState<DictionaryScreen> {
                 _WordRow(word: m, onTap: () => _open(m)),
             ] else if (_text.text.trim().isNotEmpty) ...[
               const SizedBox(height: 12),
-              Text('फ़ोन पर नहीं मिला — सर्च दबाकर ऑनलाइन देखें', style: h.small(c.inkMuted)),
+              Text(t.notOnDevice, style: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: settings.hindiScale, size: 13)),
             ],
             if (_text.text.isEmpty) ...[
               if (recent.isNotEmpty) ...[
-                const SectionLabel('RECENT'),
+                SectionLabel(t.recent),
                 for (final w in recent) _WordRow(word: w, onTap: () => _open(w)),
               ],
               if (wotd != null) ...[
-                const SectionLabel('WORD OF THE DAY'),
+                SectionLabel(t.wordOfTheDay),
                 InkWell(
                   onTap: () => context.push('/word/${wotd.word}'),
                   child: Column(
