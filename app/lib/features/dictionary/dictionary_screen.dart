@@ -93,8 +93,8 @@ class _DictionaryScreenState extends ConsumerState<DictionaryScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
           children: [
-            Text(t.dictionaryTitle, style: t.isHindi ? h.body(c.inkMuted).copyWith(fontSize: 20) : EnglishText.italic(c.inkMuted, size: 22)),
-            const SizedBox(height: 14),
+            Text(t.dictionaryTitle, style: uiTitle(hindi: t.isHindi, color: c.ink, scale: settings.hindiScale)),
+            const SizedBox(height: 18),
             TextField(
               controller: _text,
               style: EnglishText.word(c.ink, size: 26),
@@ -103,6 +103,9 @@ class _DictionaryScreenState extends ConsumerState<DictionaryScreen> {
               decoration: InputDecoration(
                 hintText: t.searchHint,
                 hintStyle: t.isHindi ? h.body(c.inkMuted).copyWith(fontSize: 20) : EnglishText.body(c.inkMuted, size: 20),
+                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: c.ink, width: 1.5)),
+                focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: c.accent, width: 2)),
+                prefixIcon: Icon(Icons.search_rounded, color: c.inkMuted),
                 suffixIcon: _busy
                     ? const Padding(
                         padding: EdgeInsets.all(14),
@@ -136,24 +139,36 @@ class _DictionaryScreenState extends ConsumerState<DictionaryScreen> {
               ],
               if (wotd != null) ...[
                 SectionLabel(t.wordOfTheDay),
-                InkWell(
-                  onTap: () => context.push('/word/${wotd.word}'),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(wotd.word, style: EnglishText.word(c.ink, size: 30)),
-                      const SizedBox(height: 4),
-                      Wrap(
-                        spacing: 10,
-                        crossAxisAlignment: WrapCrossAlignment.center,
+                Material(
+                  color: c.card,
+                  borderRadius: BorderRadius.circular(16),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => context.push('/word/${wotd.word}'),
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: c.rule),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (wotd.ipa.isNotEmpty) Text('/${wotd.ipa}/', style: EnglishText.ipa(c.accent)),
-                          Text(wotd.senses.first.partOfSpeech, style: h.small(c.inkMuted)),
+                          Text(wotd.word, style: EnglishText.word(c.accent, size: 32)),
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 10,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              if (wotd.ipa.isNotEmpty) Text('/${wotd.ipa}/', style: EnglishText.ipa(c.inkMuted)),
+                              Text(wotd.senses.first.partOfSpeech, style: h.small(c.inkMuted)),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          SenseList(senses: wotd.senses, max: 1),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      SenseList(senses: wotd.senses, max: 1),
-                    ],
+                    ),
                   ),
                 ),
               ],

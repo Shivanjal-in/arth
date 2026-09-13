@@ -366,7 +366,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               child: Center(
                 child: Text(
                   '$_page / ${_controller.isReady ? _controller.pageCount : '…'}',
-                  style: EnglishText.caps(c.inkMuted),
+                  style: EnglishText.label(c.inkMuted),
                 ),
               ),
             ),

@@ -51,30 +51,88 @@ class _Shell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
     final t = ref.watch(stringsProvider);
+    final scale = ref.watch(settingsProvider).hindiScale;
+    final items = [
+      (Icons.menu_book_outlined, Icons.menu_book_rounded, t.tabLibrary),
+      (Icons.search_rounded, Icons.search_rounded, t.tabDictionary),
+      (Icons.bookmark_border_rounded, Icons.bookmark_rounded, t.tabSaved),
+      (Icons.person_outline_rounded, Icons.person_rounded, t.tabYou),
+    ];
     return Scaffold(
       body: shell,
       bottomNavigationBar: Container(
-        decoration: BoxDecoration(border: Border(top: BorderSide(color: c.rule))),
-        child: NavigationBarTheme(
-          data: NavigationBarTheme.of(context).copyWith(
-            labelTextStyle: WidgetStateProperty.resolveWith(
-              (states) => uiLabel(
-                hindi: t.isHindi,
-                color: states.contains(WidgetState.selected) ? c.accent : c.inkMuted,
-              ),
+        decoration: BoxDecoration(
+          color: c.paper,
+          border: Border(top: BorderSide(color: c.rule)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 62,
+            child: Row(
+              children: [
+                for (var i = 0; i < items.length; i++)
+                  Expanded(
+                    child: _NavItem(
+                      icon: items[i].$1,
+                      selectedIcon: items[i].$2,
+                      label: items[i].$3,
+                      selected: shell.currentIndex == i,
+                      hindi: t.isHindi,
+                      scale: scale,
+                      onTap: () => shell.goBranch(i, initialLocation: i == shell.currentIndex),
+                    ),
+                  ),
+              ],
             ),
           ),
-          child: NavigationBar(
-          selectedIndex: shell.currentIndex,
-          onDestinationSelected: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),
-          destinations: [
-            NavigationDestination(icon: const Icon(Icons.menu_book_outlined), selectedIcon: const Icon(Icons.menu_book_rounded), label: t.tabLibrary),
-            NavigationDestination(icon: const Icon(Icons.search_rounded), label: t.tabDictionary),
-            NavigationDestination(icon: const Icon(Icons.bookmark_border_rounded), selectedIcon: const Icon(Icons.bookmark_rounded), label: t.tabSaved),
-            NavigationDestination(icon: const Icon(Icons.person_outline_rounded), selectedIcon: const Icon(Icons.person_rounded), label: t.tabYou),
-          ],
         ),
-        ),
+      ),
+    );
+  }
+}
+
+/// Icon + label; the selected tab carries a short lac-red underline — the
+/// one mark the reference design used for "you are here".
+class _NavItem extends StatelessWidget {
+  const _NavItem({
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+    required this.selected,
+    required this.hindi,
+    required this.scale,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+  final bool selected;
+  final bool hindi;
+  final double scale;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final color = selected ? c.accent : c.inkMuted;
+    return InkWell(
+      onTap: onTap,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(selected ? selectedIcon : icon, size: 22, color: color),
+          const SizedBox(height: 3),
+          Text(label, style: uiLabel(hindi: hindi, color: color, scale: scale).copyWith(fontSize: hindi ? null : 12)),
+          const SizedBox(height: 4),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: selected ? 22 : 0,
+            height: 2,
+            decoration: BoxDecoration(color: c.accent, borderRadius: BorderRadius.circular(1)),
+          ),
+        ],
       ),
     );
   }

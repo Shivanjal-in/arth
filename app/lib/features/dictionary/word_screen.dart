@@ -26,7 +26,7 @@ class WordScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back_rounded), onPressed: () => context.pop()),
-        title: Text(t.back, style: uiLabel(hindi: t.isHindi, color: c.ink, scale: scale)),
+        title: Text(t.back, style: uiLabel(hindi: t.isHindi, color: c.inkMuted, scale: scale)),
         titleSpacing: 0,
       ),
       body: outcome.when(

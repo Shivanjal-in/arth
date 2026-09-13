@@ -15,7 +15,10 @@ class SavedScreen extends ConsumerWidget {
     final t = ref.watch(stringsProvider);
     final saved = ref.watch(savedWordsProvider);
     return Scaffold(
-      appBar: AppBar(title: Text(t.savedTitle)),
+      appBar: AppBar(
+        title: Text(t.savedTitle, style: uiTitle(hindi: t.isHindi, color: c.ink, scale: scale).copyWith(fontSize: 26)),
+        toolbarHeight: 64,
+      ),
       body: saved.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, _) => Center(child: Text(t.somethingWrong, style: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: scale))),
@@ -33,7 +36,7 @@ class SavedScreen extends ConsumerWidget {
             : ListView.separated(
                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 40),
                 itemCount: list.length,
-                separatorBuilder: (_, _) => const Divider(),
+                separatorBuilder: (_, _) => Divider(color: c.rule),
                 itemBuilder: (_, i) {
                   final w = list[i];
                   return Dismissible(
@@ -64,7 +67,10 @@ class SavedScreen extends ConsumerWidget {
                               ),
                             ),
                           if (w.bookTitle != null)
-                            Text(w.bookTitle!, style: EnglishText.caps(c.inkMuted, size: 10)),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(w.bookTitle!, style: EnglishText.label(c.inkMuted, size: 12)),
+                            ),
                         ],
                       ),
                       onTap: () => context.push('/word/${w.lemma}'),

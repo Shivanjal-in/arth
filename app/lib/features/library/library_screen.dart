@@ -52,7 +52,10 @@ class LibraryScreen extends ConsumerWidget {
     final books = ref.watch(libraryProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(t.tabLibrary)),
+      appBar: AppBar(
+        title: Text(t.tabLibrary, style: uiTitle(hindi: t.isHindi, color: c.ink, scale: s.hindiScale).copyWith(fontSize: 26)),
+        toolbarHeight: 64,
+      ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: c.accent,
         foregroundColor: c.paper,
@@ -67,7 +70,7 @@ class LibraryScreen extends ConsumerWidget {
             : ListView.separated(
                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 96),
                 itemCount: list.length,
-                separatorBuilder: (_, _) => const Divider(),
+                separatorBuilder: (_, _) => Divider(color: c.rule),
                 itemBuilder: (_, i) => _BookTile(book: list[i]),
               ),
       ),
@@ -90,7 +93,7 @@ class _Empty extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.menu_book_rounded, size: 48, color: c.rule),
+            Text('अ', style: const HindiText(1).headline(c.rule).copyWith(fontSize: 72, height: 1)),
             const SizedBox(height: 16),
             Text(t.libraryEmptyTitle, style: uiHeadline(hindi: t.isHindi, color: c.ink, scale: scale), textAlign: TextAlign.center),
             const SizedBox(height: 6),
@@ -119,53 +122,112 @@ class _BookTile extends ConsumerWidget {
     final small = uiBody(hindi: t.isHindi, color: c.inkMuted, scale: scale, size: 13);
     final pages = book.pageCount;
     final progress = pages == null || pages == 0 ? null : book.lastPage / pages;
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(vertical: 8),
-      title: Text(book.title, style: EnglishText.word(c.ink, size: 20)),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(top: 6),
+    return InkWell(
+      onTap: () => context.push('/read/${book.id}'),
+      onLongPress: () => _confirmRemove(context, ref, t, scale),
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
           children: [
-            if (progress != null) ...[
-              SizedBox(
-                width: 80,
-                child: LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 3,
-                  color: c.accent,
-                  backgroundColor: c.rule,
-                ),
+            _Cover(title: book.title),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    book.title,
+                    style: EnglishText.word(c.ink, size: 19),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  if (progress != null) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(2),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 3,
+                        color: c.marigold,
+                        backgroundColor: c.rule,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(t.page(book.lastPage, pages!), style: small),
+                  ] else
+                    Text(t.notStarted, style: small),
+                ],
               ),
-              const SizedBox(width: 10),
-              Text(t.page(book.lastPage, pages!), style: small),
-            ] else
-              Text(t.notStarted, style: small),
+            ),
+            const SizedBox(width: 8),
+            Icon(Icons.chevron_right_rounded, color: c.rule),
           ],
         ),
       ),
-      trailing: Icon(Icons.chevron_right_rounded, color: c.inkMuted),
-      onTap: () => context.push('/read/${book.id}'),
-      onLongPress: () async {
-        final ok = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(t.removeBook, style: uiHeadline(hindi: t.isHindi, color: c.ink, scale: scale)),
-            content: Text(book.title, style: EnglishText.body(c.ink)),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.no)),
-              TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.remove)),
-            ],
+    );
+  }
+
+  Future<void> _confirmRemove(BuildContext context, WidgetRef ref, AppStrings t, double scale) async {
+    final c = context.colors;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: c.card,
+        title: Text(t.removeBook, style: uiHeading(hindi: t.isHindi, color: c.ink, scale: scale)),
+        content: Text(book.title, style: EnglishText.body(c.ink)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.no)),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.remove)),
+        ],
+      ),
+    );
+    if (ok ?? false) {
+      await ref.read(libraryProvider.notifier).remove(book.id);
+      try {
+        await File(p.join(ref.read(documentsDirProvider), book.path)).delete();
+      } on FileSystemException {
+        // already gone
+      }
+    }
+  }
+}
+
+/// A book has no cover of its own (it's a PDF), so it gets a spine-coloured
+/// one: an ink picked from the title, the first letter set large.
+class _Cover extends StatelessWidget {
+  const _Cover({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final ink = kCoverInks[title.hashCode.abs() % kCoverInks.length];
+    final initial = title.trim().isEmpty ? '?' : title.trim()[0].toUpperCase();
+    return Container(
+      width: 54,
+      height: 74,
+      decoration: BoxDecoration(
+        color: ink,
+        borderRadius: const BorderRadius.horizontal(left: Radius.circular(3), right: Radius.circular(8)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 6, offset: const Offset(2, 3))],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            child: Container(width: 6, color: Colors.black.withValues(alpha: 0.22)),
           ),
-        );
-        if (ok ?? false) {
-          await ref.read(libraryProvider.notifier).remove(book.id);
-          try {
-            await File(p.join(ref.read(documentsDirProvider), book.path)).delete();
-          } on FileSystemException {
-            // already gone
-          }
-        }
-      },
+          Center(
+            child: Text(
+              initial,
+              style: EnglishText.word(Colors.white.withValues(alpha: 0.92), size: 28),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

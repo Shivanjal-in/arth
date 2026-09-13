@@ -5,6 +5,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+/// Palette: a corrected schoolbook. Indigo ink for text, lac red (रोली) for
+/// the app's own voice, marigold for what's being pointed at, on warm paper;
+/// at night the page itself turns indigo.
 class ArthColors extends ThemeExtension<ArthColors> {
   const ArthColors({
     required this.paper,
@@ -12,38 +15,52 @@ class ArthColors extends ThemeExtension<ArthColors> {
     required this.ink,
     required this.inkMuted,
     required this.accent,
+    required this.marigold,
     required this.rule,
     required this.highlight,
+    required this.onAccent,
   });
 
   final Color paper;
   final Color card;
   final Color ink;
   final Color inkMuted;
+
+  /// Lac red: selection, primary actions, the tab you're on.
   final Color accent;
+
+  /// Marigold: the tapped word, progress, "on" states.
+  final Color marigold;
   final Color rule;
 
   /// Word highlight under the tooltip.
   final Color highlight;
 
+  /// Text on an accent-filled surface.
+  final Color onAccent;
+
   static const light = ArthColors(
-    paper: Color(0xFFF5F0E8),
-    card: Color(0xFFFCFAF6),
-    ink: Color(0xFF1F1B17),
-    inkMuted: Color(0xFF7C746A),
-    accent: Color(0xFF9B3A31),
-    rule: Color(0xFFDDD5C8),
-    highlight: Color(0x339B3A31),
+    paper: Color(0xFFF4EEE3),
+    card: Color(0xFFFCF9F2),
+    ink: Color(0xFF1B2233),
+    inkMuted: Color(0xFF6B7180),
+    accent: Color(0xFFA3271F),
+    marigold: Color(0xFFE39A2E),
+    rule: Color(0xFFDCD2C1),
+    highlight: Color(0x66E39A2E),
+    onAccent: Color(0xFFFBF6EC),
   );
 
   static const dark = ArthColors(
-    paper: Color(0xFF17140F),
-    card: Color(0xFF221D17),
-    ink: Color(0xFFECE5D8),
-    inkMuted: Color(0xFF9A9187),
-    accent: Color(0xFFD26A5E),
-    rule: Color(0xFF332C24),
-    highlight: Color(0x40D26A5E),
+    paper: Color(0xFF151A27),
+    card: Color(0xFF1E2536),
+    ink: Color(0xFFEDE6D6),
+    inkMuted: Color(0xFF9AA0AE),
+    accent: Color(0xFFE2705F),
+    marigold: Color(0xFFF0B348),
+    rule: Color(0xFF2E3648),
+    highlight: Color(0x59F0B348),
+    onAccent: Color(0xFF151A27),
   );
 
   @override
@@ -53,8 +70,10 @@ class ArthColors extends ThemeExtension<ArthColors> {
     Color? ink,
     Color? inkMuted,
     Color? accent,
+    Color? marigold,
     Color? rule,
     Color? highlight,
+    Color? onAccent,
   }) =>
       ArthColors(
         paper: paper ?? this.paper,
@@ -62,8 +81,10 @@ class ArthColors extends ThemeExtension<ArthColors> {
         ink: ink ?? this.ink,
         inkMuted: inkMuted ?? this.inkMuted,
         accent: accent ?? this.accent,
+        marigold: marigold ?? this.marigold,
         rule: rule ?? this.rule,
         highlight: highlight ?? this.highlight,
+        onAccent: onAccent ?? this.onAccent,
       );
 
   @override
@@ -75,8 +96,10 @@ class ArthColors extends ThemeExtension<ArthColors> {
       ink: Color.lerp(ink, other.ink, t)!,
       inkMuted: Color.lerp(inkMuted, other.inkMuted, t)!,
       accent: Color.lerp(accent, other.accent, t)!,
+      marigold: Color.lerp(marigold, other.marigold, t)!,
       rule: Color.lerp(rule, other.rule, t)!,
       highlight: Color.lerp(highlight, other.highlight, t)!,
+      onAccent: Color.lerp(onAccent, other.onAccent, t)!,
     );
   }
 }
@@ -134,13 +157,33 @@ class EnglishText {
         height: 1.45,
       );
 
-  /// Small tracked caps: section labels, tab labels, IPA.
-  static TextStyle caps(Color color, {double size = 11}) => GoogleFonts.literata(
+  /// Small labels: sentence case, a touch of tracking, never all-caps.
+  static TextStyle label(Color color, {double size = 13}) => GoogleFonts.literata(
         fontSize: size,
         fontWeight: FontWeight.w600,
-        letterSpacing: 1.6,
+        letterSpacing: 0.2,
         color: color,
+        height: 1.3,
       );
+
+  /// Section headings and screen titles.
+  static TextStyle heading(Color color, {double size = 20}) => GoogleFonts.literata(
+        fontSize: size,
+        fontWeight: FontWeight.w600,
+        color: color,
+        height: 1.2,
+      );
+
+  /// Screen titles: the biggest serif on the page.
+  static TextStyle title(Color color, {double size = 32}) => GoogleFonts.literata(
+        fontSize: size,
+        fontWeight: FontWeight.w500,
+        color: color,
+        height: 1.1,
+      );
+
+  /// Kept for the IPA line and page counters.
+  static TextStyle caps(Color color, {double size = 11}) => label(color, size: size);
 
   static TextStyle ipa(Color color) => GoogleFonts.notoSans(
         fontSize: 14,
@@ -175,7 +218,24 @@ ThemeData arthTheme(Brightness brightness) {
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
-      titleTextStyle: EnglishText.word(c.ink, size: 20),
+      titleTextStyle: EnglishText.heading(c.ink, size: 22),
+    ),
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith(
+        (s) => s.contains(WidgetState.selected) ? c.onAccent : c.card,
+      ),
+      trackColor: WidgetStateProperty.resolveWith(
+        (s) => s.contains(WidgetState.selected) ? c.accent : c.rule,
+      ),
+      trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: c.accent,
+        foregroundColor: c.onAccent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      ),
     ),
     dividerTheme: DividerThemeData(color: c.rule, thickness: 1, space: 1),
     bottomSheetTheme: BottomSheetThemeData(
@@ -219,9 +279,17 @@ extension ArthThemeContext on BuildContext {
   ArthColors get colors => Theme.of(this).extension<ArthColors>()!;
 }
 
-/// Section/tab label style: tracked serif caps in English, Mukta in Hindi.
+/// Small label style: sentence-case serif in English, Mukta in Hindi.
 TextStyle uiLabel({required bool hindi, required Color color, double scale = 1}) =>
-    hindi ? HindiText(scale).label(color) : EnglishText.caps(color);
+    hindi ? HindiText(scale).label(color) : EnglishText.label(color);
+
+/// Section heading in the interface language.
+TextStyle uiHeading({required bool hindi, required Color color, double scale = 1}) =>
+    hindi ? HindiText(scale).headline(color) : EnglishText.heading(color);
+
+/// Screen title in the interface language.
+TextStyle uiTitle({required bool hindi, required Color color, double scale = 1}) =>
+    hindi ? HindiText(scale).headline(color).copyWith(fontSize: 30 * scale) : EnglishText.title(color);
 
 /// Body-ish UI copy (empty states, helper text) in the interface language.
 TextStyle uiBody({required bool hindi, required Color color, double scale = 1, double size = 15.5}) =>
@@ -229,3 +297,12 @@ TextStyle uiBody({required bool hindi, required Color color, double scale = 1, d
 
 TextStyle uiHeadline({required bool hindi, required Color color, double scale = 1}) =>
     hindi ? HindiText(scale).headline(color) : EnglishText.word(color);
+
+/// Five muted inks for generated book covers, picked by title hash.
+const List<Color> kCoverInks = [
+  Color(0xFF2F4858),
+  Color(0xFF7A3E2C),
+  Color(0xFF3F5D3A),
+  Color(0xFF5B4A7A),
+  Color(0xFF8A6A1F),
+];

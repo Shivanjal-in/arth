@@ -42,7 +42,7 @@ class _SeedScreenState extends ConsumerState<SeedScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('अर्थ', style: EnglishText.word(c.accent, size: 44)),
+              Text('अ', style: const HindiText(1).headline(c.accent).copyWith(fontSize: 72, height: 1)),
               const SizedBox(height: 24),
               Text(t.seedTitle, style: uiHeadline(hindi: t.isHindi, color: c.ink, scale: scale)),
               const SizedBox(height: 6),
@@ -50,9 +50,10 @@ class _SeedScreenState extends ConsumerState<SeedScreen> {
               const SizedBox(height: 24),
               LinearProgressIndicator(
                 value: p.phase == SeedPhase.downloading ? p.fraction : (p.phase == SeedPhase.done ? 1 : 0),
-                color: c.accent,
+                color: c.marigold,
                 backgroundColor: c.rule,
-                minHeight: 4,
+                minHeight: 5,
+                borderRadius: BorderRadius.circular(3),
               ),
               const SizedBox(height: 8),
               Text(

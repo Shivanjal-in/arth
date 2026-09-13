@@ -22,7 +22,7 @@ enum AppStrings {
   String get tabDictionary => _('Dictionary', 'शब्दकोश');
   String get tabSaved => _('Saved', 'सहेजे');
   String get tabYou => _('You', 'आप');
-  String get back => _('BACK', 'पीछे');
+  String get back => _('Back', 'पीछे');
   String get about => _('About Arth', 'Arth के बारे में');
 
   // ---- library ----
@@ -70,8 +70,8 @@ enum AppStrings {
   // ---- dictionary ----
   String get dictionaryTitle => _('Dictionary', 'शब्दकोश');
   String get searchHint => _('Any English word', 'कोई अंग्रेज़ी शब्द');
-  String get recent => _('RECENT', 'हाल के');
-  String get wordOfTheDay => _('WORD OF THE DAY', 'आज का शब्द');
+  String get recent => _('Recent', 'हाल के');
+  String get wordOfTheDay => _('Word of the day', 'आज का शब्द');
   String get notOnDevice => _(
         'Not on this phone — press search to look it up online',
         'फ़ोन पर नहीं मिला — सर्च दबाकर ऑनलाइन देखें',
@@ -91,10 +91,18 @@ enum AppStrings {
   String get sectionServer => _('Server', 'सर्वर');
   String get sectionInfo => _('Info', 'जानकारी');
   String get language => _('Interface language', 'इंटरफ़ेस की भाषा');
-  String get theme => _('Colours', 'रंग');
-  String get themePaper => _('Paper', 'कागज़');
-  String get themeNight => _('Night', 'रात');
+  String get theme => _('Appearance', 'रूप');
+  String get themePaper => _('Light', 'हल्का');
+  String get themeNight => _('Dark', 'गहरा');
   String get themeSystem => _('Phone', 'फ़ोन');
+  String get languageSampleEn => 'Library, Dictionary, Saved';
+  String get languageSampleHi => 'किताबें, शब्दकोश, सहेजे';
+  String get hindiSizeSample => 'मतलब, आशय — जैसे इस वाक्य में';
+  String get settingsIntro => _(
+        'How Arth reads with you.',
+        'Arth आपके साथ कैसे पढ़े।',
+      );
+  String get serverTitle => _('API server', 'API सर्वर');
   String get tooltipDetail => _('Tooltip', 'टूलटिप');
   String get tooltipCompact => _('Compact', 'छोटा');
   String get tooltipDetailed => _('Detailed', 'विस्तार से');
@@ -106,9 +114,19 @@ enum AppStrings {
         'अगले पन्ने के कठिन शब्द पहले से तैयार रखता है। डेटा खर्च होता है।',
       );
   String wordsOnDevice(int n) => _(
-        '$n words are stored on this phone — they work offline.',
-        'फ़ोन पर $n शब्द सहेजे हैं — बिना इंटरनेट भी काम करते हैं।',
+        '${_group(n)} words on this phone, ready offline.',
+        'फ़ोन पर ${_group(n)} शब्द, बिना इंटरनेट भी तैयार।',
       );
+
+  static String _group(int n) {
+    final s = n.toString();
+    final b = StringBuffer();
+    for (var i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) b.write(',');
+      b.write(s[i]);
+    }
+    return b.toString();
+  }
   String get updateDictionary => _('Update dictionary', 'शब्दकोश अपडेट करें');
   String get serverHelp => _(
         'Leave empty to use the build default',

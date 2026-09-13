@@ -32,12 +32,15 @@ class TooltipCard extends StatelessWidget {
           color: c.card,
           elevation: 10,
           shadowColor: Colors.black.withValues(alpha: 0.35),
-          borderRadius: BorderRadius.circular(14),
           clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: c.rule),
+          ),
           child: ConstrainedBox(
             constraints: BoxConstraints(maxHeight: maxHeight - 9, maxWidth: width),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 12, 14),
+              padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
               child: DefaultTextHeightBehavior(
                 // Keep ascenders/descenders of the first and last Hindi lines.
                 textHeightBehavior: const TextHeightBehavior(

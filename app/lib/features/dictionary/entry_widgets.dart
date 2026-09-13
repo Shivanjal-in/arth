@@ -157,9 +157,9 @@ class InContextBlock extends ConsumerWidget {
       margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
       decoration: BoxDecoration(
-        color: c.accent.withValues(alpha: 0.07),
+        color: c.marigold.withValues(alpha: 0.13),
         borderRadius: BorderRadius.circular(10),
-        border: Border(left: BorderSide(color: c.accent, width: 3)),
+        border: Border(left: BorderSide(color: c.marigold, width: 3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -217,7 +217,7 @@ class SenseList extends ConsumerWidget {
               children: [
                 Text(
                   '${s.index + 1}',
-                  style: EnglishText.caps(c.accent, size: 12),
+                  style: EnglishText.label(c.accent, size: 12.5),
                 ),
                 const SizedBox(width: 10),
                 Expanded(

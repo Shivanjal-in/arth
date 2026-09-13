@@ -29,6 +29,12 @@ class _ArthAppState extends ConsumerState<ArthApp> {
               (s) => s.copyWith(language: lang == 'hi' ? UiLanguage.hi : UiLanguage.en),
             );
       }
+      final theme = p['theme'];
+      if (theme != null) {
+        await ref.read(settingsProvider.notifier).update(
+              (s) => s.copyWith(themeMode: ThemeMode.values.byName(theme)),
+            );
+      }
       if (p['to'] != null) router.go(p['to']!);
       return {'ok': true};
     });

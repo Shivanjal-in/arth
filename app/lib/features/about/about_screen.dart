@@ -16,11 +16,11 @@ class AboutScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
         children: [
-          Text('अर्थ', style: EnglishText.word(c.accent, size: 40)),
+          Text('अर्थ', style: const HindiText(1).headline(c.accent).copyWith(fontSize: 48, height: 1.1)),
           const SizedBox(height: 8),
           Text(t.aboutTagline, style: uiBody(hindi: t.isHindi, color: c.ink, scale: scale)),
           const SizedBox(height: 28),
-          Text('DATA SOURCES', style: EnglishText.caps(c.inkMuted)),
+          Text('Data sources', style: EnglishText.heading(c.ink, size: 18)),
           const SizedBox(height: 10),
           Text(
             'Dictionary senses, pronunciations, inflected forms and phrases are derived from '
