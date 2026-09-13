@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://arth.app/contracts/api-error.json",
+  "title": "ApiError",
+  "description": "The `error` object in `{ ok: false, error }`. `message` is user-facing Hindi; `code` is for the client.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["code", "message"],
+  "properties": {
+    "code": {
+      "type": "string",
+      "enum": ["NOT_FOUND", "BAD_REQUEST", "RATE_LIMITED", "UPSTREAM_FAILED", "INTERNAL"]
+    },
+    "message": { "type": "string", "description": "Hindi, shown to the user as-is." },
+    "suggestions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Only on NOT_FOUND from /lookup. The server always sends []; the app fills it from its local index by Levenshtein."
+    }
+  }
+}

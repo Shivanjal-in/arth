@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://arth.app/contracts/phrase-match.json",
+  "title": "PhraseMatch",
+  "description": "Result of POST /phrases/match when a multi-word phrase covers the tapped token.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["phrase", "lemma"],
+  "properties": {
+    "phrase": { "type": "string", "description": "The matched phrase as it appears in `phrases._id`." },
+    "lemma": { "type": "string", "description": "Key into `entries`." }
+  }
+}

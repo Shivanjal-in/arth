@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://arth.app/contracts/dictionary-entry.json",
+  "title": "DictionaryEntry",
+  "description": "One headword (or phrase) with its Hindi layer. Stored in Mongo `entries` with `_id = word`, and in the on-device SQLite as a JSON column.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["word", "ipa", "hindiPronunciation", "senses", "synonyms", "antonyms", "forms", "isPhrase"],
+  "properties": {
+    "word": { "type": "string", "minLength": 1, "description": "Lemma, lowercase. For phrases, the space-joined normalized tokens." },
+    "ipa": { "type": "string", "description": "IPA transcription without surrounding slashes. Empty string when unknown." },
+    "hindiPronunciation": { "type": "string", "description": "Devanagari transliteration of the English pronunciation, e.g. फ़ॉर्चून." },
+    "senses": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/Sense" } },
+    "synonyms": { "type": "array", "items": { "$ref": "#/definitions/BilingualPair" } },
+    "antonyms": { "type": "array", "items": { "$ref": "#/definitions/BilingualPair" } },
+    "forms": { "type": "array", "items": { "$ref": "#/definitions/Form" } },
+    "isPhrase": { "type": "boolean" }
+  },
+  "definitions": {
+    "Sense": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index", "partOfSpeech", "meaning", "definition", "examples"],
+      "properties": {
+        "index": { "type": "integer", "minimum": 0, "description": "Stable position in `senses`; the context resolver returns this." },
+        "partOfSpeech": { "type": "string", "description": "Hindi: संज्ञा | क्रिया | विशेषण | क्रियाविशेषण | सर्वनाम | पूर्वसर्ग | समुच्चयबोधक | विस्मयादिबोधक | मुहावरा" },
+        "meaning": { "type": "string", "minLength": 1, "description": "Hindi, short. The tooltip headline." },
+        "definition": { "type": "string", "minLength": 1, "description": "Hindi, one plain sentence." },
+        "examples": { "type": "array", "items": { "$ref": "#/definitions/BilingualPair" } }
+      }
+    },
+    "BilingualPair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["en", "hi"],
+      "properties": {
+        "en": { "type": "string" },
+        "hi": { "type": "string" }
+      }
+    },
+    "Form": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["en", "label", "hi"],
+      "properties": {
+        "en": { "type": "string", "minLength": 1, "description": "The inflected form, lowercase." },
+        "label": { "type": "string", "description": "Hindi label: बहुवचन | भूतकाल | वर्तमान (वह) | क्रिया-रूप | तुलनात्मक | उत्तमता | अमेरिकी वर्तनी ..." },
+        "hi": { "type": "string" }
+      }
+    }
+  }
+}

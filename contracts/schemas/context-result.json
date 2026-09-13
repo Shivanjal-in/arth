@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://arth.app/contracts/context-result.json",
+  "title": "ContextResult",
+  "description": "Which sense of a word applies in one sentence. Also the exact Structured Outputs schema for the live /context model call.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["senseIndex", "meaning", "note"],
+  "properties": {
+    "senseIndex": { "type": "integer", "minimum": 0, "description": "Index into DictionaryEntry.senses. Out-of-range values are clamped to 0 by the API and logged." },
+    "meaning": { "type": "string", "minLength": 1, "description": "Hindi meaning as used in this sentence. Usually the chosen sense's `meaning`, occasionally tightened." },
+    "note": { "type": "string", "description": "Hindi, at most two lines: why this sense, and what the word is NOT here when that is the likely confusion." }
+  }
+}

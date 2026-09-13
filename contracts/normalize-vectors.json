@@ -1,0 +1,329 @@
+{
+  "version": 1,
+  "vectors": [
+    {
+      "id": "s1-soft-hyphen",
+      "kind": "sentence",
+      "input": "ac­knowledge",
+      "expected": "acknowledge"
+    },
+    {
+      "id": "s1-zwsp-bom",
+      "kind": "sentence",
+      "input": "﻿It is​ a truth",
+      "expected": "It is a truth"
+    },
+    {
+      "id": "s1-keep-zwnj-devanagari",
+      "kind": "sentence",
+      "input": "क‍ष",
+      "expected": "क‍ष"
+    },
+    {
+      "id": "s2-fi",
+      "kind": "sentence",
+      "input": "a ﬁne ﬂat",
+      "expected": "a fine flat"
+    },
+    {
+      "id": "s2-ff-ffi-ffl",
+      "kind": "sentence",
+      "input": "oﬀer eﬃcient aﬄuent",
+      "expected": "offer efficient affluent"
+    },
+    {
+      "id": "s2-st",
+      "kind": "sentence",
+      "input": "ﬅart ﬆill",
+      "expected": "start still"
+    },
+    {
+      "id": "s3-single",
+      "kind": "sentence",
+      "input": "‘Tis Mr. Darcy’s",
+      "expected": "'Tis Mr. Darcy's"
+    },
+    {
+      "id": "s3-double",
+      "kind": "sentence",
+      "input": "“My dear,” said he",
+      "expected": "\"My dear,\" said he"
+    },
+    {
+      "id": "s3-low-and-primes",
+      "kind": "sentence",
+      "input": "„hallo‟ ′x″",
+      "expected": "\"hallo\" 'x\""
+    },
+    {
+      "id": "s3-modifier-apostrophe",
+      "kind": "sentence",
+      "input": "Bennetʼs",
+      "expected": "Bennet's"
+    },
+    {
+      "id": "s3-guillemets-kept",
+      "kind": "sentence",
+      "input": "«Fitful»",
+      "expected": "«Fitful»"
+    },
+    {
+      "id": "s4-hyphen-variants",
+      "kind": "sentence",
+      "input": "well‐known non‑stop 3−2",
+      "expected": "well-known non-stop 3-2"
+    },
+    {
+      "id": "s4-en-em-to-em",
+      "kind": "sentence",
+      "input": "left–quickly, left—quickly, left―quickly",
+      "expected": "left—quickly, left—quickly, left—quickly"
+    },
+    {
+      "id": "s4-spaced-en-dash",
+      "kind": "sentence",
+      "input": "he went – alone",
+      "expected": "he went — alone"
+    },
+    {
+      "id": "s4-two-em",
+      "kind": "sentence",
+      "input": "wait⸺oh",
+      "expected": "wait—oh"
+    },
+    {
+      "id": "s4-fullwidth-hyphen",
+      "kind": "sentence",
+      "input": "up－to﹣date",
+      "expected": "up-to-date"
+    },
+    {
+      "id": "s5-basic",
+      "kind": "sentence",
+      "input": "inter-\nesting",
+      "expected": "interesting"
+    },
+    {
+      "id": "s5-crlf",
+      "kind": "sentence",
+      "input": "inter-\r\nesting",
+      "expected": "interesting"
+    },
+    {
+      "id": "s5-cr-only",
+      "kind": "sentence",
+      "input": "inter-\resting",
+      "expected": "interesting"
+    },
+    {
+      "id": "s5-trailing-spaces",
+      "kind": "sentence",
+      "input": "inter-  \n   esting",
+      "expected": "interesting"
+    },
+    {
+      "id": "s5-page-break",
+      "kind": "sentence",
+      "input": "for-\ftune",
+      "expected": "fortune"
+    },
+    {
+      "id": "s5-unicode-hyphen-then-break",
+      "kind": "sentence",
+      "input": "inter‐\nesting",
+      "expected": "interesting"
+    },
+    {
+      "id": "s5-no-join-digits",
+      "kind": "sentence",
+      "input": "2-\n3",
+      "expected": "2- 3"
+    },
+    {
+      "id": "s5-no-join-em-dash",
+      "kind": "sentence",
+      "input": "wait—\nno",
+      "expected": "wait— no"
+    },
+    {
+      "id": "s5-no-join-space-before-hyphen",
+      "kind": "sentence",
+      "input": "a -\nb",
+      "expected": "a - b"
+    },
+    {
+      "id": "s5-known-limitation-compound",
+      "kind": "sentence",
+      "input": "well-\nknown",
+      "expected": "wellknown"
+    },
+    {
+      "id": "s5-accented-letters",
+      "kind": "sentence",
+      "input": "café-\nélite",
+      "expected": "caféélite"
+    },
+    {
+      "id": "s5-multiple",
+      "kind": "sentence",
+      "input": "un-\nbe-\nlievable",
+      "expected": "unbelievable"
+    },
+    {
+      "id": "s6-collapse",
+      "kind": "sentence",
+      "input": "  It   is\ta\n\ntruth  ",
+      "expected": "It is a truth"
+    },
+    {
+      "id": "s6-nbsp-and-thin",
+      "kind": "sentence",
+      "input": "Mr. Darcy was　here",
+      "expected": "Mr. Darcy was here"
+    },
+    {
+      "id": "s6-page-boundary-stitch",
+      "kind": "sentence",
+      "input": "must be in want\fof a wife.",
+      "expected": "must be in want of a wife."
+    },
+    {
+      "id": "s6-page-boundary-after-period",
+      "kind": "sentence",
+      "input": "of a wife.\fHowever little known",
+      "expected": "of a wife. However little known"
+    },
+    {
+      "id": "s6-line-sep",
+      "kind": "sentence",
+      "input": "a b cd",
+      "expected": "a b c d"
+    },
+    {
+      "id": "s6-case-preserved",
+      "kind": "sentence",
+      "input": "It Is A Truth",
+      "expected": "It Is A Truth"
+    },
+    {
+      "id": "s6-empty",
+      "kind": "sentence",
+      "input": "  \n\t ",
+      "expected": ""
+    },
+    {
+      "id": "s6-pp-opening",
+      "kind": "sentence",
+      "input": "It is a truth universally acknowledged, that a single man in pos-\nsession of a good fortune, must be in want of a wife.",
+      "expected": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife."
+    },
+    {
+      "id": "w-lower",
+      "kind": "word",
+      "input": "Fortune",
+      "expected": "fortune"
+    },
+    {
+      "id": "w-edge-punct",
+      "kind": "word",
+      "input": "“Fortune,”",
+      "expected": "fortune"
+    },
+    {
+      "id": "w-possessive-kept",
+      "kind": "word",
+      "input": "Darcy’s",
+      "expected": "darcy's"
+    },
+    {
+      "id": "w-internal-apostrophe",
+      "kind": "word",
+      "input": "Don’t",
+      "expected": "don't"
+    },
+    {
+      "id": "w-internal-hyphen",
+      "kind": "word",
+      "input": "Well‐Known",
+      "expected": "well-known"
+    },
+    {
+      "id": "w-leading-apostrophe",
+      "kind": "word",
+      "input": "’tis",
+      "expected": "tis"
+    },
+    {
+      "id": "w-ellipsis-and-paren",
+      "kind": "word",
+      "input": "(fortune...)",
+      "expected": "fortune"
+    },
+    {
+      "id": "w-ligature",
+      "kind": "word",
+      "input": "ﬁtful",
+      "expected": "fitful"
+    },
+    {
+      "id": "w-whitespace",
+      "kind": "word",
+      "input": "  fortune \n",
+      "expected": "fortune"
+    },
+    {
+      "id": "w-accented",
+      "kind": "word",
+      "input": "CafÉ",
+      "expected": "café"
+    },
+    {
+      "id": "w-digits-kept",
+      "kind": "word",
+      "input": "1990s.",
+      "expected": "1990s"
+    },
+    {
+      "id": "w-only-punct",
+      "kind": "word",
+      "input": "—",
+      "expected": ""
+    },
+    {
+      "id": "w-hyphen-break",
+      "kind": "word",
+      "input": "for-\ntune",
+      "expected": "fortune"
+    },
+    {
+      "id": "key-ctx-single",
+      "kind": "key",
+      "keyKind": "context",
+      "word": "“Single”",
+      "sentence": "It is a truth universally acknowledged, that a single man in pos-\nsession of a good fortune,   must be in want of a wife.",
+      "expected": "9e36bca324d9429a4a7ac204c0de86318b3797d35a8993589c01ab15fe6e4aa9"
+    },
+    {
+      "id": "key-ctx-devanagari-passthrough",
+      "kind": "key",
+      "keyKind": "context",
+      "word": "wife",
+      "sentence": "“wife” — पत्नी",
+      "expected": "c0fb02e323ae867888d092e43f1f991aae92fa979e08cd55937e5930bbbfd822"
+    },
+    {
+      "id": "key-sentence-pp",
+      "kind": "key",
+      "keyKind": "sentence",
+      "text": "  It is a truth universally acknowledged, that a single man in possession\fof a good fortune, must be in want of a wife.\n",
+      "expected": "08c12090188a4908b296dcd0d54cf3d4f1b32fed4007a8b0e3d477fe5948611c"
+    },
+    {
+      "id": "key-sentence-case-matters",
+      "kind": "key",
+      "keyKind": "sentence",
+      "text": "It Is A Truth",
+      "expected": "103b6305fdcc25a0ed0c8d20c7eb1570a6abf9ac0c6a229081f42c564ffc4e53"
+    }
+  ]
+}
