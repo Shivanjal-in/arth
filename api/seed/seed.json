@@ -1,0 +1,699 @@
+{
+  "_comment": "Hand-written Phase 1 seed. Mostly the opening of Pride and Prejudice. Register target: a Class 10 student reads it and gets it at once. Replaced by the pipeline output in Phase 2.",
+  "entries": [
+    {
+      "word": "fortune",
+      "freqRank": 1840,
+      "ipa": "ˈfɔːtʃuːn",
+      "hindiPronunciation": "फ़ॉर्चून",
+      "isPhrase": false,
+      "senses": [
+        {
+          "index": 0,
+          "partOfSpeech": "संज्ञा",
+          "meaning": "धन-दौलत",
+          "definition": "बहुत सारा पैसा या जायदाद।",
+          "examples": [
+            { "en": "He inherited a large fortune from his uncle.", "hi": "उसे अपने चाचा से विरासत में बहुत बड़ी दौलत मिली।" }
+          ]
+        },
+        {
+          "index": 1,
+          "partOfSpeech": "संज्ञा",
+          "meaning": "किस्मत",
+          "definition": "अच्छा या बुरा नसीब, जो हमारे बस में नहीं होता।",
+          "examples": [
+            { "en": "Fortune favours the brave.", "hi": "किस्मत बहादुरों का साथ देती है।" }
+          ]
+        }
+      ],
+      "synonyms": [ { "en": "wealth", "hi": "दौलत" }, { "en": "luck", "hi": "किस्मत" } ],
+      "antonyms": [ { "en": "poverty", "hi": "गरीबी" }, { "en": "misfortune", "hi": "बदकिस्मती" } ],
+      "forms": [ { "en": "fortunes", "label": "बहुवचन", "hi": "दौलतें / किस्मतें" } ]
+    },
+    {
+      "word": "single",
+      "freqRank": 640,
+      "ipa": "ˈsɪŋɡəl",
+      "hindiPronunciation": "सिंगल",
+      "isPhrase": false,
+      "senses": [
+        {
+          "index": 0,
+          "partOfSpeech": "विशेषण",
+          "meaning": "अविवाहित",
+          "definition": "जिसकी शादी न हुई हो।",
+          "examples": [
+            { "en": "He is thirty and still single.", "hi": "वह तीस साल का है और अभी तक उसकी शादी नहीं हुई है।" }
+          ]
+        },
+        {
+          "index": 1,
+          "partOfSpeech": "विशेषण",
+          "meaning": "एक, सिर्फ़ एक",
+          "definition": "सिर्फ़ एक, एक से ज़्यादा नहीं।",
+          "examples": [
+            { "en": "Not a single word was spoken.", "hi": "एक भी शब्द नहीं बोला गया।" }
+          ]
+        },
+        {
+          "index": 2,
+          "partOfSpeech": "विशेषण",
+          "meaning": "अकेला",
+          "definition": "जो किसी के साथ न हो, अकेले।",
+          "examples": [
+            { "en": "She walked in a single file behind the guide.", "hi": "वह गाइड के पीछे एक कतार में अकेली चल रही थी।" }
+          ]
+        },
+        {
+          "index": 3,
+          "partOfSpeech": "संज्ञा",
+          "meaning": "सिंगल (अलग से निकला गाना)",
+          "definition": "एल्बम से अलग, अकेले रिलीज़ किया गया एक गाना।",
+          "examples": [
+            { "en": "Her new single came out on Friday.", "hi": "उसका नया गाना शुक्रवार को आया।" }
+          ]
+        }
+      ],
+      "synonyms": [ { "en": "unmarried", "hi": "अविवाहित" }, { "en": "sole", "hi": "एकमात्र" }, { "en": "alone", "hi": "अकेला" } ],
+      "antonyms": [ { "en": "married", "hi": "विवाहित" }, { "en": "multiple", "hi": "कई" } ],
+      "forms": [ { "en": "singles", "label": "बहुवचन", "hi": "सिंगल्स" }, { "en": "singly", "label": "क्रियाविशेषण", "hi": "एक-एक करके" } ]
+    },
+    {
+      "word": "want",
+      "freqRank": 210,
+      "ipa": "wɒnt",
+      "hindiPronunciation": "वॉन्ट",
+      "isPhrase": false,
+      "senses": [
+        {
+          "index": 0,
+          "partOfSpeech": "क्रिया",
+          "meaning": "चाहना",
+          "definition": "किसी चीज़ की इच्छा होना।",
+          "examples": [
+            { "en": "I want a cup of tea.", "hi": "मुझे एक कप चाय चाहिए।" }
+          ]
+        },
+        {
+          "index": 1,
+          "partOfSpeech": "संज्ञा",
+          "meaning": "कमी",
+          "definition": "किसी ज़रूरी चीज़ का न होना।",
+          "examples": [
+            { "en": "The family lived in want.", "hi": "वह परिवार तंगी में रहता था।" }
+          ]
+        }
+      ],
+      "synonyms": [ { "en": "desire", "hi": "चाहत" }, { "en": "lack", "hi": "कमी" } ],
+      "antonyms": [ { "en": "have", "hi": "पास होना" }, { "en": "plenty", "hi": "भरपूर" } ],
+      "forms": [
+        { "en": "wants", "label": "वर्तमान (वह)", "hi": "चाहता है" },
+        { "en": "wanted", "label": "भूतकाल", "hi": "चाहा" },
+        { "en": "wanting", "label": "क्रिया-रूप", "hi": "चाहते हुए" }
+      ]
+    },
+    {
+      "word": "acknowledge",
+      "freqRank": 4120,
+      "ipa": "əkˈnɒlɪdʒ",
+      "hindiPronunciation": "अक्नॉलिज",
+      "isPhrase": false,
+      "senses": [
+        {
+          "index": 0,
+          "partOfSpeech": "क्रिया",
+          "meaning": "मानना, स्वीकार करना",
+          "definition": "किसी बात को सच मान लेना।",
+          "examples": [
+            { "en": "She acknowledged her mistake.", "hi": "उसने अपनी गलती मान ली।" }
+          ]
+        },
+        {
+          "index": 1,
+          "partOfSpeech": "क्रिया",
+          "meaning": "पावती देना",
+          "definition": "यह बताना कि कोई चीज़ या संदेश आपको मिल गया है।",
+          "examples": [
+            { "en": "Please acknowledge this email.", "hi": "कृपया बताएँ कि यह ईमेल आपको मिल गया।" }
+          ]
+        }
+      ],
+      "synonyms": [ { "en": "admit", "hi": "मानना" }, { "en": "accept", "hi": "स्वीकार करना" } ],
+      "antonyms": [ { "en": "deny", "hi": "इनकार करना" } ],
+      "forms": [
+        { "en": "acknowledged", "label": "भूतकाल", "hi": "माना" },
+        { "en": "acknowledges", "label": "वर्तमान (वह)", "hi": "मानता है" },
+        { "en": "acknowledging", "label": "क्रिया-रूप", "hi": "मानते हुए" }
+      ]
+    },
+    {
+      "word": "truth",
+      "freqRank": 1310,
+      "ipa": "truːθ",
+      "hindiPronunciation": "ट्रूथ",
+      "isPhrase": false,
+      "senses": [
+        {
+          "index": 0,
+          "partOfSpeech": "संज्ञा",
+          "meaning": "सच",
+          "definition": "जो बात सही और असली हो।",
+          "examples": [
+            { "en": "Tell me the truth.", "hi": "मुझे सच बताओ।" }
+          ]
+        }
+      ],
+      "synonyms": [ { "en": "fact", "hi": "तथ्य" }, { "en": "reality", "hi": "हक़ीक़त" } ],
+      "antonyms": [ { "en": "lie", "hi": "झूठ" } ],
+      "forms": [ { "en": "truths", "label": "बहुवचन", "hi": "सच्चाइयाँ" } ]
+    },
+    {
+      "word": "universally",
+      "freqRank": 9800,
+      "ipa": "ˌjuːnɪˈvɜːsəli",
+      "hindiPronunciation": "यूनिवर्सली",
+      "isPhrase": false,
+      "senses": [
+        {
+          "index": 0,
+          "partOfSpeech": "क्रियाविशेषण",
+          "meaning": "सब जगह, सबके द्वारा",
+          "definition": "हर जगह और हर किसी के द्वारा।",
+          "examples": [
+            { "en": "This rule is universally accepted.", "hi": "इस नियम को सब मानते हैं।" }
+          ]
+        }
+      ],
+      "synonyms": [ { "en": "everywhere", "hi": "हर जगह" }, { "en": "generally", "hi": "आम तौर पर" } ],
+      "antonyms": [ { "en": "rarely", "hi": "कभी-कभार" } ],
+      "forms": [ { "en": "universal", "label": "विशेषण", "hi": "सार्वभौमिक, सबका" } ]
+    },
+    {
+      "word": "possession",
+      "freqRank": 3900,
+      "ipa": "pəˈzɛʃən",
+      "hindiPronunciation": "पज़ेशन",
+      "isPhrase": false,
+      "senses": [
+        {
+          "index": 0,
+          "partOfSpeech": "संज्ञा",
+          "meaning": "कब्ज़ा, मालिकाना",
+          "definition": "किसी चीज़ का आपके पास होना या आपकी होना।",
+          "examples": [
+            { "en": "The house is in his possession.", "hi": "घर उसके कब्ज़े में है।" }
+          ]
+        },
+        {
+          "index": 1,
+          "partOfSpeech": "संज्ञा",
+          "meaning": "सामान, चीज़ें",
+          "definition": "वे चीज़ें जो किसी की अपनी हों।",
+          "examples": [
+            { "en": "He lost all his possessions in the flood.", "hi": "बाढ़ में उसका सारा सामान चला गया।" }
+          ]
+        }
+      ],
+      "synonyms": [ { "en": "ownership", "hi": "मालिकाना" }, { "en": "belongings", "hi": "सामान" } ],
+      "antonyms": [ { "en": "loss", "hi": "नुकसान" } ],
+      "forms": [ { "en": "possessions", "label": "बहुवचन", "hi": "सामान" }, { "en": "possess", "label": "क्रिया", "hi": "पास होना" } ]
+    },
+    {
+      "word": "wife",
+      "freqRank": 720,
+      "ipa": "waɪf",
+      "hindiPronunciation": "वाइफ़",
+      "isPhrase": false,
+      "senses": [
+        {
+          "index": 0,
+          "partOfSpeech": "संज्ञा",
+          "meaning": "पत्नी",
+          "definition": "वह औरत जिससे किसी आदमी की शादी हुई हो।",
+          "examples": [
+            { "en": "His wife is a doctor.", "hi": "उसकी पत्नी डॉक्टर है।" }
+          ]
+        }
+      ],
+      "synonyms": [ { "en": "spouse", "hi": "जीवनसाथी" } ],
+      "antonyms": [ { "en": "husband", "hi": "पति" } ],
+      "forms": [ { "en": "wives", "label": "बहुवचन", "hi": "पत्नियाँ" } ]
+    },
+    {
+      "word": "good",
+      "freqRank": 95,
+      "ipa": "ɡʊd",
+      "hindiPronunciation": "गुड",
+      "isPhrase": false,
+      "senses": [
+        {
+          "index": 0,
+          "partOfSpeech": "विशेषण",
+          "meaning": "अच्छा",
+          "definition": "जो ठीक, बढ़िया या सही हो।",
+          "examples": [
+            { "en": "This is a good book.", "hi": "यह एक अच्छी किताब है।" }
+          ]
+        },
+        {
+          "index": 1,
+          "partOfSpeech": "विशेषण",
+          "meaning": "काफ़ी, अच्छा-खासा",
+          "definition": "मात्रा में काफ़ी ज़्यादा।",
+          "examples": [
+            { "en": "He has a good fortune.", "hi": "उसके पास अच्छी-खासी दौलत है।" }
+          ]
+        },
+        {
+          "index": 2,
+          "partOfSpeech": "संज्ञा",
+          "meaning": "भलाई",
+          "definition": "किसी का फ़ायदा या अच्छाई।",
+          "examples": [
+            { "en": "It is for your own good.", "hi": "यह तुम्हारी ही भलाई के लिए है।" }
+          ]
+        }
+      ],
+      "synonyms": [ { "en": "fine", "hi": "बढ़िया" }, { "en": "considerable", "hi": "काफ़ी" } ],
+      "antonyms": [ { "en": "bad", "hi": "बुरा" } ],
+      "forms": [ { "en": "better", "label": "तुलनात्मक", "hi": "बेहतर" }, { "en": "best", "label": "उत्तमता", "hi": "सबसे अच्छा" } ]
+    },
+    {
+      "word": "mind",
+      "freqRank": 480,
+      "ipa": "maɪnd",
+      "hindiPronunciation": "माइंड",
+      "isPhrase": false,
+      "senses": [
+        {
+          "index": 0,
+          "partOfSpeech": "संज्ञा",
+          "meaning": "मन, दिमाग़",
+          "definition": "सोचने-समझने और महसूस करने की जगह।",
+          "examples": [
+            { "en": "Keep an open mind.", "hi": "मन खुला रखो।" }
+          ]
+        },
+        {
+          "index": 1,
+          "partOfSpeech": "क्रिया",
+          "meaning": "बुरा मानना, एतराज़ करना",
+          "definition": "किसी बात से परेशानी या एतराज़ होना।",
+          "examples": [
+            { "en": "Do you mind if I sit here?", "hi": "अगर मैं यहाँ बैठूँ तो आपको कोई एतराज़ तो नहीं?" }
+          ]
+        },
+        {
+          "index": 2,
+          "partOfSpeech": "क्रिया",
+          "meaning": "ध्यान रखना",
+          "definition": "किसी चीज़ का ख़याल रखना या उससे सावधान रहना।",
+          "examples": [
+            { "en": "Mind the step.", "hi": "सीढ़ी का ध्यान रखना।" }
+          ]
+        }
+      ],
+      "synonyms": [ { "en": "brain", "hi": "दिमाग़" }, { "en": "object", "hi": "एतराज़ करना" } ],
+      "antonyms": [ { "en": "body", "hi": "शरीर" } ],
+      "forms": [ { "en": "minds", "label": "बहुवचन", "hi": "मन" }, { "en": "minded", "label": "भूतकाल", "hi": "बुरा माना" } ]
+    },
+    {
+      "word": "object",
+      "freqRank": 1150,
+      "ipa": "ˈɒbdʒɪkt",
+      "hindiPronunciation": "ऑब्जेक्ट (संज्ञा) / अब्जेक्ट (क्रिया)",
+      "isPhrase": false,
+      "senses": [
+        {
+          "index": 0,
+          "partOfSpeech": "संज्ञा",
+          "meaning": "चीज़, वस्तु",
+          "definition": "कोई ऐसी चीज़ जिसे देखा या छुआ जा सके।",
+          "examples": [
+            { "en": "A strange object lay on the table.", "hi": "मेज़ पर एक अजीब चीज़ रखी थी।" }
+          ]
+        },
+        {
+          "index": 1,
+          "partOfSpeech": "संज्ञा",
+          "meaning": "मकसद, लक्ष्य",
+          "definition": "जो हासिल करना हो।",
+          "examples": [
+            { "en": "The object of the game is to score.", "hi": "खेल का मकसद स्कोर करना है।" }
+          ]
+        },
+        {
+          "index": 2,
+          "partOfSpeech": "क्रिया",
+          "meaning": "एतराज़ करना",
+          "definition": "किसी बात के खिलाफ़ होना और वह बात कहना।",
+          "examples": [
+            { "en": "I object to this plan.", "hi": "मुझे इस योजना पर एतराज़ है।" }
+          ]
+        }
+      ],
+      "synonyms": [ { "en": "thing", "hi": "चीज़" }, { "en": "aim", "hi": "मकसद" }, { "en": "protest", "hi": "विरोध करना" } ],
+      "antonyms": [ { "en": "agree", "hi": "सहमत होना" } ],
+      "forms": [ { "en": "objects", "label": "बहुवचन", "hi": "चीज़ें" }, { "en": "objected", "label": "भूतकाल", "hi": "एतराज़ किया" } ]
+    },
+    {
+      "word": "property",
+      "freqRank": 1020,
+      "ipa": "ˈprɒpəti",
+      "hindiPronunciation": "प्रॉपर्टी",
+      "isPhrase": false,
+      "senses": [
+        {
+          "index": 0,
+          "partOfSpeech": "संज्ञा",
+          "meaning": "जायदाद, संपत्ति",
+          "definition": "ज़मीन, मकान या कोई चीज़ जो किसी की अपनी हो।",
+          "examples": [
+            { "en": "The property belongs to his family.", "hi": "यह जायदाद उसके परिवार की है।" }
+          ]
+        },
+        {
+          "index": 1,
+          "partOfSpeech": "संज्ञा",
+          "meaning": "गुण",
+          "definition": "किसी चीज़ की खास बात या खासियत।",
+          "examples": [
+            { "en": "Water has the property of dissolving salt.", "hi": "पानी में नमक घोलने का गुण होता है।" }
+          ]
+        }
+      ],
+      "synonyms": [ { "en": "estate", "hi": "जायदाद" }, { "en": "quality", "hi": "गुण" } ],
+      "antonyms": [],
+      "forms": [ { "en": "properties", "label": "बहुवचन", "hi": "जायदादें / गुण" } ]
+    },
+    {
+      "word": "neighbourhood",
+      "freqRank": 3450,
+      "ipa": "ˈneɪbəhʊd",
+      "hindiPronunciation": "नेबरहुड",
+      "isPhrase": false,
+      "senses": [
+        {
+          "index": 0,
+          "partOfSpeech": "संज्ञा",
+          "meaning": "मोहल्ला, आस-पड़ोस",
+          "definition": "आपके घर के आस-पास का इलाका और वहाँ रहने वाले लोग।",
+          "examples": [
+            { "en": "Everyone in the neighbourhood knew her.", "hi": "मोहल्ले में सब उसे जानते थे।" }
+          ]
+        }
+      ],
+      "synonyms": [ { "en": "locality", "hi": "इलाका" }, { "en": "area", "hi": "क्षेत्र" } ],
+      "antonyms": [],
+      "forms": [ { "en": "neighborhood", "label": "अमेरिकी वर्तनी", "hi": "मोहल्ला" }, { "en": "neighbourhoods", "label": "बहुवचन", "hi": "मोहल्ले" } ]
+    },
+    {
+      "word": "feeling",
+      "freqRank": 900,
+      "ipa": "ˈfiːlɪŋ",
+      "hindiPronunciation": "फ़ीलिंग",
+      "isPhrase": false,
+      "senses": [
+        {
+          "index": 0,
+          "partOfSpeech": "संज्ञा",
+          "meaning": "एहसास, भावना",
+          "definition": "मन में जो महसूस हो — खुशी, दुख, डर वगैरह।",
+          "examples": [
+            { "en": "I did not want to hurt her feelings.", "hi": "मैं उसका दिल नहीं दुखाना चाहता था।" }
+          ]
+        },
+        {
+          "index": 1,
+          "partOfSpeech": "संज्ञा",
+          "meaning": "अंदाज़ा, लगना",
+          "definition": "बिना पक्के सबूत के कुछ लगना।",
+          "examples": [
+            { "en": "I have a feeling he will come.", "hi": "मुझे लगता है कि वह आएगा।" }
+          ]
+        }
+      ],
+      "synonyms": [ { "en": "emotion", "hi": "भावना" }, { "en": "sense", "hi": "एहसास" } ],
+      "antonyms": [ { "en": "numbness", "hi": "सुन्नपन" } ],
+      "forms": [ { "en": "feelings", "label": "बहुवचन", "hi": "भावनाएँ" }, { "en": "feel", "label": "मूल क्रिया", "hi": "महसूस करना" } ]
+    },
+    {
+      "word": "consider",
+      "freqRank": 760,
+      "ipa": "kənˈsɪdə",
+      "hindiPronunciation": "कन्सिडर",
+      "isPhrase": false,
+      "senses": [
+        {
+          "index": 0,
+          "partOfSpeech": "क्रिया",
+          "meaning": "सोचना, विचार करना",
+          "definition": "किसी बात पर ध्यान से सोचना।",
+          "examples": [
+            { "en": "Consider the offer carefully.", "hi": "इस ऑफ़र पर ध्यान से सोचो।" }
+          ]
+        },
+        {
+          "index": 1,
+          "partOfSpeech": "क्रिया",
+          "meaning": "मानना, समझना",
+          "definition": "किसी को या किसी चीज़ को कुछ समझना।",
+          "examples": [
+            { "en": "I consider him a friend.", "hi": "मैं उसे अपना दोस्त मानता हूँ।" }
+          ]
+        }
+      ],
+      "synonyms": [ { "en": "think about", "hi": "सोचना" }, { "en": "regard", "hi": "मानना" } ],
+      "antonyms": [ { "en": "ignore", "hi": "नज़रअंदाज़ करना" } ],
+      "forms": [
+        { "en": "considered", "label": "भूतकाल", "hi": "माना / सोचा" },
+        { "en": "considers", "label": "वर्तमान (वह)", "hi": "मानता है" },
+        { "en": "considering", "label": "क्रिया-रूप", "hi": "सोचते हुए" }
+      ]
+    },
+    {
+      "word": "delight",
+      "freqRank": 4600,
+      "ipa": "dɪˈlaɪt",
+      "hindiPronunciation": "डिलाइट",
+      "isPhrase": false,
+      "senses": [
+        {
+          "index": 0,
+          "partOfSpeech": "संज्ञा",
+          "meaning": "बहुत खुशी",
+          "definition": "बहुत ज़्यादा खुशी या मज़ा।",
+          "examples": [
+            { "en": "To her great delight, she passed the exam.", "hi": "उसकी बड़ी खुशी की बात यह हुई कि वह परीक्षा में पास हो गई।" }
+          ]
+        },
+        {
+          "index": 1,
+          "partOfSpeech": "क्रिया",
+          "meaning": "खुश कर देना",
+          "definition": "किसी को बहुत खुश करना।",
+          "examples": [
+            { "en": "The show delighted the children.", "hi": "शो ने बच्चों को बहुत खुश कर दिया।" }
+          ]
+        }
+      ],
+      "synonyms": [ { "en": "joy", "hi": "खुशी" }, { "en": "please", "hi": "खुश करना" } ],
+      "antonyms": [ { "en": "sorrow", "hi": "दुख" }, { "en": "displease", "hi": "नाराज़ करना" } ],
+      "forms": [ { "en": "delighted", "label": "भूतकाल / विशेषण", "hi": "बहुत खुश" }, { "en": "delightful", "label": "विशेषण", "hi": "बहुत सुखद" } ]
+    },
+    {
+      "word": "settle",
+      "freqRank": 1900,
+      "ipa": "ˈsɛtl",
+      "hindiPronunciation": "सेटल",
+      "isPhrase": false,
+      "senses": [
+        {
+          "index": 0,
+          "partOfSpeech": "क्रिया",
+          "meaning": "बस जाना",
+          "definition": "किसी जगह पर रहने लगना।",
+          "examples": [
+            { "en": "They settled in Mumbai after the war.", "hi": "युद्ध के बाद वे मुंबई में बस गए।" }
+          ]
+        },
+        {
+          "index": 1,
+          "partOfSpeech": "क्रिया",
+          "meaning": "निपटाना, तय करना",
+          "definition": "किसी झगड़े या सवाल को सुलझा लेना।",
+          "examples": [
+            { "en": "They settled the dispute out of court.", "hi": "उन्होंने झगड़ा अदालत के बाहर ही निपटा लिया।" }
+          ]
+        },
+        {
+          "index": 2,
+          "partOfSpeech": "क्रिया",
+          "meaning": "बैठ जाना, शांत होना",
+          "definition": "आराम से बैठ जाना या शांत हो जाना।",
+          "examples": [
+            { "en": "The dust finally settled.", "hi": "धूल आखिरकार बैठ गई।" }
+          ]
+        }
+      ],
+      "synonyms": [ { "en": "resolve", "hi": "सुलझाना" }, { "en": "calm down", "hi": "शांत होना" } ],
+      "antonyms": [ { "en": "unsettle", "hi": "बेचैन करना" } ],
+      "forms": [
+        { "en": "settled", "label": "भूतकाल", "hi": "बस गया / निपटा दिया" },
+        { "en": "settles", "label": "वर्तमान (वह)", "hi": "बसता है" },
+        { "en": "settling", "label": "क्रिया-रूप", "hi": "बसते हुए" }
+      ]
+    },
+    {
+      "word": "rightful",
+      "freqRank": 14200,
+      "ipa": "ˈraɪtfʊl",
+      "hindiPronunciation": "राइटफ़ुल",
+      "isPhrase": false,
+      "senses": [
+        {
+          "index": 0,
+          "partOfSpeech": "विशेषण",
+          "meaning": "हक़दार, असली",
+          "definition": "जिसका किसी चीज़ पर सही और कानूनी हक़ हो।",
+          "examples": [
+            { "en": "The land was returned to its rightful owner.", "hi": "ज़मीन उसके असली मालिक को लौटा दी गई।" }
+          ]
+        }
+      ],
+      "synonyms": [ { "en": "legitimate", "hi": "जायज़" }, { "en": "lawful", "hi": "कानूनी" } ],
+      "antonyms": [ { "en": "wrongful", "hi": "नाजायज़" } ],
+      "forms": [ { "en": "rightfully", "label": "क्रियाविशेषण", "hi": "हक़ से" } ]
+    },
+    {
+      "word": "daughter",
+      "freqRank": 1050,
+      "ipa": "ˈdɔːtə",
+      "hindiPronunciation": "डॉटर",
+      "isPhrase": false,
+      "senses": [
+        {
+          "index": 0,
+          "partOfSpeech": "संज्ञा",
+          "meaning": "बेटी",
+          "definition": "किसी की लड़की संतान।",
+          "examples": [
+            { "en": "Mrs. Bennet had five daughters.", "hi": "मिसेज़ बेनेट की पाँच बेटियाँ थीं।" }
+          ]
+        }
+      ],
+      "synonyms": [ { "en": "girl child", "hi": "लड़की" } ],
+      "antonyms": [ { "en": "son", "hi": "बेटा" } ],
+      "forms": [ { "en": "daughters", "label": "बहुवचन", "hi": "बेटियाँ" } ]
+    },
+    {
+      "word": "surrounding",
+      "freqRank": 3300,
+      "ipa": "səˈraʊndɪŋ",
+      "hindiPronunciation": "सराउंडिंग",
+      "isPhrase": false,
+      "senses": [
+        {
+          "index": 0,
+          "partOfSpeech": "विशेषण",
+          "meaning": "आस-पास का",
+          "definition": "जो किसी चीज़ के चारों ओर हो।",
+          "examples": [
+            { "en": "He is the rightful property of the surrounding families.", "hi": "आस-पास के परिवार उस पर अपना हक़ समझते हैं।" }
+          ]
+        },
+        {
+          "index": 1,
+          "partOfSpeech": "संज्ञा",
+          "meaning": "आस-पास का माहौल",
+          "definition": "किसी जगह के चारों ओर की चीज़ें और माहौल (आम तौर पर बहुवचन में)।",
+          "examples": [
+            { "en": "The hotel has beautiful surroundings.", "hi": "होटल के आस-पास का माहौल बहुत सुंदर है।" }
+          ]
+        }
+      ],
+      "synonyms": [ { "en": "nearby", "hi": "पास का" }, { "en": "environment", "hi": "माहौल" } ],
+      "antonyms": [ { "en": "distant", "hi": "दूर का" } ],
+      "forms": [ { "en": "surroundings", "label": "बहुवचन", "hi": "आस-पास का माहौल" }, { "en": "surround", "label": "मूल क्रिया", "hi": "घेरना" } ]
+    },
+    {
+      "word": "in want of",
+      "freqRank": 30000,
+      "ipa": "",
+      "hindiPronunciation": "इन वॉन्ट ऑफ़",
+      "isPhrase": true,
+      "senses": [
+        {
+          "index": 0,
+          "partOfSpeech": "मुहावरा",
+          "meaning": "की ज़रूरत में, की कमी में",
+          "definition": "जिसे किसी चीज़ की ज़रूरत हो या जिसके पास वह चीज़ न हो। पुराने अंदाज़ की अंग्रेज़ी।",
+          "examples": [
+            { "en": "A single man in possession of a good fortune must be in want of a wife.", "hi": "जिस अविवाहित आदमी के पास अच्छी-खासी दौलत हो, उसे पत्नी की ज़रूरत होती ही है।" }
+          ]
+        }
+      ],
+      "synonyms": [ { "en": "in need of", "hi": "की ज़रूरत में" }, { "en": "lacking", "hi": "की कमी में" } ],
+      "antonyms": [],
+      "forms": []
+    },
+    {
+      "word": "in possession of",
+      "freqRank": 30000,
+      "ipa": "",
+      "hindiPronunciation": "इन पज़ेशन ऑफ़",
+      "isPhrase": true,
+      "senses": [
+        {
+          "index": 0,
+          "partOfSpeech": "मुहावरा",
+          "meaning": "जिसके पास हो, का मालिक",
+          "definition": "जिसके पास कोई चीज़ हो या जो उसका मालिक हो।",
+          "examples": [
+            { "en": "He was in possession of a large estate.", "hi": "उसके पास एक बड़ी जागीर थी।" }
+          ]
+        }
+      ],
+      "synonyms": [ { "en": "owning", "hi": "का मालिक" }, { "en": "having", "hi": "जिसके पास हो" } ],
+      "antonyms": [],
+      "forms": []
+    }
+  ],
+  "forms": [
+    { "form": "fortunes", "lemma": "fortune" },
+    { "form": "singles", "lemma": "single" },
+    { "form": "wants", "lemma": "want" },
+    { "form": "wanted", "lemma": "want" },
+    { "form": "wanting", "lemma": "want" },
+    { "form": "acknowledged", "lemma": "acknowledge" },
+    { "form": "acknowledges", "lemma": "acknowledge" },
+    { "form": "acknowledging", "lemma": "acknowledge" },
+    { "form": "truths", "lemma": "truth" },
+    { "form": "possessions", "lemma": "possession" },
+    { "form": "wives", "lemma": "wife" },
+    { "form": "better", "lemma": "good" },
+    { "form": "best", "lemma": "good" },
+    { "form": "minds", "lemma": "mind" },
+    { "form": "minded", "lemma": "mind" },
+    { "form": "objects", "lemma": "object" },
+    { "form": "objected", "lemma": "object" },
+    { "form": "properties", "lemma": "property" },
+    { "form": "neighborhood", "lemma": "neighbourhood" },
+    { "form": "neighbourhoods", "lemma": "neighbourhood" },
+    { "form": "feelings", "lemma": "feeling" },
+    { "form": "considered", "lemma": "consider" },
+    { "form": "considers", "lemma": "consider" },
+    { "form": "considering", "lemma": "consider" },
+    { "form": "delighted", "lemma": "delight" },
+    { "form": "settled", "lemma": "settle" },
+    { "form": "settles", "lemma": "settle" },
+    { "form": "settling", "lemma": "settle" },
+    { "form": "daughters", "lemma": "daughter" },
+    { "form": "surroundings", "lemma": "surrounding" }
+  ],
+  "phrases": [
+    { "phrase": "in want of", "lemma": "in want of" },
+    { "phrase": "in possession of", "lemma": "in possession of" }
+  ]
+}
