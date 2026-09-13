@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://arth.app/contracts/entry-generation.json",
+  "title": "EntryGeneration",
+  "description": "What the pipeline's LLM pass returns for one headword: the Hindi layer only. The pipeline merges it with word/ipa/isPhrase from Wiktionary into a DictionaryEntry and validates that. `senses` must have exactly one item per input sense, in the same order, with matching `index` values — the model translates and explains the given senses and never adds, drops or reorders them. Definitions are duplicated from dictionary-entry.json (not $ref'd across files) because OpenAI strict mode needs a self-contained schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["hindiPronunciation", "senses", "synonyms", "antonyms", "forms"],
+  "properties": {
+    "hindiPronunciation": { "type": "string", "description": "Devanagari transliteration of the English pronunciation, e.g. फ़ॉर्चून." },
+    "senses": { "type": "array", "items": { "$ref": "#/definitions/Sense" } },
+    "synonyms": { "type": "array", "items": { "$ref": "#/definitions/BilingualPair" } },
+    "antonyms": { "type": "array", "items": { "$ref": "#/definitions/BilingualPair" } },
+    "forms": { "type": "array", "items": { "$ref": "#/definitions/Form" } }
+  },
+  "definitions": {
+    "Sense": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index", "partOfSpeech", "meaning", "definition", "examples"],
+      "properties": {
+        "index": { "type": "integer", "minimum": 0 },
+        "partOfSpeech": { "type": "string" },
+        "meaning": { "type": "string", "minLength": 1 },
+        "definition": { "type": "string", "minLength": 1 },
+        "examples": { "type": "array", "items": { "$ref": "#/definitions/BilingualPair" } }
+      }
+    },
+    "BilingualPair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["en", "hi"],
+      "properties": { "en": { "type": "string" }, "hi": { "type": "string" } }
+    },
+    "Form": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["en", "label", "hi"],
+      "properties": { "en": { "type": "string", "minLength": 1 }, "label": { "type": "string" }, "hi": { "type": "string" } }
+    }
+  }
+}

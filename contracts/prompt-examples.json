@@ -1,0 +1,267 @@
+{
+  "version": 1,
+  "_comment": "Gold examples of the Hindi register, sent as fixed user/assistant pairs after the system prompt so prompt caching applies. Shared by pipeline/04_generate.py and api/ (context, translate). Inputs mirror the exact shape each caller sends; outputs validate against the matching schema.",
+  "entry": [
+    {
+      "input": {
+        "word": "fortune",
+        "ipa": "ˈfɔːtʃuːn",
+        "isPhrase": false,
+        "senses": [
+          { "index": 0, "partOfSpeech": "संज्ञा", "gloss": "Destiny, especially favorable; luck.", "examples": ["Fortune favours the brave."] },
+          { "index": 1, "partOfSpeech": "संज्ञा", "gloss": "A prediction or set of predictions about a person's future provided by a fortune teller.", "examples": [] },
+          { "index": 2, "partOfSpeech": "संज्ञा", "gloss": "One's wealth; the amount of money one has; especially, a large amount of money or other assets.", "examples": ["He inherited a large fortune from his uncle."] }
+        ],
+        "synonyms": ["luck", "wealth"],
+        "antonyms": ["misfortune", "poverty"],
+        "forms": [{ "en": "fortunes", "label": "बहुवचन" }]
+      },
+      "output": {
+        "hindiPronunciation": "फ़ॉर्चून",
+        "senses": [
+          {
+            "index": 0,
+            "partOfSpeech": "संज्ञा",
+            "meaning": "किस्मत",
+            "definition": "अच्छा या बुरा नसीब, जो हमारे बस में नहीं होता।",
+            "examples": [{ "en": "Fortune favours the brave.", "hi": "किस्मत बहादुरों का साथ देती है।" }]
+          },
+          {
+            "index": 1,
+            "partOfSpeech": "संज्ञा",
+            "meaning": "भविष्यफल",
+            "definition": "ज्योतिषी या हाथ देखने वाला आपके आने वाले समय के बारे में जो बताता है।",
+            "examples": [{ "en": "The old woman told his fortune for ten rupees.", "hi": "बुढ़िया ने दस रुपये में उसका भविष्य बताया।" }]
+          },
+          {
+            "index": 2,
+            "partOfSpeech": "संज्ञा",
+            "meaning": "धन-दौलत",
+            "definition": "बहुत सारा पैसा या जायदाद।",
+            "examples": [{ "en": "He inherited a large fortune from his uncle.", "hi": "उसे अपने चाचा से विरासत में बहुत बड़ी दौलत मिली।" }]
+          }
+        ],
+        "synonyms": [{ "en": "luck", "hi": "किस्मत" }, { "en": "wealth", "hi": "दौलत" }],
+        "antonyms": [{ "en": "misfortune", "hi": "बदकिस्मती" }, { "en": "poverty", "hi": "गरीबी" }],
+        "forms": [{ "en": "fortunes", "label": "बहुवचन", "hi": "दौलतें / किस्मतें" }]
+      }
+    },
+    {
+      "input": {
+        "word": "single",
+        "ipa": "ˈsɪŋɡəl",
+        "isPhrase": false,
+        "senses": [
+          { "index": 0, "partOfSpeech": "विशेषण", "gloss": "Not accompanied by anything else; one in number.", "examples": ["Not a single word was spoken."] },
+          { "index": 1, "partOfSpeech": "विशेषण", "gloss": "Not married, and (in modern times) not dating.", "examples": ["He is thirty and still single."] },
+          { "index": 2, "partOfSpeech": "विशेषण", "gloss": "Not divided in parts; whole.", "examples": ["a single piece of cloth"] },
+          { "index": 3, "partOfSpeech": "संज्ञा", "gloss": "(music) A recording of one song, released separately from an album.", "examples": [] }
+        ],
+        "synonyms": ["sole", "unmarried"],
+        "antonyms": ["married", "multiple"],
+        "forms": [{ "en": "singles", "label": "बहुवचन" }, { "en": "singly", "label": "क्रियाविशेषण" }]
+      },
+      "output": {
+        "hindiPronunciation": "सिंगल",
+        "senses": [
+          {
+            "index": 0,
+            "partOfSpeech": "विशेषण",
+            "meaning": "एक, सिर्फ़ एक",
+            "definition": "सिर्फ़ एक, एक से ज़्यादा नहीं।",
+            "examples": [{ "en": "Not a single word was spoken.", "hi": "एक भी शब्द नहीं बोला गया।" }]
+          },
+          {
+            "index": 1,
+            "partOfSpeech": "विशेषण",
+            "meaning": "अविवाहित",
+            "definition": "जिसकी शादी न हुई हो।",
+            "examples": [{ "en": "He is thirty and still single.", "hi": "वह तीस साल का है और अभी तक उसकी शादी नहीं हुई है।" }]
+          },
+          {
+            "index": 2,
+            "partOfSpeech": "विशेषण",
+            "meaning": "साबुत, बिना जोड़ का",
+            "definition": "जो टुकड़ों में बँटा न हो, एक ही पूरा।",
+            "examples": [{ "en": "a single piece of cloth", "hi": "कपड़े का एक साबुत टुकड़ा" }]
+          },
+          {
+            "index": 3,
+            "partOfSpeech": "संज्ञा",
+            "meaning": "सिंगल (अलग से निकला गाना)",
+            "definition": "एल्बम से अलग, अकेले रिलीज़ किया गया एक गाना।",
+            "examples": [{ "en": "Her new single came out on Friday.", "hi": "उसका नया गाना शुक्रवार को आया।" }]
+          }
+        ],
+        "synonyms": [{ "en": "sole", "hi": "एकमात्र" }, { "en": "unmarried", "hi": "अविवाहित" }],
+        "antonyms": [{ "en": "married", "hi": "विवाहित" }, { "en": "multiple", "hi": "कई" }],
+        "forms": [{ "en": "singles", "label": "बहुवचन", "hi": "सिंगल्स" }, { "en": "singly", "label": "क्रियाविशेषण", "hi": "एक-एक करके" }]
+      }
+    },
+    {
+      "input": {
+        "word": "mind",
+        "ipa": "maɪnd",
+        "isPhrase": false,
+        "senses": [
+          { "index": 0, "partOfSpeech": "संज्ञा", "gloss": "The ability for rational thought; the seat of consciousness.", "examples": ["Keep an open mind."] },
+          { "index": 1, "partOfSpeech": "संज्ञा", "gloss": "Desire, inclination, or intention.", "examples": ["She had a mind to walk out."] },
+          { "index": 2, "partOfSpeech": "क्रिया", "gloss": "To dislike, to object to; to be bothered by.", "examples": ["Do you mind if I sit here?"] },
+          { "index": 3, "partOfSpeech": "क्रिया", "gloss": "To pay attention to; to be careful of.", "examples": ["Mind the step."] }
+        ],
+        "synonyms": ["brain", "object"],
+        "antonyms": ["body"],
+        "forms": [{ "en": "minds", "label": "बहुवचन" }, { "en": "minded", "label": "भूतकाल" }]
+      },
+      "output": {
+        "hindiPronunciation": "माइंड",
+        "senses": [
+          {
+            "index": 0,
+            "partOfSpeech": "संज्ञा",
+            "meaning": "मन, दिमाग़",
+            "definition": "सोचने-समझने और महसूस करने की जगह।",
+            "examples": [{ "en": "Keep an open mind.", "hi": "मन खुला रखो।" }]
+          },
+          {
+            "index": 1,
+            "partOfSpeech": "संज्ञा",
+            "meaning": "इरादा, मन",
+            "definition": "कुछ करने की इच्छा या इरादा।",
+            "examples": [{ "en": "She had a mind to walk out.", "hi": "उसका मन हुआ कि उठकर चली जाए।" }]
+          },
+          {
+            "index": 2,
+            "partOfSpeech": "क्रिया",
+            "meaning": "बुरा मानना, एतराज़ करना",
+            "definition": "किसी बात से परेशानी या एतराज़ होना।",
+            "examples": [{ "en": "Do you mind if I sit here?", "hi": "अगर मैं यहाँ बैठूँ तो आपको कोई एतराज़ तो नहीं?" }]
+          },
+          {
+            "index": 3,
+            "partOfSpeech": "क्रिया",
+            "meaning": "ध्यान रखना",
+            "definition": "किसी चीज़ का ख़याल रखना या उससे सावधान रहना।",
+            "examples": [{ "en": "Mind the step.", "hi": "सीढ़ी का ध्यान रखना।" }]
+          }
+        ],
+        "synonyms": [{ "en": "brain", "hi": "दिमाग़" }, { "en": "object", "hi": "एतराज़ करना" }],
+        "antonyms": [{ "en": "body", "hi": "शरीर" }],
+        "forms": [{ "en": "minds", "label": "बहुवचन", "hi": "मन" }, { "en": "minded", "label": "भूतकाल", "hi": "बुरा माना" }]
+      }
+    },
+    {
+      "input": {
+        "word": "in want of",
+        "ipa": "",
+        "isPhrase": true,
+        "senses": [
+          { "index": 0, "partOfSpeech": "मुहावरा", "gloss": "(dated) Lacking; in need of.", "examples": ["A single man in possession of a good fortune must be in want of a wife."] }
+        ],
+        "synonyms": ["in need of"],
+        "antonyms": [],
+        "forms": []
+      },
+      "output": {
+        "hindiPronunciation": "इन वॉन्ट ऑफ़",
+        "senses": [
+          {
+            "index": 0,
+            "partOfSpeech": "मुहावरा",
+            "meaning": "की ज़रूरत में, की कमी में",
+            "definition": "जिसे किसी चीज़ की ज़रूरत हो या जिसके पास वह चीज़ न हो। पुराने अंदाज़ की अंग्रेज़ी।",
+            "examples": [{ "en": "A single man in possession of a good fortune must be in want of a wife.", "hi": "जिस अविवाहित आदमी के पास अच्छी-खासी दौलत हो, उसे पत्नी की ज़रूरत होती ही है।" }]
+          }
+        ],
+        "synonyms": [{ "en": "in need of", "hi": "की ज़रूरत में" }],
+        "antonyms": [],
+        "forms": []
+      }
+    }
+  ],
+  "context": [
+    {
+      "input": {
+        "word": "single",
+        "sentence": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
+        "senses": [
+          { "index": 0, "partOfSpeech": "विशेषण", "meaning": "एक, सिर्फ़ एक" },
+          { "index": 1, "partOfSpeech": "विशेषण", "meaning": "अविवाहित" },
+          { "index": 2, "partOfSpeech": "विशेषण", "meaning": "साबुत, बिना जोड़ का" },
+          { "index": 3, "partOfSpeech": "संज्ञा", "meaning": "सिंगल (अलग से निकला गाना)" }
+        ]
+      },
+      "output": {
+        "senseIndex": 1,
+        "meaning": "अविवाहित",
+        "note": "यहाँ 'single' का मतलब अविवाहित है, अकेला नहीं। बात एक ऐसे आदमी की हो रही है जिसे पत्नी चाहिए।"
+      }
+    },
+    {
+      "input": {
+        "word": "mind",
+        "sentence": "\"Do you mind if I open the window?\" she asked.",
+        "senses": [
+          { "index": 0, "partOfSpeech": "संज्ञा", "meaning": "मन, दिमाग़" },
+          { "index": 1, "partOfSpeech": "संज्ञा", "meaning": "इरादा, मन" },
+          { "index": 2, "partOfSpeech": "क्रिया", "meaning": "बुरा मानना, एतराज़ करना" },
+          { "index": 3, "partOfSpeech": "क्रिया", "meaning": "ध्यान रखना" }
+        ]
+      },
+      "output": {
+        "senseIndex": 2,
+        "meaning": "एतराज़ होना",
+        "note": "यहाँ 'mind' क्रिया है — \"क्या आपको एतराज़ होगा?\" यह दिमाग़ वाला 'mind' नहीं है।"
+      }
+    },
+    {
+      "input": {
+        "word": "fortune",
+        "sentence": "He inherited a large fortune from his uncle.",
+        "senses": [
+          { "index": 0, "partOfSpeech": "संज्ञा", "meaning": "किस्मत" },
+          { "index": 1, "partOfSpeech": "संज्ञा", "meaning": "भविष्यफल" },
+          { "index": 2, "partOfSpeech": "संज्ञा", "meaning": "धन-दौलत" }
+        ]
+      },
+      "output": {
+        "senseIndex": 2,
+        "meaning": "धन-दौलत",
+        "note": "यहाँ 'fortune' का मतलब दौलत है, किस्मत नहीं — चाचा से विरासत में पैसा मिला है।"
+      }
+    }
+  ],
+  "translate": [
+    {
+      "input": {
+        "text": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
+        "context": null
+      },
+      "output": {
+        "source": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
+        "hindi": "यह एक ऐसा सच है जिसे सब मानते हैं कि जिस अविवाहित आदमी के पास अच्छी-खासी दौलत हो, उसे पत्नी की ज़रूरत होती ही है।",
+        "simpleMeaning": "लेखिका मज़ाक में कह रही है: अमीर कुँवारा आदमी दिखा नहीं कि लोग मान लेते हैं कि उसे शादी करनी ही होगी — चाहे वह खुद ऐसा सोचे या नहीं।",
+        "difficultWords": [
+          { "en": "universally acknowledged", "hi": "जिसे सब मानते हैं" },
+          { "en": "in possession of", "hi": "जिसके पास हो" },
+          { "en": "in want of", "hi": "की ज़रूरत में" }
+        ]
+      }
+    },
+    {
+      "input": {
+        "text": "He was not going to let them see how much it hurt.",
+        "context": "The boys laughed at his torn shoes."
+      },
+      "output": {
+        "source": "He was not going to let them see how much it hurt.",
+        "hindi": "वह उन्हें यह नहीं दिखाने वाला था कि उसे कितनी चोट पहुँची है।",
+        "simpleMeaning": "लड़कों की हँसी से उसे बहुत बुरा लगा, लेकिन उसने ठान लिया कि वह अपना दुख उन्हें नहीं दिखाएगा।",
+        "difficultWords": [
+          { "en": "let them see", "hi": "उन्हें दिखने देना" },
+          { "en": "hurt", "hi": "चोट पहुँचना (यहाँ दिल की)" }
+        ]
+      }
+    }
+  ]
+}

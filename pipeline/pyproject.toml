@@ -1,0 +1,35 @@
+[project]
+name = "arth-pipeline"
+version = "0.1.0"
+description = "Builds the Arth English→Hindi dictionary: Wiktionary → LLM batch → Mongo."
+requires-python = ">=3.11"
+dependencies = [
+  "wordfreq>=3.1",
+  "openai>=1.60",
+  "pydantic>=2.9",
+  "pymongo>=4.10",
+  "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8",
+  "ruff>=0.6",
+  "datamodel-code-generator>=0.26",
+]
+
+[tool.setuptools]
+packages = ["arth_pipeline", "arth_pipeline.llm"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+# Generated from contracts/schemas; regenerate with ./gen-models.sh, never lint-fix.
+exclude = ["arth_pipeline/models"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ANN", "N", "W"]
+ignore = ["ANN401"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -13,7 +13,7 @@ contracts/  JSON Schemas, normalization spec + test vectors shared by all three
 ## Status
 
 - [x] Phase 1 — contracts + API skeleton (`/v1/lookup` on a 22-entry hand-written seed)
-- [ ] Phase 2 — pipeline, 500-word slice
+- [~] Phase 2 — pipeline built and tested; 500-word generation waits on an OpenAI key
 - [ ] Phase 3 — `/context`, `/translate`, `/phrases/match`, cache
 - [ ] Phase 4 — Flutter app
 - [ ] Phase 5 — scale and harden
@@ -46,12 +46,24 @@ npm run typecheck
 
 For Atlas, set `MONGODB_URI` in `.env` to the connection string. Nothing else changes.
 
+### Pipeline
+
+```sh
+cd pipeline
+python3.11 -m venv .venv && .venv/bin/pip install -e '.[dev]'
+cp .env.example .env          # add OPENAI_API_KEY
+.venv/bin/pytest              # 69 tests: normalize vectors, generation validation + retry
+.venv/bin/python 01_download.py && .venv/bin/python 02_select.py --n 500 && .venv/bin/python 03_extract.py
+```
+
+See `pipeline/README.md` for the generate → load steps and the review reports.
+
 ### Contracts
 
 `contracts/` is the source of truth for wire types and text normalization. See
 `contracts/README.md`. Every language's `normalize()` must pass
-`contracts/normalize-vectors.json` — TypeScript does (`api/test/normalize.test.ts`);
-Python and Dart are added in their phases.
+`contracts/normalize-vectors.json` — TypeScript (`api/test/normalize.test.ts`) and Python
+(`pipeline/tests/test_normalize.py`) do; Dart is added in Phase 4.
 
 ## Conventions
 
