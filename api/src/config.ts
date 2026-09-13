@@ -18,6 +18,10 @@ const EnvSchema = z.object({
   // Includes hidden reasoning tokens on the gpt-5.6 family; the visible note is ~100.
   LLM_CONTEXT_MAX_TOKENS: z.coerce.number().int().default(900),
   LLM_TRANSLATE_MAX_TOKENS: z.coerce.number().int().default(1200),
+
+  // --- rate limits per device, per minute (Section 6) ---
+  RATE_LIMIT_LOOKUPS: z.coerce.number().int().default(60),
+  RATE_LIMIT_LLM: z.coerce.number().int().default(20),
 });
 
 export type Config = z.infer<typeof EnvSchema>;

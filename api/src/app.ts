@@ -10,6 +10,7 @@ import { seedRoutes } from './routes/seed.js';
 import { translateRoutes } from './routes/translate.js';
 import type { CacheStore } from './cache/cache.js';
 import type { Config } from './config.js';
+import rateLimit from '@fastify/rate-limit';
 import type { LLMProvider } from './llm/provider.js';
 import type { Store } from './services/mongo-store.js';
 
@@ -36,6 +37,7 @@ export type AppOptions = {
   store: Store;
   cache: CacheStore;
   llm: LLMProvider;
+  rateLimits?: { lookups: number; llm: number };
   config: Pick<
     Config,
     | 'CONTEXT_MODE'
@@ -102,18 +104,36 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     return reply.status(status).send(fail(status >= 500 ? 'INTERNAL' : 'BAD_REQUEST', status >= 500 ? messages.internal : messages.badRequest));
   });
 
+  // Per-device limits (Section 6). The app sends X-Device-Id; without it we
+  // fall back to the IP. Two buckets: cheap DB reads, and LLM calls.
+  const limits = opts.rateLimits ?? { lookups: 60, llm: 20 };
+  const keyGenerator = (req: FastifyRequest) => (req.headers['x-device-id'] as string | undefined)?.slice(0, 64) || req.ip;
+  const limited = (max: number, message: string) => ({
+    max,
+    timeWindow: '1 minute',
+    keyGenerator,
+    errorResponseBuilder: () => new ApiError('RATE_LIMITED', message),
+  });
+
   app.register(
     async (v1) => {
+      await v1.register(rateLimit, { global: false });
       await v1.register(healthRoutes);
-      await v1.register(lookupRoutes, { store: opts.store });
-      await v1.register(seedRoutes);
-      await v1.register(phraseRoutes, { store: opts.store });
-      const log = { warn: (obj: object, msg: string) => app.log.warn(obj, msg) };
-      await v1.register(contextRoutes, {
-        deps: { config: opts.config, llm: opts.llm, cache: opts.cache, store: opts.store, log },
+      await v1.register(async (dbRoutes) => {
+        dbRoutes.addHook('preHandler', dbRoutes.rateLimit(limited(limits.lookups, messages.rateLimited)));
+        await dbRoutes.register(lookupRoutes, { store: opts.store });
+        await dbRoutes.register(phraseRoutes, { store: opts.store });
       });
-      await v1.register(translateRoutes, {
-        deps: { config: opts.config, llm: opts.llm, cache: opts.cache, log },
+      await v1.register(seedRoutes);
+      const log = { warn: (obj: object, msg: string) => app.log.warn(obj, msg) };
+      await v1.register(async (llmRoutes) => {
+        llmRoutes.addHook('preHandler', llmRoutes.rateLimit(limited(limits.llm, messages.llmRateLimited)));
+        await llmRoutes.register(contextRoutes, {
+          deps: { config: opts.config, llm: opts.llm, cache: opts.cache, store: opts.store, log },
+        });
+        await llmRoutes.register(translateRoutes, {
+          deps: { config: opts.config, llm: opts.llm, cache: opts.cache, log },
+        });
       });
     },
     { prefix: '/v1' },
