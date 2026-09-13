@@ -276,10 +276,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         continue;
       }
       var sent = 0;
+      final sentenceStarts = {for (final s in idx.sentences) s.firstWord};
       for (final w in idx.words) {
         if (sent >= _prefetchMaxPerPage || !mounted) break;
         final key = w.key;
         if (key.length < 3) continue;
+        // Capitalised mid-sentence → almost certainly a name; not worth a call.
+        if (_looksLikeName(w.text) && !sentenceStarts.contains(w.index)) continue;
         final rank = await store.rankOf(key);
         if (rank != null && rank <= _prefetchRankThreshold) continue;
         final sentence = await cache.sentenceFor(p, idx, w);
@@ -291,6 +294,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         );
       }
     }
+  }
+
+  static final RegExp _leadingPunct = RegExp('^[^a-zA-Z]+');
+
+  static bool _looksLikeName(String token) {
+    final t = token.replaceFirst(_leadingPunct, '');
+    if (t.isEmpty) return false;
+    final c = t[0];
+    return c.toUpperCase() == c && c.toLowerCase() != c;
   }
 
   // ---- helpers ----
