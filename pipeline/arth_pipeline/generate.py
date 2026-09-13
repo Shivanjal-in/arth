@@ -208,8 +208,16 @@ def _settle(
             first_error = str(e)
 
     log.warning("%s: attempt 1 failed: %s", extract["word"], first_error[:300])
-    retry = retry_request(req, result.content or "{}", first_error)
-    second = provider.complete(retry)
+    if result.finish_reason == "content_filter":
+        # The filter usually trips on a Wiktionary quotation, not on the word.
+        # Retry once with the examples stripped; the model writes its own.
+        log.warning("%s: content filter — retrying without examples", extract["word"])
+        stripped = {**extract, "senses": [{**s, "examples": []} for s in extract["senses"]]}
+        second = provider.complete(build_request(stripped, req.model))
+        extract = stripped
+    else:
+        retry = retry_request(req, result.content or "{}", first_error)
+        second = provider.complete(retry)
     usage = usage + second.usage
     if second.error or not second.content:
         err = f"attempt 2: {second.error or 'empty content'}"

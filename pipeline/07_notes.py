@@ -21,7 +21,7 @@ from typing import Any
 
 from pymongo import MongoClient, UpdateOne
 
-from arth_pipeline.config import DATA_DIR, config, read_wordlist
+from arth_pipeline.config import DATA_DIR, config, read_jsonl, read_wordlist
 from arth_pipeline.contracts import prompt_text, schema
 from arth_pipeline.generate import cost_usd
 from arth_pipeline.llm.openai_provider import OpenAIProvider
@@ -73,11 +73,7 @@ def main() -> None:
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
-    entries = {}
-    for line in args.inp.read_text(encoding="utf-8").splitlines():
-        if line.strip():
-            row = json.loads(line)
-            entries[row["word"]] = row["entry"]
+    entries = {row["word"]: row["entry"] for row in read_jsonl(args.inp)}
     wanted = [w.strip() for w in (args.words or "").split(",") if w.strip()]
     if args.words_file:
         wanted += read_wordlist(args.words_file)

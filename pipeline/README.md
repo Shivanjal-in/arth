@@ -58,6 +58,22 @@ done
   `--model` overrides for comparisons.
 - `arth_pipeline/models/` is generated from `contracts/schemas` by `./gen-models.sh`. Never hand-edit.
 
+## Full build (what was actually run)
+
+```sh
+.venv/bin/python 02_select.py --n 20000 --max-phrases 3000 --extra-words wordlists/compare50.txt --out data/select-full.json
+.venv/bin/python 03_extract.py --in data/select-full.json --out data/extract-full.json
+.venv/bin/python 04_generate.py --mode batch-submit --name full20k --in data/extract-full.json --out data/generated-full.jsonl
+.venv/bin/python 04_generate.py --mode batch-fetch  --name full20k --in data/extract-full.json
+# entries the batch could not validate (content filter, truncation) → live with more headroom
+.venv/bin/python 04_generate.py --mode live --max-output-tokens 7000 --in data/extract-full.json \
+    --words-file data/failed-words.txt --out data/generated-full.jsonl
+.venv/bin/python 05_load.py --in data/generated-full.jsonl --extract data/extract-full.json
+```
+
+23,001 entries (20,000 headwords + 3,000 phrases + review extras), 85k senses, on gpt-5.6-luna:
+$8.03 batch + ~$0.10 live retries. Batch jobs are chunked at 4,000 requests (200 MB file limit).
+
 ## Known limitations (deliberate for now)
 
 - Wiktionary phrases with placeholders (`make up one's mind`) are skipped: they can't be

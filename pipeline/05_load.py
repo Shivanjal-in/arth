@@ -21,7 +21,7 @@ from typing import Any
 from pymongo import MongoClient, UpdateOne
 from pymongo.collection import Collection
 
-from arth_pipeline.config import DATA_DIR, config
+from arth_pipeline.config import DATA_DIR, config, read_jsonl
 from arth_pipeline.models.dictionary_entry import DictionaryEntry
 from arth_pipeline.normalize import normalize_sentence, normalize_word
 
@@ -55,10 +55,7 @@ def main() -> None:
     form_ops: dict[str, UpdateOne] = {}
     phrase_ops: dict[str, UpdateOne] = {}
     bad = 0
-    for line in args.inp.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        row = json.loads(line)
+    for row in read_jsonl(args.inp):
         try:
             entry = DictionaryEntry.model_validate(row["entry"])  # never load anything off-contract
         except Exception as e:  # noqa: BLE001

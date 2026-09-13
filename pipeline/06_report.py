@@ -19,7 +19,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from arth_pipeline.config import DATA_DIR
+from arth_pipeline.config import DATA_DIR, read_jsonl
 
 # Words that are abstract or polysemous enough to stress the register. Used by `sample`
 # when present in the input; the rest of the sample is spread across freqRank.
@@ -43,13 +43,8 @@ STRESS_WORDS = [
 ]
 
 
-def read_jsonl(path: Path) -> dict[str, dict[str, Any]]:
-    rows = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if line.strip():
-            row = json.loads(line)
-            rows[row["word"]] = row
-    return rows
+def rows_by_word(path: Path) -> dict[str, dict[str, Any]]:
+    return {row["word"]: row for row in read_jsonl(path)}
 
 
 def render_entry(row: dict[str, Any], *, header: bool = True) -> str:
@@ -79,7 +74,7 @@ def render_entry(row: dict[str, Any], *, header: bool = True) -> str:
 
 
 def cmd_sample(args: argparse.Namespace) -> None:
-    rows = read_jsonl(args.inp)
+    rows = rows_by_word(args.inp)
     extract = json.loads((DATA_DIR / "extract.json").read_text(encoding="utf-8"))["entries"]
     rank = {e["word"]: e["freqRank"] for e in extract}
     ordered = sorted(rows, key=lambda w: rank.get(w, 10**9))
@@ -99,7 +94,7 @@ def cmd_sample(args: argparse.Namespace) -> None:
 
 
 def cmd_compare(args: argparse.Namespace) -> None:
-    files = [(p, read_jsonl(p)) for p in args.files]
+    files = [(p, rows_by_word(p)) for p in args.files]
     words: list[str] = []
     for _, rows in files:
         for w in rows:

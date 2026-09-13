@@ -30,7 +30,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from arth_pipeline.config import DATA_DIR, config, read_wordlist
+from arth_pipeline.config import DATA_DIR, config, read_jsonl, read_wordlist
 from arth_pipeline.generate import Outcome, build_request, cost_usd, generate_live, settle_batch
 from arth_pipeline.llm.openai_provider import OpenAIProvider
 from arth_pipeline.llm.provider import Usage
@@ -64,10 +64,8 @@ def load_extracts(path: Path, args: argparse.Namespace) -> list[dict[str, Any]]:
 def write_outcomes(out_path: Path, outcomes: list[Outcome], mode: str) -> None:
     existing: dict[str, dict[str, Any]] = {}
     if out_path.exists():
-        for line in out_path.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                row = json.loads(line)
-                existing[row["word"]] = row
+        for row in read_jsonl(out_path):
+            existing[row["word"]] = row
     failed_path = out_path.with_suffix(".failed.jsonl")
     failed: list[dict[str, Any]] = []
     for o in outcomes:
@@ -88,9 +86,12 @@ def write_outcomes(out_path: Path, outcomes: list[Outcome], mode: str) -> None:
             continue
         existing[o.word] = {**row, "entry": o.entry.model_dump()}
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    with out_path.open("w", encoding="utf-8") as f:
+    # Write to a temp file and rename so an interrupted run never leaves a half-written JSONL.
+    tmp = out_path.with_suffix(out_path.suffix + ".tmp")
+    with tmp.open("w", encoding="utf-8") as f:
         for row in existing.values():
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    tmp.replace(out_path)
     if failed:
         with failed_path.open("a", encoding="utf-8") as f:
             for row in failed:
@@ -142,9 +143,12 @@ def main() -> None:
     ap.add_argument("--words-file", type=Path, help="one word per line, in this order")
     ap.add_argument("--dry-run", action="store_true", help="build requests, print one, make no calls")
     ap.add_argument("--chunk", type=int, default=4000, help="max requests per Batch API job")
+    ap.add_argument("--max-output-tokens", type=int, help="override config (8-sense entries can exceed 3000)")
     args = ap.parse_args()
 
     extracts = load_extracts(args.inp, args)
+    if args.max_output_tokens:
+        object.__setattr__(config, "max_output_tokens", args.max_output_tokens)
 
     def model_for(x: dict[str, Any]) -> str:
         return args.model or config.model_for_tier(x["tier"])

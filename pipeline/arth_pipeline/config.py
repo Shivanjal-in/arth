@@ -73,3 +73,16 @@ class Config:
 
 
 config = Config()
+
+
+def read_jsonl(path: Path) -> list[dict]:
+    """JSONL rows. Splits on '\\n' only: str.splitlines() also breaks on U+2028 and
+    friends, which json.dumps leaves unescaped inside Hindi strings."""
+    import json
+
+    out = []
+    with path.open(encoding="utf-8") as f:
+        for line in f:
+            if line.strip():
+                out.append(json.loads(line))
+    return out

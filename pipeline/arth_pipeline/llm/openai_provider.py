@@ -73,6 +73,7 @@ class OpenAIProvider:
             usage=_usage(resp.usage),
             refusal=refusal,
             error=None if msg.content else f"empty content (finish_reason={choice.finish_reason})",
+            finish_reason=choice.finish_reason,
         )
 
     # ---- batch ----
@@ -144,6 +145,7 @@ class OpenAIProvider:
                         error=None
                         if msg.get("content")
                         else f"empty content ({choice.get('finish_reason')})",  # noqa: E501
+                        finish_reason=choice.get("finish_reason"),
                     )
                 )
         return results

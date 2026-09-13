@@ -13,10 +13,10 @@ contracts/  JSON Schemas, normalization spec + test vectors shared by all three
 ## Status
 
 - [x] Phase 1 — contracts + API skeleton (`/v1/lookup` on a 22-entry hand-written seed)
-- [~] Phase 2 — pipeline built and tested; 500-word generation waits on an OpenAI key
+- [x] Phase 2 — pipeline; full 23k-entry build on luna loaded to Atlas ($8.10 real cost)
 - [x] Phase 3 — `/context`, `/translate` (SSE), `/phrases/match`, content-hash cache, index-only experiment behind `CONTEXT_MODE`
 - [x] Phase 4 — Flutter app (reader + tooltip verified on a real PDF; /context and /translate light up with Phase 3)
-- [ ] Phase 5 — scale and harden
+- [x] Phase 5 — full-size build, prefetch, per-device rate limits, gzip seed, bilingual UI, error/empty states, attribution
 
 ## Setup
 
@@ -82,6 +82,9 @@ flutter run --release -d <device-id> --dart-define=ARTH_API_URL=http://192.168.x
 flutter run -d <simulator-id> --dart-define=ARTH_API_URL=http://127.0.0.1:3000 \
   --dart-define=ARTH_DEV_PDF_URL=http://127.0.0.1:8765/book.pdf
 ```
+
+The interface is English by default; **You → Interface language** switches to Hindi. Dictionary
+content is always Hindi. Strings live in `app/lib/app/strings.dart`.
 
 Debug builds expose `ext.arth.nav / tapWord / select / dismiss / state` VM-service
 extensions (`app/lib/app/dev_hooks.dart`) so the tooltip can be exercised on a

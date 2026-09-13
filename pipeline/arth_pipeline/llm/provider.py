@@ -42,6 +42,7 @@ class JsonResult:
     usage: Usage = field(default_factory=Usage)
     error: str | None = None
     refusal: str | None = None
+    finish_reason: str | None = None
 
 
 @dataclass(frozen=True)

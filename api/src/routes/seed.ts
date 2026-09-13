@@ -1,3 +1,4 @@
+import { createGzip } from 'node:zlib';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { ApiError, messages } from '../lib/errors.js';
@@ -38,11 +39,18 @@ export const seedRoutes: FastifyPluginAsync = async (app) => {
     ]);
     request.meta.seed = { since: since?.toISOString(), entries, forms, phrases };
 
+    // ~55 MB raw for the 20k slice, ~12 MB gzipped. Streamed through zlib so
+    // the first lines still arrive immediately; the phone's HTTP client
+    // decompresses transparently.
+    const gzip = (request.headers['accept-encoding'] ?? '').toString().includes('gzip');
     reply.raw.writeHead(200, {
       'content-type': 'application/x-ndjson; charset=utf-8',
       'cache-control': 'no-store',
+      ...(gzip ? { 'content-encoding': 'gzip' } : {}),
     });
-    const write = (obj: unknown) => reply.raw.write(JSON.stringify(obj) + '\n');
+    const out = gzip ? createGzip({ level: 6 }) : reply.raw;
+    if (gzip) (out as import('node:stream').Transform).pipe(reply.raw);
+    const write = (obj: unknown) => out.write(JSON.stringify(obj) + '\n');
 
     write({ t: 'meta', asOf: new Date().toISOString(), entries, forms, phrases });
 
@@ -57,7 +65,7 @@ export const seedRoutes: FastifyPluginAsync = async (app) => {
       write({ t: 'phrase', phrase: doc._id, lemma: doc.lemma, firstToken: doc.firstToken, tokenCount: doc.tokenCount });
     }
     write({ t: 'end' });
-    reply.raw.end();
+    out.end();
     return reply;
   });
 };
