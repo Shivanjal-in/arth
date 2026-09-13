@@ -48,7 +48,11 @@ class Config:
     model_tail: str = field(default_factory=lambda: _env("LLM_MODEL_TAIL", "gpt-5.6-luna"))
     top_tier_size: int = field(default_factory=lambda: int(_env("LLM_TOP_TIER_SIZE", "5000")))
 
-    temperature: float = 0.3
+    # Section 8 asks for 0.3, but the gpt-5.6 family rejects the parameter outright
+    # (400: unsupported). Leave LLM_TEMPERATURE unset to omit it; set it for models that accept it.
+    temperature: float | None = field(
+        default_factory=lambda: float(_env("LLM_TEMPERATURE", "")) if _env("LLM_TEMPERATURE", "") else None
+    )
     # Devanagari tokenizes ~2–3× worse than English; an entry with 8 senses can run long.
     max_output_tokens: int = 3000
     max_senses_per_entry: int = 8

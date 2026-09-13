@@ -110,7 +110,9 @@ def main() -> None:
             if fid and fid != lemma and fid not in loaded:
                 form_ops.setdefault(fid, UpdateOne({"_id": fid}, {"$set": {"lemma": lemma}}, upsert=True))
 
-    print(f"{len(entry_ops)} entries ({bad} invalid skipped), {len(form_ops)} forms, {len(phrase_ops)} phrases")  # noqa: E501
+    print(
+        f"{len(entry_ops)} entries ({bad} invalid skipped), {len(form_ops)} forms, {len(phrase_ops)} phrases"
+    )  # noqa: E501
 
     client = MongoClient(config.mongodb_uri, serverSelectionTimeoutMS=5000)
     db = client.get_default_database()

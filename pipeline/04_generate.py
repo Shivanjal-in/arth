@@ -174,49 +174,57 @@ def main() -> None:
         report(outcomes, extracts, batch=False)
 
     elif args.mode == "batch-submit":
-        reqs = [build_request(x, model_for(x)) for x in extracts]
-        models = sorted({r.model for r in reqs})
-        batch_id = provider.submit_batch(reqs, description=f"arth {args.name}: {len(reqs)} entries")
+        # The Batch API accepts one model per job, so tiered runs become one job per model.
+        by_model: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for x in extracts:
+            by_model[model_for(x)].append(x)
+        jobs = []
+        for model, xs in by_model.items():
+            reqs = [build_request(x, model) for x in xs]
+            desc = f"arth {args.name} {model}: {len(reqs)} entries"
+            batch_id = provider.submit_batch(reqs, description=desc)
+            jobs.append({"batchId": batch_id, "model": model, "words": [x["word"] for x in xs]})
+            print(f"submitted {batch_id}: {len(reqs)} requests on {model}")
         BATCH_DIR.mkdir(parents=True, exist_ok=True)
         state_path.write_text(
             json.dumps(
                 {
-                    "batchId": batch_id,
                     "submittedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                    "models": models,
-                    "override": args.model,
-                    "words": [x["word"] for x in extracts],
+                    "jobs": jobs,
                     "input": str(args.inp),
                     "out": str(args.out),
                 },
                 indent=1,
             )
         )
-        print(f"submitted batch {batch_id} with {len(reqs)} requests on {models}; state → {state_path}")
+        print(f"state → {state_path}")
 
     elif args.mode == "batch-status":
-        st = provider.batch_status(json.loads(state_path.read_text())["batchId"])
-        print(f"{st.id}: {st.status} — {st.completed}/{st.total} done, {st.failed} failed")
+        for job in json.loads(state_path.read_text())["jobs"]:
+            st = provider.batch_status(job["batchId"])
+            print(
+                f"{st.id} [{job['model']}]: {st.status} — {st.completed}/{st.total} done, {st.failed} failed"
+            )
 
     elif args.mode == "batch-fetch":
         state = json.loads(state_path.read_text())
-        st = provider.batch_status(state["batchId"])
-        if not st.done:
-            print(f"batch {st.id} is {st.status} ({st.completed}/{st.total}); try later")
-            return
-        words = set(state["words"])
         all_entries = json.loads(args.inp.read_text(encoding="utf-8"))["entries"]
-        extracts = [x for x in all_entries if x["word"] in words]
-        override = state.get("override")
-
-        def model_for_state(x: dict[str, Any]) -> str:
-            return override or config.model_for_tier(x["tier"])
-
-        results = provider.fetch_batch(state["batchId"])
-        print(f"fetched {len(results)} results for {len(extracts)} entries", file=sys.stderr)
-        outcomes = settle_batch(provider, extracts, results, model_for_state)
-        write_outcomes(Path(state.get("out", args.out)), outcomes, "batch")
-        report(outcomes, extracts, batch=True)
+        by_word = {x["word"]: x for x in all_entries}
+        outcomes: list[Outcome] = []
+        extracts = []
+        for job in state["jobs"]:
+            st = provider.batch_status(job["batchId"])
+            if not st.done:
+                print(f"batch {st.id} [{job['model']}] is {st.status} ({st.completed}/{st.total}); try later")
+                continue
+            xs = [by_word[w] for w in job["words"] if w in by_word]
+            results = provider.fetch_batch(job["batchId"])
+            print(f"{st.id}: fetched {len(results)} results for {len(xs)} entries", file=sys.stderr)
+            outcomes += settle_batch(provider, xs, results, lambda _x, m=job["model"]: m)
+            extracts += xs
+        if outcomes:
+            write_outcomes(Path(state.get("out", args.out)), outcomes, "batch")
+            report(outcomes, extracts, batch=True)
 
 
 if __name__ == "__main__":

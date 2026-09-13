@@ -24,7 +24,7 @@ def _body(req: JsonRequest, *, with_temperature: bool = True) -> dict[str, Any]:
         },
         "max_completion_tokens": req.max_output_tokens,
     }
-    if with_temperature:
+    if with_temperature and req.temperature is not None:
         body["temperature"] = req.temperature
     return body
 
@@ -57,7 +57,7 @@ class OpenAIProvider:
             resp = self._client.chat.completions.create(**_body(req, with_temperature=with_temp))
         except BadRequestError as e:
             # Some model families reject `temperature`; drop it for that model and retry once.
-            if with_temp and "temperature" in str(e):
+            if with_temp and req.temperature is not None and "temperature" in str(e):
                 log.warning("model %s rejects temperature; retrying without", req.model)
                 self._temperature_unsupported.add(req.model)
                 resp = self._client.chat.completions.create(**_body(req, with_temperature=False))

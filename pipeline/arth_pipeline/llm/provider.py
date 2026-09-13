@@ -30,7 +30,7 @@ class JsonRequest:
     messages: list[dict[str, str]]
     schema_name: str
     schema: dict[str, Any]
-    temperature: float = 0.3
+    temperature: float | None = None  # None = don't send the parameter
     max_output_tokens: int = 2000
 
 
