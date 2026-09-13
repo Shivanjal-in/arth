@@ -141,6 +141,7 @@ def main() -> None:
     ap.add_argument("--words", help="comma-separated words to include")
     ap.add_argument("--words-file", type=Path, help="one word per line, in this order")
     ap.add_argument("--dry-run", action="store_true", help="build requests, print one, make no calls")
+    ap.add_argument("--chunk", type=int, default=4000, help="max requests per Batch API job")
     args = ap.parse_args()
 
     extracts = load_extracts(args.inp, args)
@@ -178,13 +179,17 @@ def main() -> None:
         by_model: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for x in extracts:
             by_model[model_for(x)].append(x)
+        # One job per model, chunked: the fixed prompt prefix is repeated on every
+        # line, so 23k requests is ~210 MB, over the 200 MB input-file limit.
         jobs = []
         for model, xs in by_model.items():
-            reqs = [build_request(x, model) for x in xs]
-            desc = f"arth {args.name} {model}: {len(reqs)} entries"
-            batch_id = provider.submit_batch(reqs, description=desc)
-            jobs.append({"batchId": batch_id, "model": model, "words": [x["word"] for x in xs]})
-            print(f"submitted {batch_id}: {len(reqs)} requests on {model}")
+            for i in range(0, len(xs), args.chunk):
+                part = xs[i : i + args.chunk]
+                reqs = [build_request(x, model) for x in part]
+                desc = f"arth {args.name} {model} [{i}:{i + len(part)}]: {len(reqs)} entries"
+                batch_id = provider.submit_batch(reqs, description=desc)
+                jobs.append({"batchId": batch_id, "model": model, "words": [x["word"] for x in part]})
+                print(f"submitted {batch_id}: {len(reqs)} requests on {model}")
         BATCH_DIR.mkdir(parents=True, exist_ok=True)
         state_path.write_text(
             json.dumps(
