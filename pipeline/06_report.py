@@ -57,7 +57,8 @@ def render_entry(row: dict[str, Any], *, header: bool = True) -> str:
     u = row.get("usage", {})
     lines = []
     if header:
-        lines.append(f"## {e['word']}  ·  /{e['ipa']}/  ·  {e['hindiPronunciation']}")
+        ipa = f"/{e['ipa']}/  ·  " if e['ipa'] else ''
+        lines.append(f"## {e['word']}  ·  {ipa}{e['hindiPronunciation']}")
         lines.append(
             f"<sub>{row.get('model', '?')} · attempts {row.get('attempts', '?')} · "
             f"in {u.get('input', '?')} / out {u.get('output', '?')} tokens</sub>\n"
