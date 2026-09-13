@@ -8,6 +8,7 @@
 
 import 'dart:async';
 
+import 'package:arth/app/dev_hooks.dart';
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/theme.dart';
 import 'package:arth/core/normalize.dart';
@@ -33,9 +34,12 @@ const _pronouns = {
 };
 
 class ReaderScreen extends ConsumerStatefulWidget {
-  const ReaderScreen({required this.book, super.key});
+  const ReaderScreen({required this.book, required this.filePath, super.key});
 
   final Book book;
+
+  /// Absolute path, resolved against the documents directory at open time.
+  final String filePath;
 
   @override
   ConsumerState<ReaderScreen> createState() => _ReaderScreenState();
@@ -49,20 +53,78 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   PageTextCache? _cache;
   Timer? _selectionDebounce;
   bool _selectionHaptic = false;
-  Size _tooltipSize = const Size(340, 220);
   int? _page;
 
   @override
   void initState() {
     super.initState();
     _controller.addListener(_onViewerChanged);
+    _registerDevHooks();
   }
 
   @override
   void dispose() {
     _controller.removeListener(_onViewerChanged);
     _selectionDebounce?.cancel();
+    DevHooks.off('tapWord');
+    DevHooks.off('select');
+    DevHooks.off('dismiss');
+    DevHooks.off('state');
     super.dispose();
+  }
+
+  void _registerDevHooks() {
+    DevHooks.on('tapWord', (p) async {
+      final cache = _cache!;
+      final page = int.tryParse(p['page'] ?? '') ?? (_page ?? 1);
+      final idx = await cache.page(page);
+      final key = normalizeWord(p['word'] ?? '');
+      final nth = int.tryParse(p['nth'] ?? '') ?? 0;
+      final matches = idx.words.where((w) => w.key == key).toList();
+      if (matches.length <= nth) return {'ok': false, 'reason': 'word not on page'};
+      await _openWord(cache, page, idx, matches[nth]);
+      return {'ok': true, 'rect': matches[nth].rect.toString()};
+    });
+    DevHooks.on('select', (p) async {
+      final cache = _cache!;
+      final page = int.tryParse(p['page'] ?? '') ?? (_page ?? 1);
+      final idx = await cache.page(page);
+      final from = idx.words.indexWhere((w) => w.key == normalizeWord(p['from'] ?? ''));
+      final to = idx.words.indexWhere((w) => w.key == normalizeWord(p['to'] ?? ''), from);
+      if (from < 0 || to < 0) return {'ok': false, 'reason': 'words not on page'};
+      final span = SentenceSpan(firstWord: from, lastWord: to);
+      final text = normalizeSentence(idx.rawSentence(span));
+      _portal.show();
+      ref.read(readerControllerProvider.notifier).showSentence(
+            text: text,
+            anchor: idx.rectOf(span),
+            page: page,
+          );
+      return {'ok': true, 'text': text};
+    });
+    DevHooks.on('dismiss', (_) async {
+      ref.read(readerControllerProvider.notifier).dismiss();
+      return {'ok': true};
+    });
+    DevHooks.on('state', (_) async {
+      final s = ref.read(readerControllerProvider);
+      return {
+        'tooltip': s?.runtimeType.toString(),
+        'page': _page,
+        'ready': _cache != null,
+        if (s is WordTooltipState)
+          'word': {
+            'key': s.key,
+            'outcome': s.outcome?.runtimeType.toString(),
+            'lemma': s.outcome is LookupFound ? (s.outcome! as LookupFound).lemma : null,
+            'contextLoading': s.contextLoading,
+            'context': s.context?.toJson(),
+            'contextError': s.contextError,
+          },
+        if (s is SentenceTooltipState)
+          'sentence': {'text': s.text, 'hindi': s.hindi, 'error': s.error, 'done': s.done},
+      };
+    });
   }
 
   void _onViewerChanged() {
@@ -258,7 +320,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       body: Stack(
         children: [
           PdfViewer.file(
-            widget.book.path,
+            widget.filePath,
             key: _viewerKey,
             controller: _controller,
             initialPageNumber: widget.book.lastPage,
@@ -270,6 +332,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               ),
               // Our tooltip replaces the OS copy/paste menu entirely.
               buildContextMenu: (_, _) => null,
+              errorBannerBuilder: (ctx, error, stack, ref) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Text(
+                    'यह PDF खोली नहीं जा सकी। फ़ाइल हट गई हो सकती है — किताब को दोबारा जोड़ें।',
+                    style: const HindiText(1).body(c.inkMuted),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
               onGeneralTap: _onTap,
               onViewerReady: (doc, controller) {
                 _cache = PageTextCache(controller);
@@ -328,9 +400,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final padding = MediaQuery.paddingOf(ctx);
     final anchorOnScreen = _docToViewer(t.anchor).shift(_viewerOrigin);
     final usable = Size(screen.width, screen.height - padding.bottom);
+    // Place for the worst case (the height cap) rather than a measured height:
+    // a measured height is already clipped by the previous placement, which
+    // would feed back into a shrinking loop. Near the bottom third the tooltip
+    // therefore flips above even when short, which is the conventional feel.
     final placement = placeTooltip(
       anchor: anchorOnScreen,
-      tooltipSize: _tooltipSize,
+      tooltipSize: Size(340, usable.height * 0.45),
       screen: usable,
     );
     // Horizontal shift from "centred on the anchor" to the clamped position.
@@ -355,49 +431,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         targetAnchor: placement.above ? Alignment.topCenter : Alignment.bottomCenter,
         followerAnchor: placement.above ? Alignment.bottomCenter : Alignment.topCenter,
         offset: Offset(dx, 0),
-        child: _MeasureSize(
-          onChange: (s) {
-            if ((s.height - _tooltipSize.height).abs() > 4 && mounted) {
-              setState(() => _tooltipSize = s);
-            }
-          },
-          child: TooltipCard(
-            width: placement.width,
-            maxHeight: placement.maxHeight,
-            above: placement.above,
-            child: child,
-          ),
+        child: TooltipCard(
+          width: placement.width,
+          maxHeight: placement.maxHeight,
+          above: placement.above,
+          child: child,
         ),
       ),
     );
-  }
-}
-
-/// Reports the child's laid-out size after each frame it changes.
-class _MeasureSize extends StatefulWidget {
-  const _MeasureSize({required this.onChange, required this.child});
-
-  final ValueChanged<Size> onChange;
-  final Widget child;
-
-  @override
-  State<_MeasureSize> createState() => _MeasureSizeState();
-}
-
-class _MeasureSizeState extends State<_MeasureSize> {
-  final GlobalKey _key = GlobalKey();
-  Size? _last;
-
-  @override
-  Widget build(BuildContext context) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final box = _key.currentContext?.findRenderObject() as RenderBox?;
-      if (box == null || !box.hasSize) return;
-      if (_last != box.size) {
-        _last = box.size;
-        widget.onChange(box.size);
-      }
-    });
-    return KeyedSubtree(key: _key, child: widget.child);
   }
 }

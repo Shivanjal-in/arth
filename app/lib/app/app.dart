@@ -1,3 +1,4 @@
+import 'package:arth/app/dev_hooks.dart';
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/router.dart';
 import 'package:arth/app/theme.dart';
@@ -16,6 +17,15 @@ class ArthApp extends ConsumerStatefulWidget {
 
 class _ArthAppState extends ConsumerState<ArthApp> {
   late final GoRouter router = buildRouter(needsSeed: widget.needsSeed);
+
+  @override
+  void initState() {
+    super.initState();
+    DevHooks.on('nav', (p) async {
+      router.go(p['to'] ?? '/');
+      return {'ok': true};
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

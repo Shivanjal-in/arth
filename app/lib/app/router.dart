@@ -11,6 +11,7 @@ import 'package:arth/features/settings/settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path/path.dart' as p;
 
 GoRouter buildRouter({required bool needsSeed}) => GoRouter(
       initialLocation: needsSeed ? '/seed' : '/',
@@ -80,6 +81,6 @@ class _ReaderRoute extends ConsumerWidget {
     if (book == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    return ReaderScreen(book: book);
+    return ReaderScreen(book: book, filePath: p.join(ref.read(documentsDirProvider), book.path));
   }
 }

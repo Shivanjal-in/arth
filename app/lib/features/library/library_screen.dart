@@ -12,7 +12,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
@@ -23,15 +22,15 @@ class LibraryScreen extends ConsumerWidget {
       allowedExtensions: ['pdf'],
     );
     if (file == null) return;
-    final dir = Directory(p.join((await getApplicationDocumentsDirectory()).path, 'books'));
-    await dir.create(recursive: true);
-    final dest = p.join(dir.path, '${DateTime.now().millisecondsSinceEpoch}_${file.name}');
+    final docs = ref.read(documentsDirProvider);
+    await Directory(p.join(docs, 'books')).create(recursive: true);
+    final rel = p.join('books', '${DateTime.now().millisecondsSinceEpoch}_${file.name}');
     // Stream-copy: the picker's URI may not be a plain file path (Android SAF).
-    final sink = File(dest).openWrite();
+    final sink = File(p.join(docs, rel)).openWrite();
     await sink.addStream(file.readAsByteStream());
     await sink.close();
     final title = p.basenameWithoutExtension(file.name).replaceAll(RegExp('[_-]+'), ' ');
-    final book = await ref.read(libraryProvider.notifier).add(title: title, path: dest);
+    final book = await ref.read(libraryProvider.notifier).add(title: title, path: rel);
     if (context.mounted) unawaited(context.push('/read/${book.id}'));
   }
 
@@ -148,7 +147,7 @@ class _BookTile extends ConsumerWidget {
         if (ok ?? false) {
           await ref.read(libraryProvider.notifier).remove(book.id);
           try {
-            await File(book.path).delete();
+            await File(p.join(ref.read(documentsDirProvider), book.path)).delete();
           } on FileSystemException {
             // already gone
           }

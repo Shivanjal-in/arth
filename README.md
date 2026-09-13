@@ -15,7 +15,7 @@ contracts/  JSON Schemas, normalization spec + test vectors shared by all three
 - [x] Phase 1 — contracts + API skeleton (`/v1/lookup` on a 22-entry hand-written seed)
 - [~] Phase 2 — pipeline built and tested; 500-word generation waits on an OpenAI key
 - [ ] Phase 3 — `/context`, `/translate`, `/phrases/match`, cache
-- [ ] Phase 4 — Flutter app
+- [x] Phase 4 — Flutter app (reader + tooltip verified on a real PDF; /context and /translate light up with Phase 3)
 - [ ] Phase 5 — scale and harden
 
 ## Setup
@@ -56,6 +56,26 @@ cp .env.example .env          # add OPENAI_API_KEY and the same MONGODB_URI as a
 ```
 
 See `pipeline/README.md` for the generate → load steps and the review reports.
+
+### App
+
+```sh
+cd app
+flutter pub get
+python3 tool/gen_models.py && dart run build_runner build -d   # only after a contracts/ change
+flutter test && flutter analyze
+
+# A phone can't reach localhost on the Mac: pass the LAN IP (or set it later in Settings → सर्वर).
+flutter run --release -d <device-id> --dart-define=ARTH_API_URL=http://192.168.x.x:3000
+
+# Simulator smoke test: import a PDF automatically and drive the reader over the VM service
+flutter run -d <simulator-id> --dart-define=ARTH_API_URL=http://127.0.0.1:3000 \
+  --dart-define=ARTH_DEV_PDF_URL=http://127.0.0.1:8765/book.pdf
+```
+
+Debug builds expose `ext.arth.nav / tapWord / select / dismiss / state` VM-service
+extensions (`app/lib/app/dev_hooks.dart`) so the tooltip can be exercised on a
+simulator without touch automation. App icon: `python3 tool/make_icon.py`.
 
 ### Contracts
 

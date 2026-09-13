@@ -11,6 +11,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// Opened once in main() before runApp so screens never see a loading store.
 final localStoreProvider = Provider<LocalStore>((_) => throw UnimplementedError());
 
+/// The app documents directory, resolved once in main(). Book paths are stored
+/// relative to it: iOS moves the sandbox on every reinstall, so absolute paths
+/// silently break.
+final documentsDirProvider = Provider<String>((_) => throw UnimplementedError());
+
 final settingsProvider = NotifierProvider<SettingsNotifier, Settings>(SettingsNotifier.new);
 
 class SettingsNotifier extends Notifier<Settings> {

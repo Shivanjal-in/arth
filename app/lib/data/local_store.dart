@@ -33,6 +33,8 @@ class Book {
 
   final int id;
   final String title;
+
+  /// Relative to the app documents directory (see documentsDirProvider).
   final String path;
   final DateTime addedAt;
   final int? pageCount;
