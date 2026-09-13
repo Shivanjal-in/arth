@@ -12,12 +12,14 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --import tsx --test test/*.test.ts",
-    "seed": "node --env-file=.env --import tsx scripts/seed.ts"
+    "seed": "node --env-file=.env --import tsx scripts/seed.ts",
+    "bench:context": "node --env-file=.env --import tsx scripts/context-bench.ts"
   },
   "dependencies": {
     "ajv": "^8.17.1",
     "fastify": "^5.3.0",
     "mongoose": "^8.14.0",
+    "openai": "^7.15.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {

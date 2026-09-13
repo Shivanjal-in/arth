@@ -1,11 +1,17 @@
-import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
+import Fastify, { LogController, type FastifyInstance, type FastifyRequest } from 'fastify';
 import { ApiError, messages } from './lib/errors.js';
 import { fail } from './lib/envelope.js';
 import { schemas } from './contracts.js';
+import { contextRoutes } from './routes/context.js';
 import { healthRoutes } from './routes/health.js';
 import { lookupRoutes } from './routes/lookup.js';
+import { phraseRoutes } from './routes/phrases.js';
 import { seedRoutes } from './routes/seed.js';
-import type { LemmaStore } from './services/lemma.js';
+import { translateRoutes } from './routes/translate.js';
+import type { CacheStore } from './cache/cache.js';
+import type { Config } from './config.js';
+import type { LLMProvider } from './llm/provider.js';
+import type { Store } from './services/mongo-store.js';
 
 /** Per-request facts that end up on the one structured log line per request. */
 export type RequestMeta = {
@@ -14,6 +20,9 @@ export type RequestMeta = {
   cache?: 'hit' | 'miss' | 'bypass';
   tokens?: { input: number; output: number; cachedInput?: number };
   model?: string;
+  phrase?: string;
+  context?: { lemma: string; mode: string; senseIndex: number; clamped: boolean; llmMs: number };
+  translate?: { chars: number; retried: boolean };
 };
 
 declare module 'fastify' {
@@ -24,13 +33,26 @@ declare module 'fastify' {
 
 export type AppOptions = {
   logLevel?: string;
-  store: LemmaStore;
+  store: Store;
+  cache: CacheStore;
+  llm: LLMProvider;
+  config: Pick<
+    Config,
+    | 'CONTEXT_MODE'
+    | 'LLM_CONTEXT_MODEL'
+    | 'LLM_CONTEXT_INDEX_MODEL'
+    | 'LLM_TRANSLATE_MODEL'
+    | 'LLM_TEMPERATURE'
+    | 'LLM_CONTEXT_MAX_TOKENS'
+    | 'LLM_TRANSLATE_MAX_TOKENS'
+  >;
 };
 
 export function buildApp(opts: AppOptions): FastifyInstance {
   const app = Fastify({
     logger: { level: opts.logLevel ?? 'info' },
-    disableRequestLogging: true, // we emit our own single line in onResponse
+    // We emit our own single line per request in onResponse.
+    logController: new LogController({ disableRequestLogging: true }),
   });
 
   // Fastify forbids sharing one object across requests via decorateRequest,
@@ -85,6 +107,14 @@ export function buildApp(opts: AppOptions): FastifyInstance {
       await v1.register(healthRoutes);
       await v1.register(lookupRoutes, { store: opts.store });
       await v1.register(seedRoutes);
+      await v1.register(phraseRoutes, { store: opts.store });
+      const log = { warn: (obj: object, msg: string) => app.log.warn(obj, msg) };
+      await v1.register(contextRoutes, {
+        deps: { config: opts.config, llm: opts.llm, cache: opts.cache, store: opts.store, log },
+      });
+      await v1.register(translateRoutes, {
+        deps: { config: opts.config, llm: opts.llm, cache: opts.cache, log },
+      });
     },
     { prefix: '/v1' },
   );

@@ -1,10 +1,18 @@
 import { loadConfig } from './config.js';
 import { buildApp } from './app.js';
 import { connectMongo, disconnectMongo } from './db/connect.js';
-import { mongoLemmaStore } from './services/mongo-store.js';
+import { mongoStore } from './services/mongo-store.js';
+import { mongoCache, withMemory } from './cache/cache.js';
+import { OpenAIProvider } from './llm/openai.js';
 
 const config = loadConfig();
-const app = buildApp({ logLevel: config.LOG_LEVEL, store: mongoLemmaStore });
+const app = buildApp({
+  logLevel: config.LOG_LEVEL,
+  store: mongoStore,
+  cache: withMemory(mongoCache),
+  llm: new OpenAIProvider(config.OPENAI_API_KEY),
+  config,
+});
 
 try {
   await connectMongo(config.MONGODB_URI);

@@ -5,6 +5,19 @@ const EnvSchema = z.object({
   HOST: z.string().default('0.0.0.0'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   MONGODB_URI: z.string().url(),
+
+  // --- LLM (Phase 3) ---
+  OPENAI_API_KEY: z.string().default(''),
+  LLM_CONTEXT_MODEL: z.string().default('gpt-5.6-luna'),
+  LLM_TRANSLATE_MODEL: z.string().default('gpt-5.6-luna'),
+  /** Model for the index-only context path (a nano-class model once one is named). */
+  LLM_CONTEXT_INDEX_MODEL: z.string().default('gpt-5.6-luna'),
+  /** live: model picks the sense and writes the note. index: model picks the sense; note is pre-written. */
+  CONTEXT_MODE: z.enum(['live', 'index']).default('live'),
+  LLM_TEMPERATURE: z.coerce.number().optional(),
+  // Includes hidden reasoning tokens on the gpt-5.6 family; the visible note is ~100.
+  LLM_CONTEXT_MAX_TOKENS: z.coerce.number().int().default(900),
+  LLM_TRANSLATE_MAX_TOKENS: z.coerce.number().int().default(1200),
 });
 
 export type Config = z.infer<typeof EnvSchema>;

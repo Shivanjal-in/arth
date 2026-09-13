@@ -1,35 +1,12 @@
 import { test, describe, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { buildApp } from '../src/app.js';
-import type { LemmaStore } from '../src/services/lemma.js';
-import { validate, type DictionaryEntry } from '../src/contracts.js';
+import { validate } from '../src/contracts.js';
 
-type SeedFile = {
-  entries: (DictionaryEntry & { freqRank: number })[];
-  forms: { form: string; lemma: string }[];
-};
-const seed = JSON.parse(
-  readFileSync(fileURLToPath(new URL('../seed/seed.json', import.meta.url)), 'utf8'),
-) as SeedFile;
+import { appOptions, seed, FakeLLM } from './fakes.js';
 
 const entries = new Map(seed.entries.map((e) => [e.word, e]));
-const forms = new Map(seed.forms.map((f) => [f.form, f.lemma]));
-
-const store: LemmaStore = {
-  async findEntry(id) {
-    const e = entries.get(id);
-    if (!e) return null;
-    const { freqRank: _r, ...wire } = e;
-    return wire;
-  },
-  async findFormLemma(form) {
-    return forms.get(form) ?? null;
-  },
-};
-
-const app = buildApp({ logLevel: 'silent', store });
+const app = buildApp(appOptions(new FakeLLM({})));
 after(() => app.close());
 
 describe('seed file', () => {

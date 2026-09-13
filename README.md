@@ -14,7 +14,7 @@ contracts/  JSON Schemas, normalization spec + test vectors shared by all three
 
 - [x] Phase 1 — contracts + API skeleton (`/v1/lookup` on a 22-entry hand-written seed)
 - [~] Phase 2 — pipeline built and tested; 500-word generation waits on an OpenAI key
-- [ ] Phase 3 — `/context`, `/translate`, `/phrases/match`, cache
+- [x] Phase 3 — `/context`, `/translate` (SSE), `/phrases/match`, content-hash cache, index-only experiment behind `CONTEXT_MODE`
 - [x] Phase 4 — Flutter app (reader + tooltip verified on a real PDF; /context and /translate light up with Phase 3)
 - [ ] Phase 5 — scale and harden
 
@@ -34,7 +34,17 @@ npm run dev                   # http://localhost:3000
 curl 'localhost:3000/v1/lookup?word=fortune'
 curl 'localhost:3000/v1/lookup?word=Wives'      # → wife, via lowercase + forms
 curl 'localhost:3000/v1/lookup?word=in%20want%20of'
+curl -X POST localhost:3000/v1/context -H 'content-type: application/json' \
+  -d '{"word":"single","sentence":"It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife."}'
+curl -N -X POST localhost:3000/v1/translate -H 'content-type: application/json' -d '{"text":"It is a truth universally acknowledged."}'   # SSE
+curl -X POST localhost:3000/v1/phrases/match -H 'content-type: application/json' -d '{"tokens":["must","be","in","want","of"],"index":3}'
 ```
+
+`/context` and `/translate` need `OPENAI_API_KEY` in `api/.env`. Every LLM call goes through
+`src/llm/provider.ts`; results are cached forever in the `cache` collection by content hash
+(`contracts/normalize.md`), with an in-process LRU in front. `/v1/health` reports the hit rate.
+`CONTEXT_MODE=index` switches `/context` to the index-only path (model classifies, note comes
+from `senseNotes` written by `pipeline/07_notes.py`); `npm run bench:context` compares both.
 
 Tests (no Mongo needed — lemma resolution runs on an in-memory store):
 
