@@ -4,11 +4,13 @@ import { fail } from './lib/envelope.js';
 import { schemas } from './contracts.js';
 import { healthRoutes } from './routes/health.js';
 import { lookupRoutes } from './routes/lookup.js';
+import { seedRoutes } from './routes/seed.js';
 import type { LemmaStore } from './services/lemma.js';
 
 /** Per-request facts that end up on the one structured log line per request. */
 export type RequestMeta = {
   lookup?: { word: string; lemma?: string; via: string };
+  seed?: { since: string | undefined; entries: number; forms: number; phrases: number };
   cache?: 'hit' | 'miss' | 'bypass';
   tokens?: { input: number; output: number; cachedInput?: number };
   model?: string;
@@ -82,6 +84,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     async (v1) => {
       await v1.register(healthRoutes);
       await v1.register(lookupRoutes, { store: opts.store });
+      await v1.register(seedRoutes);
     },
     { prefix: '/v1' },
   );
