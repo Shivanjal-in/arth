@@ -3,14 +3,32 @@
  * validators. These are the same files the pipeline and the Dart codegen use;
  * nothing about the wire types is defined only in TypeScript.
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Ajv, type ValidateFunction, type ErrorObject } from 'ajv';
 
-const schemasDir = fileURLToPath(new URL('../../contracts/schemas/', import.meta.url));
+/**
+ * contracts/ sits at the repo root, beside api/. Walk up from this module so
+ * the path works both from src/ (tsx) and from dist/src/ (compiled), or from
+ * wherever CONTRACTS_DIR points.
+ */
+function findContractsDir(): string {
+  if (process.env['CONTRACTS_DIR']) return process.env['CONTRACTS_DIR'];
+  let dir = dirname(fileURLToPath(import.meta.url));
+  for (let i = 0; i < 6; i++) {
+    const candidate = join(dir, 'contracts');
+    if (existsSync(join(candidate, 'normalize.md'))) return candidate;
+    dir = dirname(dir);
+  }
+  throw new Error('contracts/ directory not found; set CONTRACTS_DIR');
+}
+
+const contractsDir = findContractsDir() + '/';
+const schemasDir = join(contractsDir, 'schemas') + '/';
 
 function load(name: string): Record<string, unknown> {
-  return JSON.parse(readFileSync(new URL(name, `file://${schemasDir}`), 'utf8')) as Record<string, unknown>;
+  return JSON.parse(readFileSync(join(schemasDir, name), 'utf8')) as Record<string, unknown>;
 }
 
 export const schemas = {
@@ -21,8 +39,6 @@ export const schemas = {
   phraseMatch: load('phrase-match.json'),
   apiError: load('api-error.json'),
 } as const;
-
-const contractsDir = fileURLToPath(new URL('../../contracts/', import.meta.url));
 
 /** System prompts shared with the pipeline, verbatim. */
 export function promptText(name: 'context-system' | 'translate-system'): string {

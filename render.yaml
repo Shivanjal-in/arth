@@ -1,0 +1,33 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# Deploys the API. The repo root is the service root so api/ can read ../contracts.
+services:
+  - type: web
+    name: arth-api
+    runtime: node
+    plan: starter            # free tier sleeps after 15 min idle; starter stays warm (matters for the LRU cache)
+    region: singapore        # closest to India; put the Atlas cluster in ap-south-1 (Mumbai) or ap-southeast-1
+    buildCommand: cd api && npm ci && npm run build
+    startCommand: cd api && npm start
+    healthCheckPath: /v1/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: LOG_LEVEL
+        value: info
+      - key: MONGODB_URI
+        sync: false          # set in the dashboard: mongodb+srv://…/arth
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: LLM_CONTEXT_MODEL
+        value: gpt-5.6-luna
+      - key: LLM_TRANSLATE_MODEL
+        value: gpt-5.6-luna
+      - key: LLM_CONTEXT_INDEX_MODEL
+        value: gpt-5.6-luna
+      - key: CONTEXT_MODE
+        value: live
+      - key: RATE_LIMIT_LOOKUPS
+        value: "60"
+      - key: RATE_LIMIT_LLM
+        value: "20"

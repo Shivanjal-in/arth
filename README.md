@@ -97,6 +97,14 @@ simulator without touch automation. App icon: `python3 tool/make_icon.py`.
 `contracts/normalize-vectors.json` — TypeScript (`api/test/normalize.test.ts`) and Python
 (`pipeline/tests/test_normalize.py`) do; Dart is added in Phase 4.
 
+## Deploying the API (Render)
+
+`render.yaml` at the repo root is a Blueprint: New → Blueprint in the Render dashboard, pick
+this repo, set `MONGODB_URI` and `OPENAI_API_KEY` when prompted. Build is
+`cd api && npm ci && npm run build`, start is `cd api && npm start`, health check `/v1/health`.
+Then point the app at it: `--dart-define=ARTH_API_URL=https://<service>.onrender.com`
+or **You → API server** in the app.
+
 ## Conventions
 
 - Secrets only in `.env`; `.env.example` is checked in. The app never holds the OpenAI key.
