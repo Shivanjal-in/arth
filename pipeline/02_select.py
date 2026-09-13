@@ -54,11 +54,17 @@ def phrase_ok(word: str, entry: dict) -> bool:
     return has_usable_sense(entry, strict=True)
 
 
-def scan_wiktionary() -> tuple[set[str], dict[str, str], dict[str, list[str]]]:
-    """One pass: headwords with real senses, form → lemma, and multi-word headwords → tokens."""
+def phrase_weight(entry: dict) -> int:
+    """Evidence the phrase is common: sense-level translation counts (same signal 03_extract
+    uses to rank senses). 'as well as' scores in the dozens; 'for to' scores 0."""
+    return sum(len(s.get("translations") or ()) for s in entry.get("senses") or ())
+
+
+def scan_wiktionary() -> tuple[set[str], dict[str, str], dict[str, tuple[list[str], int]]]:
+    """One pass: headwords with real senses, form → lemma, and multi-word headwords → (tokens, weight)."""
     headwords: set[str] = set()
     form_to_lemma: dict[str, str] = {}
-    phrases: dict[str, list[str]] = {}
+    phrases: dict[str, tuple[list[str], int]] = {}
     n = 0
     for line in iter_lines():
         n += 1
@@ -72,7 +78,9 @@ def scan_wiktionary() -> tuple[set[str], dict[str, str], dict[str, list[str]]]:
         if has_usable_sense(entry):
             headwords.add(word)
             if " " in word and phrase_ok(word, entry):
-                phrases[word] = word.split(" ")
+                prev = phrases.get(word)
+                weight = phrase_weight(entry) + (prev[1] if prev else 0)
+                phrases[word] = (word.split(" "), weight)
             # Inflections listed on the headword itself (fortune → fortunes), only
             # rows with a tag set we can label; that excludes alt spellings and table noise.
             if " " not in word:
@@ -156,10 +164,11 @@ def main() -> None:
             added += 1
         print(f"extra words: {added} added from {args.extra_words}")
 
-    # Phrases: every token must resolve to a selected lemma. Rank = rarest constituent.
+    # Phrases: every token must resolve to a selected lemma. freqRank = rarest
+    # constituent (drives the tier); the cap keeps the best-attested phrases.
     lemma_rank = {w: e["freqRank"] for w, e in selected.items()}
     chosen: list[dict] = []
-    for phrase, toks in phrases.items():
+    for phrase, (toks, weight) in phrases.items():
         ranks = []
         for t in toks:
             k = normalize_word(t)
@@ -170,9 +179,11 @@ def main() -> None:
         else:
             r = max(ranks)
             tier = "top" if r <= config.top_tier_size else "tail"
-            chosen.append({"word": phrase, "freqRank": r, "tier": tier, "isPhrase": True})
-    chosen.sort(key=lambda e: (e["freqRank"], e["word"]))
+            chosen.append({"word": phrase, "freqRank": r, "tier": tier, "isPhrase": True, "weight": weight})
+    chosen.sort(key=lambda e: (-e["weight"], e["freqRank"], e["word"]))
     chosen = chosen[: args.max_phrases]
+    for e in chosen:
+        del e["weight"]
     print(f"phrases: {len(chosen)} kept (cap {args.max_phrases})")
 
     # Forms that point at selected lemmas — 05_load.py needs these for the `forms` collection.

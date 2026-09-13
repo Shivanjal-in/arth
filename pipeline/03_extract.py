@@ -38,6 +38,10 @@ _YEAR_RE = re.compile(r"\b(1[0-9]{3}|20[0-9]{2})\b")
 _YEAR_PREFIX_RE = re.compile(r"^(1[0-9]{3}|20[0-9]{2})\b")
 # POS that rarely matter to a reader get at most one sense so they don't crowd out nouns/verbs.
 MINOR_POS = {"intj", "particle", "det", "article", "contraction", "num"}
+# A POS earns a guaranteed slot only if its best sense has real evidence of use:
+# at least MIN_POS_SCORE, and at least MIN_POS_RATIO of the word's top score.
+MIN_POS_SCORE = 5
+MIN_POS_RATIO = 0.1
 
 
 def clean_example(text: str) -> str | None:
@@ -72,19 +76,27 @@ def sense_examples(sense: dict[str, Any], limit: int) -> list[str]:
 
 
 def sense_score(sense: dict[str, Any]) -> int:
-    """Higher = more likely the meaning a reader meets. Wiktionary lists senses
-    etymologically, not by commonness, so nudge: plain examples and synonyms are
-    evidence of a live sense; domain labels and restricted registers are not."""
-    score = 0
+    """Higher = more likely the meaning a reader meets.
+
+    Wiktionary lists senses etymologically, not by commonness. The strongest
+    commonness signal in kaikki is how many languages editors bothered to
+    translate a sense into: for "fair", "Just." has 91 sense-level translations
+    and "(shipbuilding) smooth" has 0. Examples and synonyms nudge; domain
+    labels, archaic/dated and restricted registers push down without excluding.
+    """
+    score = len(sense.get("translations") or ())
     if any(ex.get("type") != "quotation" and not ex.get("ref") for ex in sense.get("examples") or ()):
-        score += 2
+        score += 3
     if sense.get("synonyms"):
         score += 1
     gloss = gloss_text(sense)
     if gloss.startswith("("):
-        score -= 1
+        score -= 2
+    tags = set(sense.get("tags") or ())
+    if tags & {"archaic", "dated", "literary", "historical"}:
+        score -= 4
     if sense_is_restricted(sense):
-        score -= 3
+        score -= 8
     return score
 
 
@@ -155,14 +167,31 @@ def extract_word(word: str, entries: list[dict[str, Any]], is_phrase: bool) -> d
     if not buckets:
         return None
 
-    # Round-robin across POS buckets (best sense of each first) so "set" keeps
-    # noun and verb senses instead of eight nouns.
-    queues = [[x[2] for x in sorted(b)][: 1 if pos in MINOR_POS else None] for pos, b in buckets.items()]
+    # Two passes. First, the best sense of every POS that is actually in use
+    # (score >= MIN_POS_SCORE) so "set" keeps noun and verb. Then fill the
+    # remaining slots by score across all POS, so a word's eight senses are its
+    # eight commonest, not one obscure verb per POS.
+    ranked = sorted(
+        ((score, order, pos, sense) for pos, b in buckets.items() for (score, order, sense) in b),
+        key=lambda x: (x[0], x[1]),
+    )
     senses: list[dict[str, Any]] = []
-    while len(senses) < config.max_senses_per_entry and any(queues):
-        for q in queues:
-            if q and len(senses) < config.max_senses_per_entry:
-                senses.append(q.pop(0))
+    seen_pos: set[str] = set()
+    top_score = -ranked[0][0] if ranked else 0
+    floor = max(MIN_POS_SCORE, MIN_POS_RATIO * top_score)
+    for score, _order, pos, sense in ranked:
+        if pos in seen_pos or -score < floor:
+            continue
+        seen_pos.add(pos)
+        senses.append(sense)
+    minor_used = {pos for pos in seen_pos if pos in MINOR_POS}
+    for _score, _order, pos, sense in ranked:
+        if len(senses) >= config.max_senses_per_entry:
+            break
+        if any(sense is s for s in senses) or pos in minor_used:
+            continue
+        senses.append(sense)
+    senses = senses[: config.max_senses_per_entry]
     senses = [{"index": i, **s} for i, s in enumerate(senses)]
 
     return {
