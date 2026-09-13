@@ -57,7 +57,7 @@ def test_request_has_fixed_prefix_then_word() -> None:
         (lambda o: o["senses"].pop(), "expected 3 senses"),
         (lambda o: o["senses"][0].__setitem__("index", 7), "index"),
         (lambda o: o["senses"][0].__setitem__("meaning", "wealth"), "no Devanagari"),
-        (lambda o: o["senses"][0].__setitem__("definition", "बहुत सारा money"), "Latin letters"),
+        (lambda o: o["senses"][0].__setitem__("definition", "बहुत सारा money"), "English word"),
         (lambda o: o["synonyms"].pop(), "synonyms: en list"),
         (lambda o: o["forms"][0].__setitem__("label", "plural"), "forms: (en, label)"),
         (lambda o: o.__setitem__("hindiPronunciation", ""), "empty"),

@@ -25,7 +25,9 @@ from .models.entry_generation import EntryGeneration
 
 log = logging.getLogger(__name__)
 
-_LATIN = re.compile(r"[A-Za-z]")
+# A real English word leaking into Hindi prose. Single letters (x, f, "the letter O")
+# and short tokens are legitimate in definitions and examples.
+_LATIN_WORD = re.compile(r"[A-Za-z]{3,}")
 _DEVANAGARI = re.compile("[" + chr(0x0900) + "-" + chr(0x097F) + "]")  # Devanagari block
 
 
@@ -108,13 +110,13 @@ def retry_request(base: JsonRequest, bad_content: str, error: str) -> JsonReques
 # ---- validation ----
 
 
-def _check_hindi(path: str, value: str, errors: list[str]) -> None:
+def _check_hindi(path: str, value: str, errors: list[str], *, allow_latin: bool = False) -> None:
     if not value.strip():
         errors.append(f"{path}: empty")
     elif not _DEVANAGARI.search(value):
         errors.append(f"{path}: no Devanagari in {value!r}")
-    elif _LATIN.search(value):
-        errors.append(f"{path}: Latin letters in Hindi field {value!r}")
+    elif not allow_latin and _LATIN_WORD.search(value):
+        errors.append(f"{path}: English word in Hindi field {value!r}")
 
 
 def parse_generation(extract: dict[str, Any], content: str) -> DictionaryEntry:
@@ -138,7 +140,7 @@ def parse_generation(extract: dict[str, Any], content: str) -> DictionaryEntry:
         _check_hindi(f"senses[{i}].meaning", got.meaning, errors)
         _check_hindi(f"senses[{i}].definition", got.definition, errors)
         for j, ex in enumerate(got.examples):
-            _check_hindi(f"senses[{i}].examples[{j}].hi", ex.hi, errors)
+            _check_hindi(f"senses[{i}].examples[{j}].hi", ex.hi, errors, allow_latin=True)
             if not ex.en.strip():
                 errors.append(f"senses[{i}].examples[{j}].en: empty")
 
@@ -148,14 +150,14 @@ def parse_generation(extract: dict[str, Any], content: str) -> DictionaryEntry:
         if got_en != exp_en:
             errors.append(f"{key}: en list must be exactly {exp_en}, got {got_en}")
         for j, p in enumerate(getattr(gen, key)):
-            _check_hindi(f"{key}[{j}].hi", p.hi, errors)
+            _check_hindi(f"{key}[{j}].hi", p.hi, errors, allow_latin=True)
 
     got_forms = [(f.en, f.label) for f in gen.forms]
     exp_forms = [(f["en"], f["label"]) for f in extract.get("forms", [])]
     if got_forms != exp_forms:
         errors.append(f"forms: (en, label) pairs must be exactly {exp_forms}, got {got_forms}")
     for j, f in enumerate(gen.forms):
-        _check_hindi(f"forms[{j}].hi", f.hi, errors)
+        _check_hindi(f"forms[{j}].hi", f.hi, errors, allow_latin=True)
 
     _check_hindi("hindiPronunciation", gen.hindiPronunciation, errors)
 
