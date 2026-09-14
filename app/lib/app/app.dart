@@ -3,6 +3,7 @@ import 'package:arth/app/providers.dart';
 import 'package:arth/app/router.dart';
 import 'package:arth/app/strings.dart';
 import 'package:arth/app/theme.dart';
+import 'package:arth/data/seed_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -22,6 +23,7 @@ class _ArthAppState extends ConsumerState<ArthApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshDictionaryIfStale());
     DevHooks.on('nav', (p) async {
       final lang = p['lang'];
       if (lang != null) {
@@ -38,6 +40,20 @@ class _ArthAppState extends ConsumerState<ArthApp> {
       if (p['to'] != null) router.go(p['to']!);
       return {'ok': true};
     });
+  }
+
+  /// Pull the entry delta quietly once a day so the on-device dictionary
+  /// follows the server (the full build landed after some phones seeded).
+  Future<void> _refreshDictionaryIfStale() async {
+    if (widget.needsSeed) return; // the seed screen handles the first run
+    final store = ref.read(localStoreProvider);
+    final last = DateTime.tryParse(await store.get('seed_checked_at') ?? '');
+    if (last != null && DateTime.now().difference(last) < const Duration(hours: 24)) return;
+    final r = await ref.read(seedProvider.notifier).run();
+    if (r.phase == SeedPhase.done) {
+      await store.set('seed_checked_at', DateTime.now().toIso8601String());
+      ref.invalidate(localEntryCountProvider);
+    }
   }
 
   @override
