@@ -237,9 +237,22 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final page = ranges.first.pageNumber;
     final idx = await cache.page(page);
 
-    // A single selected word gets the word tooltip, with its sentence.
+    // A single selected word gets the word card (speaker, save), with its
+    // sentence. pdfrx's character offsets don't always line up with our
+    // index, so match by text and pick the occurrence nearest the selection.
     if (!text.contains(' ')) {
-      final word = idx.wordAtChar(ranges.first.start);
+      final key = normalizeWord(text);
+      final centre = anchor!.center;
+      PageWord? word = idx.wordAtChar(ranges.first.start);
+      if (word == null || word.key != key) {
+        final same = idx.words.where((w) => w.key == key).toList();
+        if (same.isNotEmpty) {
+          same.sort(
+            (a, b) => (a.rect.center - centre).distanceSquared.compareTo((b.rect.center - centre).distanceSquared),
+          );
+          word = same.first;
+        }
+      }
       if (word != null) {
         await _openWord(cache, page, idx, word);
         return;
