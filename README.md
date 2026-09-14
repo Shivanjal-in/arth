@@ -105,8 +105,8 @@ installed one. Without them the release build silently signs with the debug key.
 
 ```sh
 cd app
-flutter build apk --release --split-per-abi --dart-define=ARTH_API_URL=https://arth-api-x8of.onrender.com   # sideload: app-arm64-v8a-release.apk
-flutter build appbundle --release        --dart-define=ARTH_API_URL=https://arth-api-x8of.onrender.com   # Play Store
+flutter build apk --release --split-per-abi --dart-define=ARTH_API_URL=https://arth-api-epja.onrender.com   # sideload: app-arm64-v8a-release.apk
+flutter build appbundle --release        --dart-define=ARTH_API_URL=https://arth-api-epja.onrender.com   # Play Store
 ```
 
 R8 shrinking is on; keep rules live in `app/android/app/proguard-rules.pro`.
@@ -116,8 +116,8 @@ R8 shrinking is on; keep rules live in `app/android/app/proguard-rules.pro`.
 `render.yaml` at the repo root is a Blueprint: New → Blueprint in the Render dashboard, pick
 this repo, set `MONGODB_URI` and `OPENAI_API_KEY` when prompted. Build is
 `cd api && npm ci && npm run build`, start is `cd api && npm start`, health check `/v1/health`.
-Production instance: `https://arth-api-x8of.onrender.com`. Point the app at it with
-`--dart-define=ARTH_API_URL=https://arth-api-x8of.onrender.com`
+Production instance: `https://arth-api-epja.onrender.com`. Point the app at it with
+`--dart-define=ARTH_API_URL=https://arth-api-epja.onrender.com`
 or **You → API server** in the app.
 
 ## Conventions
