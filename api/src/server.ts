@@ -12,7 +12,7 @@ const app = buildApp({
   cache: withMemory(mongoCache),
   llm: new OpenAIProvider(config.OPENAI_API_KEY),
   config,
-  rateLimits: { lookups: config.RATE_LIMIT_LOOKUPS, llm: config.RATE_LIMIT_LLM },
+  rateLimits: { lookups: config.RATE_LIMIT_LOOKUPS, llm: config.RATE_LIMIT_LLM, prefetch: config.RATE_LIMIT_PREFETCH },
 });
 
 try {

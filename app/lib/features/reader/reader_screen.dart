@@ -13,6 +13,7 @@ import 'package:arth/app/providers.dart';
 import 'package:arth/app/theme.dart';
 import 'package:arth/core/normalize.dart';
 import 'package:arth/core/text/page_text_index.dart';
+import 'package:arth/data/api_client.dart';
 import 'package:arth/data/dictionary_repo.dart';
 import 'package:arth/data/local_store.dart';
 import 'package:arth/features/reader/details_sheet.dart';
@@ -59,7 +60,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   /// Prefetch (Section 7): sentences already sent for /context this session.
   final Set<String> _prefetched = {};
   static const _prefetchRankThreshold = 8000;
-  static const _prefetchMaxPerPage = 12;
+  static const _prefetchMaxPerPage = 6;
+  static const _prefetchMaxPerMinute = 12;
+  final List<DateTime> _prefetchSent = [];
+  DateTime? _prefetchPausedUntil;
+  int _prefetchGeneration = 0;
 
   @override
   void initState() {
@@ -265,6 +270,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     if (!ref.read(settingsProvider).prefetch) return;
     final cache = _cache;
     if (cache == null) return;
+    final gen = ++_prefetchGeneration; // a newer page turn cancels this pass
     final store = ref.read(localStoreProvider);
     final repo = ref.read(dictionaryRepoProvider);
     for (final p in [page, page + 1]) {
@@ -285,15 +291,34 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         if (_looksLikeName(w.text) && !sentenceStarts.contains(w.index)) continue;
         final rank = await store.rankOf(key);
         if (rank != null && rank <= _prefetchRankThreshold) continue;
+        if (gen != _prefetchGeneration || !_prefetchAllowed()) return;
         final sentence = await cache.sentenceFor(p, idx, w);
         final id = '$key|$sentence';
         if (!_prefetched.add(id)) continue;
         sent++;
-        unawaited(
-          repo.contextFor(word: key, sentence: sentence).then((_) {}, onError: (Object _) {}),
-        );
+        _prefetchSent.add(DateTime.now());
+        // One at a time: a burst would still trip the server bucket and
+        // compete with the user's own tap for the connection.
+        try {
+          await repo.contextFor(word: key, sentence: sentence, prefetch: true);
+        } on ApiFailure catch (e) {
+          if (e.code == 'RATE_LIMITED') {
+            _prefetchPausedUntil = DateTime.now().add(const Duration(minutes: 1));
+            return;
+          }
+          if (e.isOffline) return;
+        } on Exception catch (_) {
+          // never retried; the tap path will fetch it if needed
+        }
       }
     }
+  }
+
+  bool _prefetchAllowed() {
+    final now = DateTime.now();
+    if (_prefetchPausedUntil != null && now.isBefore(_prefetchPausedUntil!)) return false;
+    _prefetchSent.removeWhere((t) => now.difference(t) > const Duration(minutes: 1));
+    return _prefetchSent.length < _prefetchMaxPerMinute;
   }
 
   static final RegExp _leadingPunct = RegExp('^[^a-zA-Z]+');

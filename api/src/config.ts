@@ -22,6 +22,8 @@ const EnvSchema = z.object({
   // --- rate limits per device, per minute (Section 6) ---
   RATE_LIMIT_LOOKUPS: z.coerce.number().int().default(60),
   RATE_LIMIT_LLM: z.coerce.number().int().default(20),
+  /** Background prefetch (X-Prefetch: 1) has its own bucket so it never starves taps. */
+  RATE_LIMIT_PREFETCH: z.coerce.number().int().default(40),
 });
 
 export type Config = z.infer<typeof EnvSchema>;

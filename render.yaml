@@ -31,3 +31,5 @@ services:
         value: "60"
       - key: RATE_LIMIT_LLM
         value: "20"
+      - key: RATE_LIMIT_PREFETCH
+        value: "40"

@@ -191,8 +191,9 @@ class DictionaryRepo {
   Future<ContextResult> contextFor({
     required String word,
     required String sentence,
+    bool prefetch = false,
   }) =>
-      api.context(word: word, sentence: sentence);
+      api.context(word: word, sentence: sentence, prefetch: prefetch);
 
   Stream<SseEvent> translate({required String text, String? context}) =>
       api.translate(text: text, context: context);

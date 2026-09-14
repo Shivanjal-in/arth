@@ -23,6 +23,7 @@ export type RequestMeta = {
   model?: string;
   phrase?: string;
   context?: { lemma: string; mode: string; senseIndex: number; clamped: boolean; llmMs: number };
+  prefetch?: boolean;
   translate?: { chars: number; retried: boolean };
 };
 
@@ -37,7 +38,7 @@ export type AppOptions = {
   store: Store;
   cache: CacheStore;
   llm: LLMProvider;
-  rateLimits?: { lookups: number; llm: number };
+  rateLimits?: { lookups: number; llm: number; prefetch: number };
   config: Pick<
     Config,
     | 'CONTEXT_MODE'
@@ -106,9 +107,10 @@ export function buildApp(opts: AppOptions): FastifyInstance {
 
   // Per-device limits (Section 6). The app sends X-Device-Id; without it we
   // fall back to the IP. Two buckets: cheap DB reads, and LLM calls.
-  const limits = opts.rateLimits ?? { lookups: 60, llm: 20 };
-  const keyGenerator = (req: FastifyRequest) => (req.headers['x-device-id'] as string | undefined)?.slice(0, 64) || req.ip;
-  const limited = (max: number, message: string) => ({
+  const limits = opts.rateLimits ?? { lookups: 60, llm: 20, prefetch: 40 };
+  const deviceKey = (req: FastifyRequest) => (req.headers['x-device-id'] as string | undefined)?.slice(0, 64) || req.ip;
+  const isPrefetch = (req: FastifyRequest) => req.headers['x-prefetch'] === '1';
+  const limited = (max: number, message: string, keyGenerator: (req: FastifyRequest) => string) => ({
     max,
     timeWindow: '1 minute',
     keyGenerator,
@@ -120,14 +122,22 @@ export function buildApp(opts: AppOptions): FastifyInstance {
       await v1.register(rateLimit, { global: false });
       await v1.register(healthRoutes);
       await v1.register(async (dbRoutes) => {
-        dbRoutes.addHook('preHandler', dbRoutes.rateLimit(limited(limits.lookups, messages.rateLimited)));
+        dbRoutes.addHook('preHandler', dbRoutes.rateLimit(limited(limits.lookups, messages.rateLimited, deviceKey)));
         await dbRoutes.register(lookupRoutes, { store: opts.store });
         await dbRoutes.register(phraseRoutes, { store: opts.store });
       });
       await v1.register(seedRoutes);
       const log = { warn: (obj: object, msg: string) => app.log.warn(obj, msg) };
       await v1.register(async (llmRoutes) => {
-        llmRoutes.addHook('preHandler', llmRoutes.rateLimit(limited(limits.llm, messages.llmRateLimited)));
+        // Interactive taps and background prefetch are separate buckets: a
+        // reader flipping pages must never find their own tap rate-limited.
+        const interactive = llmRoutes.rateLimit(limited(limits.llm, messages.llmRateLimited, deviceKey));
+        const prefetch = llmRoutes.rateLimit(
+          limited(limits.prefetch, messages.llmRateLimited, (req) => `prefetch:${deviceKey(req)}`),
+        );
+        llmRoutes.addHook('preHandler', async function (this: FastifyInstance, req, reply) {
+          await (isPrefetch(req) ? prefetch : interactive).call(this, req, reply);
+        });
         await llmRoutes.register(contextRoutes, {
           deps: { config: opts.config, llm: opts.llm, cache: opts.cache, store: opts.store, log },
         });

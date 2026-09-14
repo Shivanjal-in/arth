@@ -5,7 +5,7 @@ import { appOptions, FakeLLM } from './fakes.js';
 
 describe('rate limits per device', () => {
   test('lookups: 3rd call within a minute from the same device → 429 with a Hindi message', async () => {
-    const app = buildApp({ ...appOptions(new FakeLLM({})), rateLimits: { lookups: 2, llm: 1 } });
+    const app = buildApp({ ...appOptions(new FakeLLM({})), rateLimits: { lookups: 2, llm: 1, prefetch: 1 } });
     after(() => app.close());
     const h = { 'x-device-id': 'dev-A' };
     for (let i = 0; i < 2; i++) {
@@ -24,7 +24,7 @@ describe('rate limits per device', () => {
 
   test('LLM bucket is separate from the lookup bucket', async () => {
     const llm = new FakeLLM({ context_result: [JSON.stringify({ senseIndex: 0, meaning: 'x', note: '' }), JSON.stringify({ senseIndex: 0, meaning: 'x', note: '' })] });
-    const app = buildApp({ ...appOptions(llm), rateLimits: { lookups: 100, llm: 1 } });
+    const app = buildApp({ ...appOptions(llm), rateLimits: { lookups: 100, llm: 1, prefetch: 1 } });
     after(() => app.close());
     const h = { 'x-device-id': 'dev-C' };
     const c1 = await app.inject({ method: 'POST', url: '/v1/context', headers: h, payload: { word: 'single', sentence: 'A single man.' } });
@@ -33,5 +33,22 @@ describe('rate limits per device', () => {
     assert.equal(c2.statusCode, 429);
     const l = await app.inject({ method: 'GET', url: '/v1/lookup?word=fortune', headers: h });
     assert.equal(l.statusCode, 200, 'lookups still allowed');
+  });
+});
+
+describe('prefetch bucket', () => {
+  test('X-Prefetch: 1 calls count against their own bucket, not the tap bucket', async () => {
+    const ok = JSON.stringify({ senseIndex: 0, meaning: 'x', note: '' });
+    const llm = new FakeLLM({ context_result: [ok, ok, ok, ok] });
+    const app = buildApp({ ...appOptions(llm), rateLimits: { lookups: 100, llm: 1, prefetch: 2 } });
+    after(() => app.close());
+    const h = { 'x-device-id': 'dev-P', 'x-prefetch': '1' };
+    const p1 = await app.inject({ method: 'POST', url: '/v1/context', headers: h, payload: { word: 'single', sentence: 'A single man.' } });
+    const p2 = await app.inject({ method: 'POST', url: '/v1/context', headers: h, payload: { word: 'single', sentence: 'A single rose.' } });
+    const p3 = await app.inject({ method: 'POST', url: '/v1/context', headers: h, payload: { word: 'single', sentence: 'A single day.' } });
+    assert.deepEqual([p1.statusCode, p2.statusCode, p3.statusCode], [200, 200, 429]);
+    // The user's own tap still goes through.
+    const tap = await app.inject({ method: 'POST', url: '/v1/context', headers: { 'x-device-id': 'dev-P' }, payload: { word: 'single', sentence: 'A single word.' } });
+    assert.equal(tap.statusCode, 200);
   });
 });

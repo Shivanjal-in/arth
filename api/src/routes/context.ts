@@ -44,6 +44,7 @@ export const contextRoutes: FastifyPluginAsync<{ deps: ContextDeps }> = async (a
       if (outcome.cache === 'hit') cacheStats.hits++;
       else if (outcome.cache === 'miss') cacheStats.misses++;
       request.meta.cache = outcome.cache;
+      if (request.headers['x-prefetch'] === '1') request.meta.prefetch = true;
       request.meta.tokens = outcome.usage;
       request.meta.context = {
         lemma: outcome.lemma,

@@ -78,11 +78,14 @@ class ApiClient {
   Future<ContextResult> context({
     required String word,
     required String sentence,
+    bool prefetch = false,
   }) async {
     try {
       final res = await _dio.post<Map<String, dynamic>>(
         '/context',
         data: {'word': word, 'sentence': sentence},
+        // Background prefetch is rate-limited in its own bucket server-side.
+        options: prefetch ? Options(headers: {'x-prefetch': '1'}) : null,
       );
       return ContextResult.fromJson(_data(res));
     } on DioException catch (e) {
