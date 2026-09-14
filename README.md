@@ -102,7 +102,8 @@ simulator without touch automation. App icon: `python3 tool/make_icon.py`.
 `render.yaml` at the repo root is a Blueprint: New → Blueprint in the Render dashboard, pick
 this repo, set `MONGODB_URI` and `OPENAI_API_KEY` when prompted. Build is
 `cd api && npm ci && npm run build`, start is `cd api && npm start`, health check `/v1/health`.
-Then point the app at it: `--dart-define=ARTH_API_URL=https://<service>.onrender.com`
+Production instance: `https://arth-api-x8of.onrender.com`. Point the app at it with
+`--dart-define=ARTH_API_URL=https://arth-api-x8of.onrender.com`
 or **You → API server** in the app.
 
 ## Conventions
