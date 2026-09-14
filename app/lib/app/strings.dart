@@ -41,9 +41,14 @@ enum AppStrings {
   // ---- reader ----
   String get readingSettings => _('Reading settings', 'पढ़ने की सेटिंग');
   String get noTextLayer => _(
-        "This PDF has no selectable text (probably a scan), so words can't be looked up.",
-        'इस PDF में चुनने लायक टेक्स्ट नहीं है (शायद स्कैन है), इसलिए शब्द नहीं देखे जा सकते।',
+        'This PDF is scanned images, not text, so words can’t be tapped. A text-based PDF of the same book will work.',
+        'यह PDF स्कैन की हुई तस्वीरें हैं, टेक्स्ट नहीं — इसलिए शब्दों पर टैप नहीं हो सकता। इसी किताब की टेक्स्ट वाली PDF काम करेगी।',
       );
+  String get noTextOnPage => _(
+        'No selectable text on this page (it’s an image). Other pages work as usual.',
+        'इस पन्ने पर चुनने लायक टेक्स्ट नहीं है (यह तस्वीर है)। बाकी पन्ने ठीक चलेंगे।',
+      );
+  String get dismiss => _('OK', 'ठीक है');
   String get pdfOpenFailed => _(
         "This PDF couldn't be opened. The file may have been removed — add the book again.",
         'यह PDF खोली नहीं जा सकी। फ़ाइल हट गई हो सकती है — किताब को दोबारा जोड़ें।',

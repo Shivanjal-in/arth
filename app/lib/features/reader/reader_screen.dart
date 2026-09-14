@@ -55,6 +55,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   Timer? _selectionDebounce;
   bool _selectionHaptic = false;
   bool _warnedNoText = false;
+
+  /// null = not checked yet; true = the first pages had no text at all.
+  bool? _documentIsScanned;
   int? _page;
 
   /// Prefetch (Section 7): sentences already sent for /context this session.
@@ -75,6 +78,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   @override
   void dispose() {
+    ScaffoldMessenger.maybeOf(context)?.hideCurrentMaterialBanner();
     _controller.removeListener(_onViewerChanged);
     _selectionDebounce?.cancel();
     DevHooks.off('tapWord');
@@ -171,9 +175,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       return;
     }
     final idx = await cache.page(page);
-    if (idx.words.isEmpty && mounted && !_warnedNoText) {
-      _warnedNoText = true;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ref.read(stringsProvider).noTextLayer)));
+    if (idx.words.isEmpty && mounted) {
+      // A scanned document gets the banner (see _checkForTextLayer); a lone
+      // image page in a text book just gets a one-line note, once.
+      if (_documentIsScanned != true && !_warnedNoText) {
+        _warnedNoText = true;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ref.read(stringsProvider).noTextOnPage)));
+      }
+      rc.dismiss();
+      return;
     }
     final word = idx.wordAt(docPos, margin: 3);
     if (word == null || word.key.isEmpty) {
@@ -272,6 +282,45 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           page: page,
           context: previous,
         );
+  }
+
+  // ---- text layer check ----
+
+  /// Sample the first pages once: if none has text, the whole PDF is almost
+  /// certainly scanned images, and the reader should say so before the first
+  /// tap fails rather than after.
+  Future<void> _checkForTextLayer(int pageCount) async {
+    final cache = _cache;
+    if (cache == null) return;
+    final sample = [for (var p = 1; p <= pageCount && p <= 6; p++) p];
+    var words = 0;
+    for (final p in sample) {
+      try {
+        words += (await cache.page(p)).words.length;
+      } on Exception {
+        // unreadable page: treat as no text
+      }
+      if (words > 0) break;
+    }
+    if (!mounted) return;
+    setState(() => _documentIsScanned = words == 0);
+    if (words == 0) {
+      final t = ref.read(stringsProvider);
+      final c = context.colors;
+      ScaffoldMessenger.of(context).showMaterialBanner(
+        MaterialBanner(
+          backgroundColor: c.card,
+          content: Text(t.noTextLayer, style: uiBody(hindi: t.isHindi, color: c.ink, scale: ref.read(settingsProvider).hindiScale)),
+          leading: Icon(Icons.image_not_supported_outlined, color: c.accent),
+          actions: [
+            TextButton(
+              onPressed: () => ScaffoldMessenger.of(context).hideCurrentMaterialBanner(),
+              child: Text(t.dismiss, style: TextStyle(color: c.accent)),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   // ---- prefetch ----
@@ -443,6 +492,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               onGeneralTap: _onTap,
               onViewerReady: (doc, controller) {
                 _cache = PageTextCache(controller);
+                unawaited(_checkForTextLayer(doc.pages.length));
                 unawaited(
                   ref.read(libraryProvider.notifier).touch(widget.book.id, pageCount: doc.pages.length),
                 );
