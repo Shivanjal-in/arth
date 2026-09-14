@@ -117,6 +117,36 @@ class PageTextIndex {
     return PageTextIndex._(fullText, words, _segment(fullText, words));
   }
 
+  /// Builds the index from OCR output: lines of (word, box). The full text is
+  /// reconstructed with spaces inside a line and newlines between lines, so
+  /// sentence segmentation and hyphen joining behave exactly as for a PDF;
+  /// every character of a word shares the word's box.
+  factory PageTextIndex.fromLines(List<List<({String text, Rect rect})>> lines) {
+    final text = StringBuffer();
+    final rects = <Rect>[];
+    for (var li = 0; li < lines.length; li++) {
+      if (li > 0) {
+        text.write('\n');
+        rects.add(Rect.zero);
+      }
+      var first = true;
+      for (final w in lines[li]) {
+        final token = w.text.trim();
+        if (token.isEmpty) continue;
+        if (!first) {
+          text.write(' ');
+          rects.add(Rect.zero);
+        }
+        first = false;
+        text.write(token);
+        for (var i = 0; i < token.length; i++) {
+          rects.add(w.rect);
+        }
+      }
+    }
+    return PageTextIndex.build(text.toString(), rects);
+  }
+
   static final RegExp _nonSpace = RegExp(r'\S+');
 
   final String fullText;

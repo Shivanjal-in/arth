@@ -38,6 +38,20 @@ enum AppStrings {
   String get remove => _('Remove', 'हटाएँ');
   String get importFailed => _('Could not import that file.', 'यह फ़ाइल जोड़ी नहीं जा सकी।');
 
+  // ---- scans ----
+  String get addPdf => _('Add a PDF', 'PDF जोड़ें');
+  String get takePhoto => _('Take a photo of a page', 'पन्ने की फ़ोटो लें');
+  String get chooseFromGallery => _('Choose a photo from gallery', 'गैलरी से फ़ोटो चुनें');
+  String get addPage => _('Add a page', 'पन्ना जोड़ें');
+  String get scanTitle => _('Scanned pages', 'स्कैन किए पन्ने');
+  String get scanEmpty => _('No pages yet. Add a photo of a page.', 'अभी कोई पन्ना नहीं। पन्ने की फ़ोटो जोड़ें।');
+  String get ocrFailed => _("Couldn't read this photo.", 'यह फ़ोटो पढ़ी नहीं जा सकी।');
+  String get ocrEmpty => _(
+        'No text found in this photo. Try better light, a flatter page, or a closer shot.',
+        'इस फ़ोटो में टेक्स्ट नहीं मिला। बेहतर रोशनी, सीधा पन्ना या पास से फ़ोटो लें।',
+      );
+  String get pages => _('pages', 'पन्ने');
+
   // ---- reader ----
   String get readingSettings => _('Reading settings', 'पढ़ने की सेटिंग');
   String get noTextLayer => _(
@@ -157,6 +171,7 @@ enum AppStrings {
       );
   String get notFound => _('Not in the dictionary.', 'यह शब्द शब्दकोश में नहीं मिला।');
   String get lookingUp => _('Looking this up…', 'अर्थ ढूँढ रहे हैं…');
+  String get translateSentence => _('Translate this sentence', 'यह वाक्य अनुवाद करें');
   String get rateLimited => _(
         'Too many requests. Wait a minute and try again.',
         'बहुत जल्दी-जल्दी अनुरोध हो रहे हैं। एक मिनट रुककर फिर कोशिश करें।',

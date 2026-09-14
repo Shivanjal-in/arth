@@ -23,6 +23,7 @@ PageTextIndex build(String text) {
 }
 
 void main() {
+  ocrTests();
   test('words carry rects and keys', () {
     final idx = build('It is a truth, "universally"');
     expect(idx.words.map((w) => w.text), ['It', 'is', 'a', 'truth,', '"universally"']);
@@ -81,5 +82,28 @@ void main() {
     expect(build('continues here.').startsMidSentence, isTrue);
     expect(build('Starts here').endsMidSentence, isTrue);
     expect(build('Starts here.').endsMidSentence, isFalse);
+  });
+}
+
+void ocrTests() {
+  test('fromLines: words carry their OCR boxes; lines break sentences and join hyphens', () {
+    const r1 = Rect.fromLTWH(0, 0, 40, 10);
+    const r2 = Rect.fromLTWH(50, 0, 60, 10);
+    const r3 = Rect.fromLTWH(0, 20, 70, 10);
+    final idx = PageTextIndex.fromLines([
+      [(text: 'It', rect: r1), (text: 'is', rect: r2)],
+      [(text: 'extra-', rect: r3), (text: 'ordinary.', rect: r3)],
+    ]);
+    expect(idx.words.map((w) => w.text), ['It', 'is', 'extra-', 'ordinary.']);
+    expect(idx.words[1].rect, r2);
+    expect(idx.wordAt(const Offset(60, 5))?.text, 'is');
+    // Two words on one line aren't a line break, so no hyphen join here…
+    expect(normalizeSentence(idx.rawSentence(idx.sentences.first)), 'It is extra- ordinary.');
+    // …but across lines the joiner works.
+    final idx2 = PageTextIndex.fromLines([
+      [(text: 'extra-', rect: r1)],
+      [(text: 'ordinary', rect: r3)],
+    ]);
+    expect(normalizeSentence(idx2.rawSentence(idx2.sentences.first)), 'extraordinary');
   });
 }

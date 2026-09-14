@@ -19,10 +19,7 @@ import 'package:arth/data/local_store.dart';
 import 'package:arth/features/reader/details_sheet.dart';
 import 'package:arth/features/reader/page_text_cache.dart';
 import 'package:arth/features/reader/reader_controller.dart';
-import 'package:arth/features/reader/tooltip/sentence_tooltip.dart';
-import 'package:arth/features/reader/tooltip/tooltip_card.dart';
-import 'package:arth/features/reader/tooltip/tooltip_placement.dart';
-import 'package:arth/features/reader/tooltip/word_tooltip.dart';
+import 'package:arth/features/reader/tooltip/tooltip_layer.dart';
 import 'package:arth/features/settings/reading_settings_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -505,89 +502,30 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 unawaited(ref.read(libraryProvider.notifier).touch(widget.book.id, lastPage: p));
                 unawaited(_prefetch(p));
               },
-              viewerOverlayBuilder: (ctx, size, _) => _overlays(tooltip),
+              viewerOverlayBuilder: (ctx, size, _) =>
+                  tooltipOverlays(context: ctx, tooltip: tooltip, link: _link, toLocal: _docToViewer),
             ),
           ),
           OverlayPortal(
             controller: _portal,
-            overlayChildBuilder: (ctx) => _follower(ctx, tooltip),
+            overlayChildBuilder: (ctx) => TooltipFollower(
+              tooltip: tooltip,
+              link: _link,
+              anchorOnScreen: tooltip == null ? Rect.zero : _docToViewer(tooltip.anchor).shift(_viewerOrigin),
+              bookId: widget.book.id,
+              bookTitle: widget.book.title,
+              onShowDetails: _showDetails,
+              onSuggestion: _lookupTyped,
+              onTranslateSentence: _translateSentence,
+            ),
           ),
         ],
       ),
     );
   }
 
-  List<Widget> _overlays(ReaderTooltip? t) {
-    if (t == null) return const [];
-    final c = context.colors;
-    final highlights = t is WordTooltipState ? (t.highlight ?? [t.anchor]) : const <Rect>[];
-    final anchor = _docToViewer(t.anchor);
-    return [
-      for (final r in highlights)
-        Positioned.fromRect(
-          rect: _docToViewer(r).inflate(1.5),
-          child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: c.highlight,
-                borderRadius: BorderRadius.circular(3),
-              ),
-            ),
-          ),
-        ),
-      Positioned.fromRect(
-        rect: anchor,
-        child: IgnorePointer(
-          child: CompositedTransformTarget(link: _link, child: const SizedBox.expand()),
-        ),
-      ),
-    ];
-  }
-
-  Widget _follower(BuildContext ctx, ReaderTooltip? t) {
-    if (t == null) return const SizedBox.shrink();
-    final screen = MediaQuery.sizeOf(ctx);
-    final padding = MediaQuery.paddingOf(ctx);
-    final anchorOnScreen = _docToViewer(t.anchor).shift(_viewerOrigin);
-    final usable = Size(screen.width, screen.height - padding.bottom);
-    // Place for the worst case (the height cap) rather than a measured height:
-    // a measured height is already clipped by the previous placement, which
-    // would feed back into a shrinking loop. Near the bottom third the tooltip
-    // therefore flips above even when short, which is the conventional feel.
-    final placement = placeTooltip(
-      anchor: anchorOnScreen,
-      tooltipSize: Size(340, usable.height * 0.45),
-      screen: usable,
-    );
-    // Horizontal shift from "centred on the anchor" to the clamped position.
-    final dx = placement.offset.dx + placement.width / 2 - anchorOnScreen.center.dx;
-
-    final child = switch (t) {
-      WordTooltipState() => WordTooltip(
-          state: t,
-          bookId: widget.book.id,
-          bookTitle: widget.book.title,
-          onShowDetails: () => _showDetails(t),
-          onSuggestion: _lookupTyped,
-        ),
-      SentenceTooltipState() => SentenceTooltip(state: t, onTapWord: _lookupTyped),
-    };
-
-    return Align(
-      alignment: Alignment.topLeft,
-      child: CompositedTransformFollower(
-        link: _link,
-        showWhenUnlinked: false,
-        targetAnchor: placement.above ? Alignment.topCenter : Alignment.bottomCenter,
-        followerAnchor: placement.above ? Alignment.bottomCenter : Alignment.topCenter,
-        offset: Offset(dx, 0),
-        child: TooltipCard(
-          width: placement.width,
-          maxHeight: placement.maxHeight,
-          above: placement.above,
-          child: child,
-        ),
-      ),
-    );
+  void _translateSentence(WordTooltipState s) {
+    _portal.show();
+    ref.read(readerControllerProvider.notifier).showSentence(text: s.sentence, anchor: s.anchor, page: s.page);
   }
 }

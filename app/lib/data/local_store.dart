@@ -8,12 +8,15 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
+enum BookKind { pdf, scan }
+
 class Book {
   const Book({
     required this.id,
     required this.title,
     required this.path,
     required this.addedAt,
+    this.kind = BookKind.pdf,
     this.pageCount,
     this.lastPage = 1,
     this.lastOpenedAt,
@@ -23,6 +26,7 @@ class Book {
         id: r['id']! as int,
         title: r['title']! as String,
         path: r['path']! as String,
+        kind: BookKind.values.byName((r['kind'] as String?) ?? 'pdf'),
         addedAt: DateTime.fromMillisecondsSinceEpoch(r['added_at']! as int),
         pageCount: r['page_count'] as int?,
         lastPage: (r['last_page'] as int?) ?? 1,
@@ -35,7 +39,9 @@ class Book {
   final String title;
 
   /// Relative to the app documents directory (see documentsDirProvider).
+  /// A PDF file for [BookKind.pdf]; a directory of page images for [BookKind.scan].
   final String path;
+  final BookKind kind;
   final DateTime addedAt;
   final int? pageCount;
   final int lastPage;
@@ -72,7 +78,7 @@ class SavedWord {
 class LocalStore {
   LocalStore._(this._db);
 
-  static const _schemaVersion = 1;
+  static const _schemaVersion = 2;
 
   final Database _db;
 
@@ -82,6 +88,11 @@ class LocalStore {
       p.join(dir.path, 'arth.db'),
       version: _schemaVersion,
       onCreate: (db, _) => _create(db),
+      onUpgrade: (db, from, _) async {
+        if (from < 2) {
+          await db.execute("ALTER TABLE books ADD COLUMN kind TEXT NOT NULL DEFAULT 'pdf'");
+        }
+      },
     );
     return LocalStore._(db);
   }
@@ -109,6 +120,7 @@ class LocalStore {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         path TEXT NOT NULL UNIQUE,
+        kind TEXT NOT NULL DEFAULT 'pdf',
         added_at INTEGER NOT NULL,
         page_count INTEGER,
         last_page INTEGER NOT NULL DEFAULT 1,
@@ -287,11 +299,11 @@ class LocalStore {
     return rows.isEmpty ? null : Book.fromRow(rows.first);
   }
 
-  Future<Book> addBook({required String title, required String path}) async {
+  Future<Book> addBook({required String title, required String path, BookKind kind = BookKind.pdf}) async {
     final now = DateTime.now().millisecondsSinceEpoch;
     final id = await _db.insert(
       'books',
-      {'title': title, 'path': path, 'added_at': now},
+      {'title': title, 'path': path, 'kind': kind.name, 'added_at': now},
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
     return (await book(id))!;

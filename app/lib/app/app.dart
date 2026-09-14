@@ -1,12 +1,17 @@
+import 'dart:io';
+
 import 'package:arth/app/dev_hooks.dart';
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/router.dart';
 import 'package:arth/app/strings.dart';
 import 'package:arth/app/theme.dart';
 import 'package:arth/data/seed_loader.dart';
+import 'package:arth/features/scan/scan_pages.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ArthApp extends ConsumerStatefulWidget {
   const ArthApp({required this.needsSeed, super.key});
@@ -39,6 +44,15 @@ class _ArthAppState extends ConsumerState<ArthApp> {
       }
       if (p['to'] != null) router.go(p['to']!);
       return {'ok': true};
+    });
+    DevHooks.on('scan', (p) async {
+      // Simulators have no camera: fetch a page image and create a scan from it.
+      final url = p['url']!;
+      final tmp = File('${ref.read(documentsDirProvider)}/dev-scan.jpg');
+      await Dio().download(url, tmp.path);
+      final book = await createScan(ref, XFile(tmp.path), title: 'Dev scan');
+      router.go('/scan/${book.id}');
+      return {'ok': true, 'id': book.id};
     });
   }
 

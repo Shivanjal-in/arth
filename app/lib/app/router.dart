@@ -6,6 +6,7 @@ import 'package:arth/features/dictionary/word_screen.dart';
 import 'package:arth/features/library/library_screen.dart';
 import 'package:arth/features/reader/reader_screen.dart';
 import 'package:arth/features/saved/saved_screen.dart';
+import 'package:arth/features/scan/scan_reader_screen.dart';
 import 'package:arth/features/seed/seed_screen.dart';
 import 'package:arth/features/settings/settings_screen.dart';
 import 'package:flutter/material.dart';
@@ -25,6 +26,10 @@ GoRouter buildRouter({required bool needsSeed}) => GoRouter(
         GoRoute(
           path: '/read/:id',
           builder: (_, s) => _ReaderRoute(id: int.parse(s.pathParameters['id']!)),
+        ),
+        GoRoute(
+          path: '/scan/:id',
+          builder: (_, s) => _ScanRoute(id: int.parse(s.pathParameters['id']!)),
         ),
         StatefulShellRoute.indexedStack(
           builder: (_, _, shell) => _Shell(shell: shell),
@@ -151,5 +156,21 @@ class _ReaderRoute extends ConsumerWidget {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     return ReaderScreen(book: book, filePath: p.join(ref.read(documentsDirProvider), book.path));
+  }
+}
+
+class _ScanRoute extends ConsumerWidget {
+  const _ScanRoute({required this.id});
+
+  final int id;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final books = ref.watch(libraryProvider).valueOrNull;
+    final book = books?.where((b) => b.id == id).firstOrNull;
+    if (book == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    return ScanReaderScreen(book: book);
   }
 }

@@ -8,6 +8,7 @@ import 'package:arth/app/tts.dart';
 import 'package:arth/data/api_client.dart';
 import 'package:arth/data/dictionary_repo.dart';
 import 'package:arth/data/local_store.dart';
+import 'package:arth/data/ocr_service.dart';
 import 'package:arth/data/seed_loader.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -73,6 +74,12 @@ final dictionaryRepoProvider = Provider<DictionaryRepo>(
 
 final ttsProvider = Provider<TtsService>((_) => TtsService());
 
+final ocrProvider = Provider<OcrService>((ref) {
+  final s = OcrService();
+  ref.onDispose(s.close);
+  return s;
+});
+
 /// Seed download state; the first-launch screen and Settings both watch it.
 final seedProvider = NotifierProvider<SeedNotifier, SeedProgress>(SeedNotifier.new);
 
@@ -96,8 +103,8 @@ class LibraryNotifier extends AsyncNotifier<List<Book>> {
   @override
   Future<List<Book>> build() => ref.watch(localStoreProvider).books();
 
-  Future<Book> add({required String title, required String path}) async {
-    final book = await ref.read(localStoreProvider).addBook(title: title, path: path);
+  Future<Book> add({required String title, required String path, BookKind kind = BookKind.pdf}) async {
+    final book = await ref.read(localStoreProvider).addBook(title: title, path: path, kind: kind);
     ref.invalidateSelf();
     return book;
   }

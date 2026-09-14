@@ -23,7 +23,7 @@ class DevHooks {
     _handlers[name] = handler;
     if (_registered) return;
     _registered = true;
-    for (final n in ['nav', 'tapWord', 'select', 'dismiss', 'state']) {
+    for (final n in ['nav', 'tapWord', 'select', 'dismiss', 'state', 'scan']) {
       dev.registerExtension('ext.arth.$n', (method, params) async {
         final h = _handlers[n];
         if (h == null) {

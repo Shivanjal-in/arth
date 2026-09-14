@@ -97,6 +97,17 @@ simulator without touch automation. App icon: `python3 tool/make_icon.py`.
 `contracts/normalize-vectors.json` — TypeScript (`api/test/normalize.test.ts`) and Python
 (`pipeline/tests/test_normalize.py`) do; Dart is added in Phase 4.
 
+## Photographed pages (scan reader)
+
+Library → **+** → *Take a photo of a page* / *Choose a photo from gallery*. The photo is OCR'd on
+the device with Google ML Kit (Latin script, offline; `app/lib/data/ocr_service.dart`, result
+cached beside the image), indexed with `PageTextIndex.fromLines`, and shown in
+`ScanReaderScreen` with the same tooltip layer as the PDF reader
+(`app/lib/features/reader/tooltip/tooltip_layer.dart`). Tap a word; the word card's translate
+action handles the sentence. A scan is a book of pages under `Documents/scans/<id>/`; *Add a
+page* from the reader's app bar. iOS deployment target is 15.5 (ML Kit). ML Kit's iOS pods have
+no Apple-Silicon simulator slice — test scans on a device.
+
 ## Expanding the dictionary on demand
 
 `pipeline/08_stage.py` stages Wiktionary senses (English only) for ~90k lemmas beyond the

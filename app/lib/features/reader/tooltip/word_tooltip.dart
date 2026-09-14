@@ -15,6 +15,7 @@ class WordTooltip extends ConsumerWidget {
     required this.state,
     required this.onShowDetails,
     required this.onSuggestion,
+    required this.onTranslateSentence,
     super.key,
     this.bookId,
     this.bookTitle,
@@ -23,6 +24,7 @@ class WordTooltip extends ConsumerWidget {
   final WordTooltipState state;
   final VoidCallback onShowDetails;
   final ValueChanged<String> onSuggestion;
+  final VoidCallback onTranslateSentence;
   final int? bookId;
   final String? bookTitle;
 
@@ -120,6 +122,12 @@ class WordTooltip extends ConsumerWidget {
                   labelled: true,
                 ),
                 const Spacer(),
+                IconButton(
+                  tooltip: t.translateSentence,
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(Icons.translate_rounded, color: c.accent, size: 20),
+                  onPressed: onTranslateSentence,
+                ),
                 TextButton(
                   onPressed: onShowDetails,
                   style: TextButton.styleFrom(foregroundColor: c.accent),
