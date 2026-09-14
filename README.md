@@ -97,6 +97,16 @@ simulator without touch automation. App icon: `python3 tool/make_icon.py`.
 `contracts/normalize-vectors.json` — TypeScript (`api/test/normalize.test.ts`) and Python
 (`pipeline/tests/test_normalize.py`) do; Dart is added in Phase 4.
 
+## Expanding the dictionary on demand
+
+`pipeline/08_stage.py` stages Wiktionary senses (English only) for ~90k lemmas beyond the
+generated 23k — the whole `wordfreq` list plus every attested Wiktionary headword — into the
+`wiktionary` collection. When `/v1/lookup` misses `entries` but the lemma is staged, the API
+generates its Hindi layer live with the pipeline's prompt and validation, stores it in
+`entries` for good and returns it (3–7 s the first time, instant after). A word that isn't
+staged either gets a 404 whose `suggestions` are morphological bases (`brimlessness` →
+`brimless`, `brim`). Generation spends the per-device LLM budget like any model call.
+
 ## Android release builds
 
 Signing uses `app/android/key.properties` and `app/android/upload-keystore.jks` — both

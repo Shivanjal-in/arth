@@ -156,6 +156,7 @@ enum AppStrings {
         'और अर्थ देखने के लिए इंटरनेट चाहिए',
       );
   String get notFound => _('Not in the dictionary.', 'यह शब्द शब्दकोश में नहीं मिला।');
+  String get lookingUp => _('Looking this up…', 'अर्थ ढूँढ रहे हैं…');
   String get rateLimited => _(
         'Too many requests. Wait a minute and try again.',
         'बहुत जल्दी-जल्दी अनुरोध हो रहे हैं। एक मिनट रुककर फिर कोशिश करें।',

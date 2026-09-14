@@ -107,8 +107,9 @@ class DictionaryRepo {
       );
     }
 
-    // 3. API: phrase first, then word.
+    // 3. API: phrase first, then word (which may be generated on demand).
     var offline = false;
+    var serverSuggestions = const <String>[];
     try {
       if (windows.isNotEmpty) {
         final m = await api.matchPhrase(tokens: tokens, index: index);
@@ -124,23 +125,34 @@ class DictionaryRepo {
           }
         }
       }
-      final entry = await api.lookup(key);
-      if (entry != null) {
+      final r = await api.lookup(key);
+      if (r.entry != null) {
         return LookupFound(
-          entry: entry,
-          lemma: entry.word,
+          entry: r.entry!,
+          lemma: r.entry!.word,
           source: LookupSource.api,
         );
       }
+      serverSuggestions = r.suggestions;
     } on ApiFailure catch (e) {
       offline = e.isOffline;
     }
 
     return LookupMissing(
       word: key,
-      suggestions: await suggestions(key),
+      suggestions: _merge(serverSuggestions, await suggestions(key)),
       offline: offline,
     );
+  }
+
+  /// Server suggestions (morphology: brimless → brim) first, then local
+  /// spelling neighbours, deduplicated.
+  static List<String> _merge(List<String> server, List<String> local) {
+    final out = <String>[...server];
+    for (final s in local) {
+      if (!out.contains(s)) out.add(s);
+    }
+    return out.take(5).toList();
   }
 
   /// Direct headword lookup (dictionary screen, saved words).
@@ -155,28 +167,30 @@ class DictionaryRepo {
       );
     }
     var offline = false;
+    var serverSuggestions = const <String>[];
     try {
-      final entry = await api.lookup(key);
-      if (entry != null) {
+      final r = await api.lookup(key);
+      if (r.entry != null) {
         return LookupFound(
-          entry: entry,
-          lemma: entry.word,
+          entry: r.entry!,
+          lemma: r.entry!.word,
           source: LookupSource.api,
         );
       }
+      serverSuggestions = r.suggestions;
     } on ApiFailure catch (e) {
       offline = e.isOffline;
     }
     return LookupMissing(
       word: key,
-      suggestions: await suggestions(key),
+      suggestions: _merge(serverSuggestions, await suggestions(key)),
       offline: offline,
     );
   }
 
   Future<DictionaryEntry?> _apiEntry(String lemma) async {
     try {
-      return await api.lookup(lemma);
+      return (await api.lookup(lemma)).entry;
     } on ApiFailure {
       return null;
     }

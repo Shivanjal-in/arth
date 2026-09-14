@@ -12,6 +12,9 @@ const EnvSchema = z.object({
   LLM_TRANSLATE_MODEL: z.string().default('gpt-5.6-luna'),
   /** Model for the index-only context path (a nano-class model once one is named). */
   LLM_CONTEXT_INDEX_MODEL: z.string().default('gpt-5.6-luna'),
+  /** On-demand dictionary entries for staged lemmas (same prompt as the pipeline). */
+  LLM_ENTRY_MODEL: z.string().default('gpt-5.6-luna'),
+  LLM_ENTRY_MAX_TOKENS: z.coerce.number().int().default(4000),
   /** live: model picks the sense and writes the note. index: model picks the sense; note is pre-written. */
   CONTEXT_MODE: z.enum(['live', 'index']).default('live'),
   LLM_TEMPERATURE: z.coerce.number().optional(),

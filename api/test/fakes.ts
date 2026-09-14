@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import type { DictionaryEntry } from '../src/contracts.js';
+import type { DictionaryEntry, WiktionaryExtract } from '../src/contracts.js';
 import type { JsonRequest, JsonResult, LLMProvider, StreamChunk } from '../src/llm/provider.js';
 import type { Store } from '../src/services/mongo-store.js';
 import type { AppOptions } from '../src/app.js';
@@ -16,7 +16,10 @@ export const seed = JSON.parse(
   readFileSync(fileURLToPath(new URL('../seed/seed.json', import.meta.url)), 'utf8'),
 ) as SeedFile;
 
-export function memStore(notes: Record<string, string[]> = {}): Store {
+export function memStore(
+  notes: Record<string, string[]> = {},
+  staged: Record<string, WiktionaryExtract> = {},
+): Store {
   const entries = new Map(seed.entries.map((e) => [e.word, e]));
   const forms = new Map(seed.forms.map((f) => [f.form, f.lemma]));
   const phrases = new Map(seed.phrases.map((p) => [p.phrase, p.lemma]));
@@ -35,6 +38,14 @@ export function memStore(notes: Record<string, string[]> = {}): Store {
     },
     async findSenseNotes(w) {
       return notes[w] ?? null;
+    },
+    async findStaged(lemma) {
+      const x = staged[lemma];
+      return x ? { extract: x, freqRank: 99_999 } : null;
+    },
+    async saveGenerated(entry) {
+      entries.set(entry.word, { ...entry, freqRank: 99_999 });
+      delete staged[entry.word];
     },
   };
 }
@@ -68,12 +79,18 @@ export const testConfig: AppOptions['config'] = {
   CONTEXT_MODE: 'live',
   LLM_CONTEXT_MODEL: 'fake-live',
   LLM_CONTEXT_INDEX_MODEL: 'fake-index',
+  LLM_ENTRY_MODEL: 'fake-entry',
+  LLM_ENTRY_MAX_TOKENS: 4000,
   LLM_TRANSLATE_MODEL: 'fake-translate',
   LLM_TEMPERATURE: undefined,
   LLM_CONTEXT_MAX_TOKENS: 400,
   LLM_TRANSLATE_MAX_TOKENS: 1200,
 };
 
-export function appOptions(llm: LLMProvider, notes?: Record<string, string[]>): AppOptions {
-  return { logLevel: 'silent', store: memStore(notes), cache: new MemoryCache(), llm, config: testConfig };
+export function appOptions(
+  llm: LLMProvider,
+  notes?: Record<string, string[]>,
+  staged?: Record<string, WiktionaryExtract>,
+): AppOptions {
+  return { logLevel: 'silent', store: memStore(notes, staged), cache: new MemoryCache(), llm, config: testConfig };
 }

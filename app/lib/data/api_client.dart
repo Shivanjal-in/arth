@@ -58,19 +58,23 @@ class ApiClient {
 
   final Dio _dio;
 
-  Future<DictionaryEntry?> lookup(String word) async {
+  /// Entry, or null with the server's suggestions (morphological bases the
+  /// reader can open) on a miss. Throws [ApiFailure] for anything else.
+  Future<({DictionaryEntry? entry, List<String> suggestions})> lookup(String word) async {
     try {
       final res = await _dio.get<Map<String, dynamic>>(
         '/lookup',
         queryParameters: {'word': word},
+        // A first-time lookup may generate the entry live (a few seconds).
+        options: Options(receiveTimeout: const Duration(seconds: 45)),
       );
-      return DictionaryEntry.fromJson(_data(res));
+      return (entry: DictionaryEntry.fromJson(_data(res)), suggestions: const <String>[]);
     } on ApiFailure catch (e) {
-      if (e.isNotFound) return null;
+      if (e.isNotFound) return (entry: null, suggestions: e.suggestions);
       rethrow;
     } on DioException catch (e) {
       final f = _failure(e);
-      if (f.isNotFound) return null;
+      if (f.isNotFound) return (entry: null, suggestions: f.suggestions);
       throw f;
     }
   }

@@ -36,15 +36,22 @@ class WordTooltip extends ConsumerWidget {
     final outcome = state.outcome;
 
     if (outcome == null) {
-      return Row(
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(state.token, style: EnglishText.word(c.ink)),
-          const Spacer(),
-          SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2, color: c.accent),
+          Row(
+            children: [
+              Text(state.token, style: EnglishText.word(c.ink)),
+              const Spacer(),
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, color: c.accent),
+              ),
+            ],
           ),
+          const SizedBox(height: 6),
+          Text(t.lookingUp, style: body),
         ],
       );
     }

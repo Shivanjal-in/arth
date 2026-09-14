@@ -35,17 +35,19 @@ export const schemas = {
   dictionaryEntry: load('dictionary-entry.json'),
   contextResult: load('context-result.json'),
   contextIndex: load('context-index.json'),
+  entryGeneration: load('entry-generation.json'),
   translationResult: load('translation-result.json'),
   phraseMatch: load('phrase-match.json'),
   apiError: load('api-error.json'),
 } as const;
 
 /** System prompts shared with the pipeline, verbatim. */
-export function promptText(name: 'context-system' | 'translate-system'): string {
+export function promptText(name: 'context-system' | 'translate-system' | 'entry-system'): string {
   return readFileSync(`${contractsDir}prompts/${name}.md`, 'utf8').trim();
 }
 
 export type PromptExamples = {
+  entry: { input: Record<string, unknown>; output: Record<string, unknown> }[];
   context: { input: Record<string, unknown>; output: ContextResult }[];
   translate: { input: Record<string, unknown>; output: TranslationResult }[];
 };
@@ -73,6 +75,7 @@ export const validate = {
   dictionaryEntry: compile<DictionaryEntry>('dictionaryEntry'),
   contextResult: compile<ContextResult>('contextResult'),
   contextIndex: compile<{ senseIndex: number }>('contextIndex'),
+  entryGeneration: compile<EntryGeneration>('entryGeneration'),
   translationResult: compile<TranslationResult>('translationResult'),
   phraseMatch: compile<PhraseMatch>('phraseMatch'),
 };
@@ -116,3 +119,23 @@ export type TranslationResult = {
 };
 
 export type PhraseMatch = { phrase: string; lemma: string; start: number; tokenCount: number };
+
+/** The model's output for one headword: the Hindi layer only (contracts/schemas/entry-generation.json). */
+export type EntryGeneration = {
+  hindiPronunciation: string;
+  senses: Sense[];
+  synonyms: BilingualPair[];
+  antonyms: BilingualPair[];
+  forms: Form[];
+};
+
+/** What pipeline/03_extract.py produces per word and 08_stage.py stores. */
+export type WiktionaryExtract = {
+  word: string;
+  ipa: string;
+  isPhrase: boolean;
+  senses: { index: number; partOfSpeech: string; gloss: string; examples: string[] }[];
+  synonyms: string[];
+  antonyms: string[];
+  forms: { en: string; label: string }[];
+};

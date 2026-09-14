@@ -34,7 +34,7 @@ export const seedRoutes: FastifyPluginAsync = async (app) => {
     const entryFilter = since ? { updatedAt: { $gt: since } } : {};
     const [entries, forms, phrases] = await Promise.all([
       EntryModel.countDocuments(entryFilter).then((n) => Math.min(n, limit)),
-      FormModel.countDocuments(),
+      FormModel.countDocuments({ staged: { $ne: true } }),
       PhraseModel.countDocuments(),
     ]);
     request.meta.seed = { since: since?.toISOString(), entries, forms, phrases };
@@ -58,7 +58,7 @@ export const seedRoutes: FastifyPluginAsync = async (app) => {
     for await (const doc of entryCursor) {
       write({ t: 'entry', word: doc._id, freqRank: doc.freqRank, entry: toDictionaryEntry(doc) });
     }
-    for await (const doc of FormModel.find().lean().cursor()) {
+    for await (const doc of FormModel.find({ staged: { $ne: true } }).lean().cursor()) {
       write({ t: 'form', form: doc._id, lemma: doc.lemma });
     }
     for await (const doc of PhraseModel.find().lean().cursor()) {

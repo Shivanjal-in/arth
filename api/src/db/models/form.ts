@@ -5,6 +5,8 @@ const formSchema = new Schema(
   {
     _id: { type: String, required: true },
     lemma: { type: String, required: true },
+    /** Points at a staged (not yet generated) lemma; the seed skips these. */
+    staged: { type: Boolean },
   },
   { versionKey: false, collection: 'forms' },
 );

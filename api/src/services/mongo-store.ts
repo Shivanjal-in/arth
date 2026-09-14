@@ -1,10 +1,11 @@
-import { EntryModel, FormModel, PhraseModel, SenseNotesModel, toDictionaryEntry } from '../db/models/index.js';
-import type { DictionaryEntry } from '../contracts.js';
+import { EntryModel, FormModel, PhraseModel, SenseNotesModel, WiktionaryModel, toDictionaryEntry } from '../db/models/index.js';
+import type { DictionaryEntry, WiktionaryExtract } from '../contracts.js';
 import type { LemmaStore } from './lemma.js';
 import type { PhraseStore } from './phrases.js';
 import type { SenseNotesStore } from './context.js';
+import type { StagingStore } from './ondemand.js';
 
-export type Store = LemmaStore & PhraseStore & SenseNotesStore;
+export type Store = LemmaStore & PhraseStore & SenseNotesStore & StagingStore;
 
 export const mongoStore: Store = {
   async findEntry(id: string): Promise<DictionaryEntry | null> {
@@ -22,5 +23,16 @@ export const mongoStore: Store = {
   async findSenseNotes(word: string): Promise<string[] | null> {
     const doc = await SenseNotesModel.findById(word).lean();
     return doc?.notes ?? null;
+  },
+  async findStaged(lemma: string) {
+    const doc = await WiktionaryModel.findById(lemma).lean();
+    return doc ? { extract: doc.extract as WiktionaryExtract, freqRank: doc.freqRank } : null;
+  },
+  async saveGenerated(entry: DictionaryEntry, meta: { freqRank: number; model: string }) {
+    await EntryModel.updateOne(
+      { _id: entry.word },
+      { $set: { ...entry, freqRank: meta.freqRank, tier: 'ondemand', model: meta.model, updatedAt: new Date() } },
+      { upsert: true },
+    );
   },
 };

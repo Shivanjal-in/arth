@@ -26,6 +26,26 @@ async function tryKey(store: LemmaStore, key: string): Promise<{ entry: Dictiona
  * Resolution order from the API contract: exact → forms → lowercase → strip trailing 's.
  * Each later step re-runs the exact+forms pair on the transformed key.
  */
+/** Same exact → forms → lowercase → 's order, but only asks "is this a lemma?" — used for staged words. */
+export async function resolveLemmaKey(
+  isLemma: (key: string) => Promise<boolean>,
+  formLemma: (form: string) => Promise<string | null>,
+  word: string,
+): Promise<string | null> {
+  const w = word.trim();
+  if (!w) return null;
+  const candidates = [w];
+  const lower = w.toLowerCase();
+  if (lower !== w) candidates.push(lower);
+  if (lower.endsWith("'s") && lower.length > 2) candidates.push(lower.slice(0, -2));
+  for (const c of candidates) {
+    if (await isLemma(c)) return c;
+    const l = await formLemma(c);
+    if (l && (await isLemma(l))) return l;
+  }
+  return null;
+}
+
 export async function resolveLemma(store: LemmaStore, word: string): Promise<LemmaResolution> {
   const w = word.trim();
   if (!w) return null;

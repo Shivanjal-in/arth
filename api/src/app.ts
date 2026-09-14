@@ -45,6 +45,8 @@ export type AppOptions = {
     | 'CONTEXT_MODE'
     | 'LLM_CONTEXT_MODEL'
     | 'LLM_CONTEXT_INDEX_MODEL'
+    | 'LLM_ENTRY_MODEL'
+    | 'LLM_ENTRY_MAX_TOKENS'
     | 'LLM_TRANSLATE_MODEL'
     | 'LLM_TEMPERATURE'
     | 'LLM_CONTEXT_MAX_TOKENS'
@@ -123,13 +125,10 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     async (v1) => {
       await v1.register(rateLimit, { global: false });
       await v1.register(healthRoutes);
-      await v1.register(async (dbRoutes) => {
-        dbRoutes.addHook('preHandler', dbRoutes.rateLimit(limited(limits.lookups, messages.rateLimited, deviceKey)));
-        await dbRoutes.register(lookupRoutes, { store: opts.store });
-        await dbRoutes.register(phraseRoutes, { store: opts.store });
-      });
-      await v1.register(seedRoutes);
-      const log = { warn: (obj: object, msg: string) => app.log.warn(obj, msg) };
+      const log = {
+        warn: (obj: object, msg: string) => app.log.warn(obj, msg),
+        info: (obj: object, msg: string) => app.log.info(obj, msg),
+      };
       // Model calls are budgeted per device and spent only on a cache miss
       // (see services): cache hits and single-sense bypasses are free.
       // Interactive taps and background prefetch have separate budgets, so a
@@ -141,6 +140,15 @@ export function buildApp(opts: AppOptions): FastifyInstance {
         const budget = req.headers['x-prefetch'] === '1' ? prefetch : interactive;
         if (!budget.tryConsume(key)) throw new ApiError('RATE_LIMITED', messages.llmRateLimited);
       };
+      await v1.register(async (dbRoutes) => {
+        dbRoutes.addHook('preHandler', dbRoutes.rateLimit(limited(limits.lookups, messages.rateLimited, deviceKey)));
+        await dbRoutes.register(lookupRoutes, {
+          store: opts.store,
+          ondemand: { config: opts.config, llm: opts.llm, log, spend },
+        });
+        await dbRoutes.register(phraseRoutes, { store: opts.store });
+      });
+      await v1.register(seedRoutes);
       await v1.register(contextRoutes, {
         deps: { config: opts.config, llm: opts.llm, cache: opts.cache, store: opts.store, log },
         spend,
