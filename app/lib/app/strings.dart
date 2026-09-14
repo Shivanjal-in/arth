@@ -62,8 +62,9 @@ enum AppStrings {
   String get antonyms => _('Antonyms', 'विलोम');
   String get forms => _('Forms', 'रूप');
   String get listen => _('Listen', 'सुनें');
-  String get save => _('Save', 'सहेजें');
-  String get unsave => _('Remove', 'हटाएँ');
+  String get save => _('Save word', 'शब्द सहेजें');
+  String get saved => _('Saved', 'सहेजा गया');
+  String get unsave => _('Remove from saved', 'सहेजे से हटाएँ');
   String get didYouMean => _('Did you mean', 'क्या आपका मतलब था');
   String get attribution => _('Based on Wiktionary (CC BY-SA)', 'Wiktionary (CC BY-SA) के आधार पर');
 

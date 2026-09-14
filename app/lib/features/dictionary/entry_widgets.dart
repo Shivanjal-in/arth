@@ -31,6 +31,68 @@ class SectionLabel extends ConsumerWidget {
   }
 }
 
+/// Bookmark toggle for an entry: icon-only in headers, or with a label.
+class SaveWordButton extends ConsumerWidget {
+  const SaveWordButton({
+    required this.entry,
+    super.key,
+    this.sentence,
+    this.bookId,
+    this.bookTitle,
+    this.labelled = false,
+  });
+
+  final DictionaryEntry entry;
+  final String? sentence;
+  final int? bookId;
+  final String? bookTitle;
+  final bool labelled;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    final settings = ref.watch(settingsProvider);
+    final t = ref.watch(stringsProvider);
+    final saved = ref.watch(savedWordsProvider).valueOrNull?.any((w) => w.lemma == entry.word) ?? false;
+    void toggle() {
+      final notifier = ref.read(savedWordsProvider.notifier);
+      if (saved) {
+        unawaited(notifier.unsave(entry.word));
+      } else {
+        unawaited(
+          notifier.save(
+            SavedWord(
+              lemma: entry.word,
+              meaning: entry.senses.first.meaning,
+              sentence: sentence,
+              bookId: bookId,
+              bookTitle: bookTitle,
+              savedAt: DateTime.now(),
+            ),
+          ),
+        );
+      }
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text(saved ? t.unsave : '${t.saved}: ${entry.word}'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+
+    final icon = Icon(saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded, color: c.accent);
+    if (!labelled) {
+      return IconButton(tooltip: saved ? t.unsave : t.save, icon: icon, onPressed: toggle);
+    }
+    return TextButton.icon(
+      onPressed: toggle,
+      style: TextButton.styleFrom(foregroundColor: c.accent),
+      icon: icon,
+      label: Text(saved ? t.saved : t.save, style: uiLabel(hindi: t.isHindi, color: c.accent, scale: settings.hindiScale)),
+    );
+  }
+}
+
 /// Word, IPA, Devanagari pronunciation, speaker and save buttons.
 class EntryHeader extends ConsumerWidget {
   const EntryHeader({
@@ -54,7 +116,6 @@ class EntryHeader extends ConsumerWidget {
     final settings = ref.watch(settingsProvider);
     final tts = ref.watch(ttsProvider);
     final t = ref.watch(stringsProvider);
-    final saved = ref.watch(savedWordsProvider).valueOrNull?.any((w) => w.lemma == entry.word) ?? false;
     final showTts = settings.ttsEnabled && tts.hasEnglish;
 
     return Row(
@@ -88,30 +149,7 @@ class EntryHeader extends ConsumerWidget {
             icon: Icon(Icons.volume_up_rounded, color: c.accent),
             onPressed: () => tts.speakEnglish(entry.word),
           ),
-        IconButton(
-          tooltip: saved ? t.unsave : t.save,
-          icon: Icon(
-            saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-            color: c.accent,
-          ),
-          onPressed: () {
-            final notifier = ref.read(savedWordsProvider.notifier);
-            if (saved) {
-              unawaited(notifier.unsave(entry.word));
-            } else {
-              unawaited(notifier.save(
-                SavedWord(
-                  lemma: entry.word,
-                  meaning: entry.senses.first.meaning,
-                  sentence: sentence,
-                  bookId: bookId,
-                  bookTitle: bookTitle,
-                  savedAt: DateTime.now(),
-                ),
-              ));
-            }
-          },
-        ),
+        SaveWordButton(entry: entry, sentence: sentence, bookId: bookId, bookTitle: bookTitle),
       ],
     );
   }

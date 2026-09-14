@@ -103,13 +103,22 @@ class WordTooltip extends ConsumerWidget {
               pinnedIndex: state.context?.senseIndex,
             ),
             const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: onShowDetails,
-                style: TextButton.styleFrom(foregroundColor: c.accent),
-                child: Text(t.seeFullEntry, style: uiLabel(hindi: t.isHindi, color: c.accent, scale: settings.hindiScale)),
-              ),
+            Row(
+              children: [
+                SaveWordButton(
+                  entry: entry,
+                  sentence: state.sentence,
+                  bookId: bookId,
+                  bookTitle: bookTitle,
+                  labelled: true,
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: onShowDetails,
+                  style: TextButton.styleFrom(foregroundColor: c.accent),
+                  child: Text(t.seeFullEntry, style: uiLabel(hindi: t.isHindi, color: c.accent, scale: settings.hindiScale)),
+                ),
+              ],
             ),
           ],
         ),
