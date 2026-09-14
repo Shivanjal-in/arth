@@ -97,6 +97,20 @@ simulator without touch automation. App icon: `python3 tool/make_icon.py`.
 `contracts/normalize-vectors.json` — TypeScript (`api/test/normalize.test.ts`) and Python
 (`pipeline/tests/test_normalize.py`) do; Dart is added in Phase 4.
 
+## Android release builds
+
+Signing uses `app/android/key.properties` and `app/android/upload-keystore.jks` — both
+gitignored, **back them up**: an app signed with a different key cannot update an
+installed one. Without them the release build silently signs with the debug key.
+
+```sh
+cd app
+flutter build apk --release --split-per-abi --dart-define=ARTH_API_URL=https://arth-api-x8of.onrender.com   # sideload: app-arm64-v8a-release.apk
+flutter build appbundle --release        --dart-define=ARTH_API_URL=https://arth-api-x8of.onrender.com   # Play Store
+```
+
+R8 shrinking is on; keep rules live in `app/android/app/proguard-rules.pro`.
+
 ## Deploying the API (Render)
 
 `render.yaml` at the repo root is a Blueprint: New → Blueprint in the Render dashboard, pick
