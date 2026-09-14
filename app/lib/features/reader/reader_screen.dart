@@ -243,7 +243,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     if (!text.contains(' ')) {
       final key = normalizeWord(text);
       final centre = anchor!.center;
-      PageWord? word = idx.wordAtChar(ranges.first.start);
+      var word = idx.wordAtChar(ranges.first.start);
       if (word == null || word.key != key) {
         final same = idx.words.where((w) => w.key == key).toList();
         if (same.isNotEmpty) {
