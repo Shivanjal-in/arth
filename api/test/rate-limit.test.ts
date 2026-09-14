@@ -22,22 +22,44 @@ describe('rate limits per device', () => {
     assert.equal(other.statusCode, 200);
   });
 
-  test('LLM bucket is separate from the lookup bucket', async () => {
-    const llm = new FakeLLM({ context_result: [JSON.stringify({ senseIndex: 0, meaning: 'x', note: '' }), JSON.stringify({ senseIndex: 0, meaning: 'x', note: '' })] });
+  test('LLM budget: spent only on model calls; cache hits and single-sense words are free', async () => {
+    const ok = JSON.stringify({ senseIndex: 0, meaning: 'x', note: '' });
+    const llm = new FakeLLM({ context_result: [ok, ok] });
     const app = buildApp({ ...appOptions(llm), rateLimits: { lookups: 100, llm: 1, prefetch: 1 } });
     after(() => app.close());
     const h = { 'x-device-id': 'dev-C' };
     const c1 = await app.inject({ method: 'POST', url: '/v1/context', headers: h, payload: { word: 'single', sentence: 'A single man.' } });
-    assert.equal(c1.statusCode, 200);
+    assert.equal(c1.statusCode, 200, 'first model call');
+    const again = await app.inject({ method: 'POST', url: '/v1/context', headers: h, payload: { word: 'single', sentence: 'A single man.' } });
+    assert.equal(again.statusCode, 200, 'cache hit is free');
+    const one = await app.inject({ method: 'POST', url: '/v1/context', headers: h, payload: { word: 'wives', sentence: 'His wives.' } });
+    assert.equal(one.statusCode, 200, 'single-sense bypass is free');
     const c2 = await app.inject({ method: 'POST', url: '/v1/context', headers: h, payload: { word: 'single', sentence: 'A single rose.' } });
-    assert.equal(c2.statusCode, 429);
+    assert.equal(c2.statusCode, 429, 'second model call within the minute');
+    assert.equal(c2.json().error.code, 'RATE_LIMITED');
+    assert.equal(llm.requests.length, 1, 'the refused call never reached the model');
     const l = await app.inject({ method: 'GET', url: '/v1/lookup?word=fortune', headers: h });
-    assert.equal(l.statusCode, 200, 'lookups still allowed');
+    assert.equal(l.statusCode, 200, 'lookups are a separate bucket');
+  });
+
+  test('translate: refused before the stream opens, as an SSE error event', async () => {
+    const r = JSON.stringify({ source: '', hindi: 'x', simpleMeaning: 'y', difficultWords: [] });
+    const llm = new FakeLLM({ translation_result: [r, r] });
+    const app = buildApp({ ...appOptions(llm), rateLimits: { lookups: 100, llm: 1, prefetch: 1 } });
+    after(() => app.close());
+    const h = { 'x-device-id': 'dev-T' };
+    const t1 = await app.inject({ method: 'POST', url: '/v1/translate', headers: h, payload: { text: 'One.' } });
+    assert.match(t1.body, /event: done/);
+    const t2 = await app.inject({ method: 'POST', url: '/v1/translate', headers: h, payload: { text: 'Two.' } });
+    assert.match(t2.body, /event: error/);
+    assert.match(t2.body, /RATE_LIMITED/);
+    const cached = await app.inject({ method: 'POST', url: '/v1/translate', headers: h, payload: { text: 'One.' } });
+    assert.match(cached.body, /event: done/, 'cache replay is free');
   });
 });
 
-describe('prefetch bucket', () => {
-  test('X-Prefetch: 1 calls count against their own bucket, not the tap bucket', async () => {
+describe('prefetch budget', () => {
+  test('X-Prefetch: 1 model calls have their own budget; the tap budget is untouched', async () => {
     const ok = JSON.stringify({ senseIndex: 0, meaning: 'x', note: '' });
     const llm = new FakeLLM({ context_result: [ok, ok, ok, ok] });
     const app = buildApp({ ...appOptions(llm), rateLimits: { lookups: 100, llm: 1, prefetch: 2 } });
@@ -47,7 +69,6 @@ describe('prefetch bucket', () => {
     const p2 = await app.inject({ method: 'POST', url: '/v1/context', headers: h, payload: { word: 'single', sentence: 'A single rose.' } });
     const p3 = await app.inject({ method: 'POST', url: '/v1/context', headers: h, payload: { word: 'single', sentence: 'A single day.' } });
     assert.deepEqual([p1.statusCode, p2.statusCode, p3.statusCode], [200, 200, 429]);
-    // The user's own tap still goes through.
     const tap = await app.inject({ method: 'POST', url: '/v1/context', headers: { 'x-device-id': 'dev-P' }, payload: { word: 'single', sentence: 'A single word.' } });
     assert.equal(tap.statusCode, 200);
   });

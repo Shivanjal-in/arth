@@ -13,7 +13,9 @@ function sse(ev: TranslateEvent): string {
   return `event: ${ev.event}\ndata: ${JSON.stringify(ev.data)}\n\n`;
 }
 
-export const translateRoutes: FastifyPluginAsync<{ deps: TranslateDeps }> = async (app, { deps }) => {
+import type { LlmSpend } from './context.js';
+
+export const translateRoutes: FastifyPluginAsync<{ deps: TranslateDeps; spend: LlmSpend }> = async (app, { deps, spend }) => {
   /**
    * Server-sent events: `hindi`, `simpleMeaning`, `difficultWords`, then `done`
    * with the full TranslationResult — or `error` with the envelope's error shape.
@@ -41,7 +43,7 @@ export const translateRoutes: FastifyPluginAsync<{ deps: TranslateDeps }> = asyn
 
     try {
       const gen = translate(
-        deps,
+        { ...deps, spend: () => spend(request) },
         text,
         context,
         (s) => {

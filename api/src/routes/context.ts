@@ -13,7 +13,9 @@ const Body = z.object({
   mode: z.enum(['live', 'index']).optional(),
 });
 
-export const contextRoutes: FastifyPluginAsync<{ deps: ContextDeps }> = async (app, { deps }) => {
+export type LlmSpend = (request: { headers: Record<string, unknown>; ip: string }) => void;
+
+export const contextRoutes: FastifyPluginAsync<{ deps: ContextDeps; spend: LlmSpend }> = async (app, { deps, spend }) => {
   app.post(
     '/context',
     {
@@ -34,7 +36,7 @@ export const contextRoutes: FastifyPluginAsync<{ deps: ContextDeps }> = async (a
       const started = performance.now();
       let outcome;
       try {
-        outcome = await resolveContext(deps, word, sentence, mode);
+        outcome = await resolveContext({ ...deps, spend: () => spend(request) }, word, sentence, mode);
       } catch (err) {
         if (err instanceof ApiError) throw err;
         request.log.error({ err }, 'context failed');

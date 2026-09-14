@@ -11,6 +11,7 @@ import { translateRoutes } from './routes/translate.js';
 import type { CacheStore } from './cache/cache.js';
 import type { Config } from './config.js';
 import rateLimit from '@fastify/rate-limit';
+import { LlmBudget } from './lib/budget.js';
 import type { LLMProvider } from './llm/provider.js';
 import type { Store } from './services/mongo-store.js';
 
@@ -54,6 +55,8 @@ export type AppOptions = {
 export function buildApp(opts: AppOptions): FastifyInstance {
   const app = Fastify({
     logger: { level: opts.logLevel ?? 'info' },
+    trustProxy: true, // Render / any load balancer: req.ip must be the client for the IP fallback
+
     // We emit our own single line per request in onResponse.
     logController: new LogController({ disableRequestLogging: true }),
   });
@@ -109,7 +112,6 @@ export function buildApp(opts: AppOptions): FastifyInstance {
   // fall back to the IP. Two buckets: cheap DB reads, and LLM calls.
   const limits = opts.rateLimits ?? { lookups: 60, llm: 20, prefetch: 40 };
   const deviceKey = (req: FastifyRequest) => (req.headers['x-device-id'] as string | undefined)?.slice(0, 64) || req.ip;
-  const isPrefetch = (req: FastifyRequest) => req.headers['x-prefetch'] === '1';
   const limited = (max: number, message: string, keyGenerator: (req: FastifyRequest) => string) => ({
     max,
     timeWindow: '1 minute',
@@ -128,22 +130,24 @@ export function buildApp(opts: AppOptions): FastifyInstance {
       });
       await v1.register(seedRoutes);
       const log = { warn: (obj: object, msg: string) => app.log.warn(obj, msg) };
-      await v1.register(async (llmRoutes) => {
-        // Interactive taps and background prefetch are separate buckets: a
-        // reader flipping pages must never find their own tap rate-limited.
-        const interactive = llmRoutes.rateLimit(limited(limits.llm, messages.llmRateLimited, deviceKey));
-        const prefetch = llmRoutes.rateLimit(
-          limited(limits.prefetch, messages.llmRateLimited, (req) => `prefetch:${deviceKey(req)}`),
-        );
-        llmRoutes.addHook('preHandler', async function (this: FastifyInstance, req, reply) {
-          await (isPrefetch(req) ? prefetch : interactive).call(this, req, reply);
-        });
-        await llmRoutes.register(contextRoutes, {
-          deps: { config: opts.config, llm: opts.llm, cache: opts.cache, store: opts.store, log },
-        });
-        await llmRoutes.register(translateRoutes, {
-          deps: { config: opts.config, llm: opts.llm, cache: opts.cache, log },
-        });
+      // Model calls are budgeted per device and spent only on a cache miss
+      // (see services): cache hits and single-sense bypasses are free.
+      // Interactive taps and background prefetch have separate budgets, so a
+      // reader flipping pages never finds their own tap refused.
+      const interactive = new LlmBudget(limits.llm);
+      const prefetch = new LlmBudget(limits.prefetch);
+      const spend = (req: { headers: Record<string, unknown>; ip: string }) => {
+        const key = (req.headers['x-device-id'] as string | undefined)?.slice(0, 64) || req.ip;
+        const budget = req.headers['x-prefetch'] === '1' ? prefetch : interactive;
+        if (!budget.tryConsume(key)) throw new ApiError('RATE_LIMITED', messages.llmRateLimited);
+      };
+      await v1.register(contextRoutes, {
+        deps: { config: opts.config, llm: opts.llm, cache: opts.cache, store: opts.store, log },
+        spend,
+      });
+      await v1.register(translateRoutes, {
+        deps: { config: opts.config, llm: opts.llm, cache: opts.cache, log },
+        spend,
       });
     },
     { prefix: '/v1' },

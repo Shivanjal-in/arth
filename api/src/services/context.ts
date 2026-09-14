@@ -71,6 +71,8 @@ export type ContextDeps = {
   cache: CacheStore;
   store: LemmaStore & SenseNotesStore;
   log: { warn: (obj: object, msg: string) => void };
+  /** Called just before a model call; throw to refuse (rate limit). */
+  spend?: () => void;
 };
 
 export async function resolveContext(
@@ -107,6 +109,7 @@ export async function resolveContext(
     };
   }
 
+  deps.spend?.();
   const req: JsonRequest = {
     model: mode === 'index' ? deps.config.LLM_CONTEXT_INDEX_MODEL : deps.config.LLM_CONTEXT_MODEL,
     messages: [...prefix(mode), { role: 'user', content: userMessage(entry, normSentence) }],

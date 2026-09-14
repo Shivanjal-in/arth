@@ -33,6 +33,8 @@ export type TranslateDeps = {
   llm: LLMProvider;
   cache: CacheStore;
   log: { warn: (obj: object, msg: string) => void };
+  /** Called just before a model call; throw to refuse (rate limit). */
+  spend?: () => void;
 };
 
 const STREAMED = ['hindi', 'simpleMeaning', 'difficultWords'] as const;
@@ -74,6 +76,7 @@ export async function* translate(
     return;
   }
 
+  deps.spend?.();
   const req: JsonRequest = {
     model: deps.config.LLM_TRANSLATE_MODEL,
     messages: [
