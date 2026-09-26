@@ -9,6 +9,7 @@ import 'package:arth/app/strings.dart';
 import 'package:arth/data/account.dart';
 import 'package:arth/data/api_client.dart';
 import 'package:arth/data/auth_service.dart';
+import 'package:arth/data/billing.dart';
 import 'package:arth/data/push_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/widgets.dart';
@@ -81,6 +82,16 @@ final pushServiceProvider = Provider<PushService?>((ref) {
       if (ref.read(signedInUidProvider) != null) unawaited(service.register());
     });
   return service;
+});
+
+/// Buying plans in the app stores. Follows sign-in so a purchase belongs to
+/// the account.
+final billingProvider = Provider<Billing>((ref) {
+  final billing = Billing();
+  ref.listen(signedInUidProvider, (prev, uid) {
+    if (uid != prev) unawaited(billing.identify(uid));
+  }, fireImmediately: true);
+  return billing;
 });
 
 /// AI uses against the allowance: from /me, then kept current by the

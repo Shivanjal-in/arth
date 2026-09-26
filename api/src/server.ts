@@ -10,6 +10,8 @@ import { disabledPusher, fcmPusher } from './push/pusher.js';
 import { parseCloudinaryUrl } from './lib/cloudinary.js';
 import { mongoAccountStore } from './services/mongo-accounts.js';
 import { mongoCommunityStore } from './services/mongo-community.js';
+import { disabledBilling, revenueCatBilling } from './billing/revenuecat.js';
+import { firebaseLoginRemover } from './auth/verifier.js';
 
 const config = loadConfig();
 const serviceAccount = parseServiceAccount(config.FIREBASE_SERVICE_ACCOUNT);
@@ -21,6 +23,11 @@ const app = buildApp({
   llm: new OpenAIProvider(config.OPENAI_API_KEY),
   config,
   seedLimit: config.SEED_LIMIT,
+  ...(fbApp ? { removeLogin: firebaseLoginRemover(fbApp) } : {}),
+  billing: {
+    billing: config.REVENUECAT_SECRET_KEY ? revenueCatBilling(config.REVENUECAT_SECRET_KEY) : disabledBilling,
+    webhookAuth: config.REVENUECAT_WEBHOOK_AUTH,
+  },
   rateLimits: { lookups: config.RATE_LIMIT_LOOKUPS, llm: config.RATE_LIMIT_LLM, prefetch: config.RATE_LIMIT_PREFETCH },
   accounts: {
     store: mongoAccountStore,
@@ -31,7 +38,12 @@ const app = buildApp({
   // Without a Firebase project nobody can sign in, so AI stays open.
   enforceQuota: config.FIREBASE_PROJECT_ID !== '',
   community: mongoCommunityStore,
-  limits: { free: config.AI_FREE_LIMIT, proMonthly: config.AI_PRO_MONTHLY, freeAccountsPerDevice: config.AI_FREE_ACCOUNTS_PER_DEVICE },
+  limits: {
+    free: config.AI_FREE_LIMIT,
+    proMonthly: config.AI_PRO_MONTHLY,
+    superMonthly: config.AI_SUPER_MONTHLY,
+    freeAccountsPerDevice: config.AI_FREE_ACCOUNTS_PER_DEVICE,
+  },
 });
 
 try {

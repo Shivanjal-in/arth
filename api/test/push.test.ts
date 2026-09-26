@@ -100,7 +100,7 @@ describe('triggers', () => {
   test('review reminders: only readers with due cards, at most daily, off when turned off', async () => {
     const store = memoryAccountStore();
     const pusher = new FakePusher();
-    const base = { displayName: '', email: null, phone: null, photoUrl: null, bio: '', role: 'user' as const, tier: 'free' as const, aiTotal: 0, aiMonth: null, aiMonthUses: 0, lastReviewNudgeAt: null, lowAiNoticeFor: null, banned: false, createdAt: 0, updatedAt: 0 };
+    const base = { displayName: '', email: null, phone: null, photoUrl: null, bio: '', role: 'user' as const, tier: 'free' as const, grantTier: 'free' as const, storeTier: 'free' as const, aiTotal: 0, aiMonth: null, aiMonthUses: 0, lastReviewNudgeAt: null, lowAiNoticeFor: null, banned: false, createdAt: 0, updatedAt: 0 };
     for (const uid of ['due', 'notdue', 'optout']) {
       await store.insertUser({ ...base, uid, reviewReminders: uid !== 'optout' });
       await store.addPushDevice(uid, { token: tok(uid), platform: 'android', lang: 'en', updatedAt: 0 });
@@ -131,7 +131,7 @@ describe('triggers', () => {
   test('low-AI warning skips Super and repeats per Pro month', async () => {
     const store = memoryAccountStore();
     const pusher = new FakePusher();
-    const base = { displayName: '', email: null, phone: null, photoUrl: null, bio: '', role: 'user' as const, reviewReminders: true, lastReviewNudgeAt: null, lowAiNoticeFor: null, banned: false, createdAt: 0, updatedAt: 0 };
+    const base = { displayName: '', email: null, phone: null, photoUrl: null, bio: '', role: 'user' as const, grantTier: 'free' as const, storeTier: 'free' as const, reviewReminders: true, lastReviewNudgeAt: null, lowAiNoticeFor: null, banned: false, createdAt: 0, updatedAt: 0 };
     await store.insertUser({ ...base, uid: 'p', tier: 'pro', aiTotal: 950, aiMonth: '2026-09', aiMonthUses: 950 });
     await store.addPushDevice('p', { token: tok('p'), platform: 'ios', lang: 'en', updatedAt: 0 });
     const limits = { free: 100, proMonthly: 1000 };

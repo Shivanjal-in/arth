@@ -128,7 +128,7 @@ describe('AI allowance', () => {
 
   test('a new month starts the pro count again', async () => {
     const store = memoryAccountStore();
-    const base = { displayName: '', email: null, phone: null, photoUrl: null, bio: '', role: 'user' as const, reviewReminders: true, lastReviewNudgeAt: null, lowAiNoticeFor: null, banned: false, createdAt: 0, updatedAt: 0 };
+    const base = { displayName: '', email: null, phone: null, photoUrl: null, bio: '', role: 'user' as const, grantTier: 'free' as const, storeTier: 'free' as const, reviewReminders: true, lastReviewNudgeAt: null, lowAiNoticeFor: null, banned: false, createdAt: 0, updatedAt: 0 };
     await store.insertUser({ ...base, uid: 'p', tier: 'pro', aiTotal: 9, aiMonth: '2026-08', aiMonthUses: 3 });
     const allowance = allowanceFor('pro', { free: 2, proMonthly: 3 });
     assert.equal(await store.consumeAi('p', '2026-08', allowance), null);

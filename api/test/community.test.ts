@@ -23,10 +23,12 @@ async function setup() {
   const pusher = new FakePusher();
   const app = buildApp({ ...appOptions(new FakeLLM({})), accounts: { store, verifier, cloudinary: null, pusher }, community });
   // Everyone signs in once; tiers and roles as the tests need.
-  for (const uid of ['pro', 'free', 'other', 'admin', 'third']) await app.inject({ method: 'GET', url: '/v1/me', headers: as(uid) });
+  for (const uid of ['pro', 'reader', 'other', 'admin', 'third', 'basic']) await app.inject({ method: 'GET', url: '/v1/me', headers: as(uid) });
   await store.updateUser('pro', { tier: 'pro' });
+  // Community members are on a paid plan; `basic` stays Free, to be turned away.
+  for (const uid of ['reader', 'other', 'third']) await store.updateUser(uid, { tier: 'super' });
   await store.updateUser('admin', { role: 'admin' });
-  for (const uid of ['pro', 'free', 'other']) await store.addPushDevice(uid, { token: `tok-${uid}-${'x'.repeat(20)}`, platform: 'android', lang: 'en', updatedAt: 0 });
+  for (const uid of ['pro', 'reader', 'other', 'basic']) await store.addPushDevice(uid, { token: `tok-${uid}-${'x'.repeat(20)}`, platform: 'android', lang: 'en', updatedAt: 0 });
   return { app, store, community, pusher };
 }
 
@@ -50,22 +52,28 @@ async function publish(app: Awaited<ReturnType<typeof setup>>['app']) {
 }
 
 describe('publishing', () => {
-  test('Pro publishes; Free is told why not; the list says who can publish', async () => {
+  test('the community is Pro and Super: signed out and Free are told what it takes', async () => {
     const { app } = await setup();
-    const free = await app.inject({ method: 'POST', url: '/v1/community/decks', headers: as('free'), payload: deckBody });
-    assert.equal(free.statusCode, 403);
-    assert.equal(free.json().error.reason, 'tier');
-    await publish(app);
-    const asFree = (await app.inject({ method: 'GET', url: '/v1/community/decks', headers: as('free') })).json().data;
-    assert.equal(asFree.canPublish, false);
+    const id = await publish(app);
+    assert.equal((await app.inject({ method: 'GET', url: '/v1/community/decks' })).statusCode, 401);
+    for (const [method, url] of [
+      ['GET', '/v1/community/decks'],
+      ['GET', `/v1/community/decks/${id}`],
+      ['POST', `/v1/community/decks/${id}/like`],
+      ['POST', '/v1/community/decks'],
+    ] as const) {
+      const r = await app.inject({ method, url, headers: as('basic'), ...(method === 'POST' && url.endsWith('decks') ? { payload: deckBody } : {}) });
+      assert.equal(r.statusCode, 403, `${method} ${url}`);
+      assert.equal(r.json().error.reason, 'plan');
+    }
     assert.equal((await app.inject({ method: 'GET', url: '/v1/community/decks', headers: as('pro') })).json().data.canPublish, true);
     await app.close();
   });
 
-  test('anyone can browse signed out; the list is a light preview with the author', async () => {
+  test('members see a light preview with the author, and the full deck on its page', async () => {
     const { app } = await setup();
     const id = await publish(app);
-    const list = (await app.inject({ method: 'GET', url: '/v1/community/decks' })).json().data;
+    const list = (await app.inject({ method: 'GET', url: '/v1/community/decks', headers: as('other') })).json().data;
     assert.equal(list.decks.length, 1);
     const d = list.decks[0];
     assert.equal(d.id, id);
@@ -74,7 +82,7 @@ describe('publishing', () => {
     assert.equal(d.author.name, 'Pro');
     assert.equal(d.author.tier, 'pro');
     assert.equal(d.cards, undefined, 'full cards only on the deck page');
-    const page = (await app.inject({ method: 'GET', url: `/v1/community/decks/${id}` })).json().data;
+    const page = (await app.inject({ method: 'GET', url: `/v1/community/decks/${id}`, headers: as('other') })).json().data;
     assert.equal(page.cards.length, 4);
     assert.equal(page.cards[1].note, '');
     assert.equal(page.mine, false);
@@ -85,10 +93,10 @@ describe('publishing', () => {
     const { app } = await setup();
     const a = await publish(app);
     const b = (await app.inject({ method: 'POST', url: '/v1/community/decks', headers: as('pro'), payload: { ...deckBody, bookTitle: 'Emma' } })).json().data.id;
-    await app.inject({ method: 'POST', url: `/v1/community/decks/${a}/save`, headers: as('free') });
-    const found = (await app.inject({ method: 'GET', url: '/v1/community/decks?q=emm' })).json().data.decks;
+    await app.inject({ method: 'POST', url: `/v1/community/decks/${a}/save`, headers: as('reader') });
+    const found = (await app.inject({ method: 'GET', url: '/v1/community/decks?q=emm', headers: as('other') })).json().data.decks;
     assert.deepEqual(found.map((d: { id: string }) => d.id), [b]);
-    const popular = (await app.inject({ method: 'GET', url: '/v1/community/decks?sort=popular' })).json().data.decks;
+    const popular = (await app.inject({ method: 'GET', url: '/v1/community/decks?sort=popular', headers: as('other') })).json().data.decks;
     assert.equal(popular[0].id, a);
     await app.close();
   });
@@ -100,7 +108,7 @@ describe('publishing', () => {
     assert.equal((await app.inject({ method: 'PATCH', url: `/v1/community/decks/${id}`, headers: as('pro'), payload: { title: 'Better title' } })).statusCode, 200);
     assert.equal((await app.inject({ method: 'DELETE', url: `/v1/community/decks/${id}`, headers: as('other') })).statusCode, 403);
     assert.equal((await app.inject({ method: 'DELETE', url: `/v1/community/decks/${id}`, headers: as('admin') })).statusCode, 200);
-    assert.equal((await app.inject({ method: 'GET', url: `/v1/community/decks/${id}` })).statusCode, 404);
+    assert.equal((await app.inject({ method: 'GET', url: `/v1/community/decks/${id}`, headers: as('other') })).statusCode, 404);
     // An admin can still open it, and is told it's gone.
     const seen = (await app.inject({ method: 'GET', url: `/v1/community/decks/${id}`, headers: as('admin') })).json().data;
     assert.equal(seen.removed, true);
@@ -112,16 +120,16 @@ describe('card font', () => {
   test('a recap keeps the font its author chose; older ones read as Montserrat', async () => {
     const { app } = await setup();
     const plain = await publish(app);
-    assert.equal((await app.inject({ method: 'GET', url: `/v1/community/decks/${plain}` })).json().data.font, 'montserrat');
+    assert.equal((await app.inject({ method: 'GET', url: `/v1/community/decks/${plain}`, headers: as('other') })).json().data.font, 'montserrat');
 
     const res = await app.inject({ method: 'POST', url: '/v1/community/decks', headers: as('pro'), payload: { ...deckBody, font: 'quintessential' } });
     const id = res.json().data.id as string;
-    assert.equal((await app.inject({ method: 'GET', url: `/v1/community/decks/${id}` })).json().data.font, 'quintessential');
-    const listed = (await app.inject({ method: 'GET', url: '/v1/community/decks' })).json().data.decks;
+    assert.equal((await app.inject({ method: 'GET', url: `/v1/community/decks/${id}`, headers: as('other') })).json().data.font, 'quintessential');
+    const listed = (await app.inject({ method: 'GET', url: '/v1/community/decks', headers: as('other') })).json().data.decks;
     assert.equal(listed.find((d: { id: string }) => d.id === id).font, 'quintessential');
 
     await app.inject({ method: 'PATCH', url: `/v1/community/decks/${id}`, headers: as('pro'), payload: { font: 'bricolage' } });
-    assert.equal((await app.inject({ method: 'GET', url: `/v1/community/decks/${id}` })).json().data.font, 'bricolage');
+    assert.equal((await app.inject({ method: 'GET', url: `/v1/community/decks/${id}`, headers: as('other') })).json().data.font, 'bricolage');
 
     const bad = await app.inject({ method: 'POST', url: '/v1/community/decks', headers: as('pro'), payload: { ...deckBody, font: 'comic-sans' } });
     assert.equal(bad.statusCode, 400);
@@ -134,11 +142,11 @@ describe('reactions and comments', () => {
     const { app } = await setup();
     const id = await publish(app);
     const like = (u: string) => app.inject({ method: 'POST', url: `/v1/community/decks/${id}/like`, headers: as(u) });
-    assert.deepEqual((await like('free')).json().data, { liked: true, likes: 1 });
-    assert.deepEqual((await like('free')).json().data, { liked: false, likes: 0 });
+    assert.deepEqual((await like('reader')).json().data, { liked: true, likes: 1 });
+    assert.deepEqual((await like('reader')).json().data, { liked: false, likes: 0 });
     const save = (u: string) => app.inject({ method: 'POST', url: `/v1/community/decks/${id}/save`, headers: as(u) });
-    await save('free');
-    await save('free');
+    await save('reader');
+    await save('reader');
     assert.equal((await save('other')).json().data.saves, 2);
     await app.close();
   });
@@ -146,8 +154,8 @@ describe('reactions and comments', () => {
   test('a comment notifies the author; a reply notifies the commenter, not the replier', async () => {
     const { app, pusher } = await setup();
     const id = await publish(app);
-    const c1 = (await app.inject({ method: 'POST', url: `/v1/community/decks/${id}/comments`, headers: as('free'), payload: { text: 'Loved the storm card' } })).json().data;
-    assert.equal(c1.author.name, 'Free');
+    const c1 = (await app.inject({ method: 'POST', url: `/v1/community/decks/${id}/comments`, headers: as('reader'), payload: { text: 'Loved the storm card' } })).json().data;
+    assert.equal(c1.author.name, 'Reader');
     await new Promise((r) => setTimeout(r, 10));
     const toPro = pusher.sent.filter((s) => s.tokens[0]!.includes('pro'));
     assert.equal(toPro.length, 1);
@@ -158,10 +166,10 @@ describe('reactions and comments', () => {
     await app.inject({ method: 'POST', url: `/v1/community/decks/${id}/comments`, headers: as('other'), payload: { text: 'Me too', parentId: c1.id } });
     await new Promise((r) => setTimeout(r, 10));
     const recipients = pusher.sent.map((s) => s.tokens[0]!.split('-')[1]).sort();
-    assert.deepEqual(recipients, ['free', 'pro'], 'the commenter gets a reply notice, the author a comment notice');
-    assert.equal(pusher.sent.find((s) => s.tokens[0]!.includes('free'))!.message.title, 'Other replied to you');
+    assert.deepEqual(recipients, ['pro', 'reader'], 'the commenter gets a reply notice, the author a comment notice');
+    assert.equal(pusher.sent.find((s) => s.tokens[0]!.includes('reader'))!.message.title, 'Other replied to you');
 
-    const page = (await app.inject({ method: 'GET', url: `/v1/community/decks/${id}` })).json().data;
+    const page = (await app.inject({ method: 'GET', url: `/v1/community/decks/${id}`, headers: as('other') })).json().data;
     assert.equal(page.thread.length, 2);
     assert.equal(page.thread[1].parentId, c1.id);
     assert.equal(page.thread[0].mine, false);
@@ -172,10 +180,10 @@ describe('reactions and comments', () => {
   test('the deck’s author can delete comments on their page; others can’t', async () => {
     const { app } = await setup();
     const id = await publish(app);
-    const c = (await app.inject({ method: 'POST', url: `/v1/community/decks/${id}/comments`, headers: as('free'), payload: { text: 'spam' } })).json().data;
+    const c = (await app.inject({ method: 'POST', url: `/v1/community/decks/${id}/comments`, headers: as('reader'), payload: { text: 'spam' } })).json().data;
     assert.equal((await app.inject({ method: 'DELETE', url: `/v1/community/comments/${c.id}`, headers: as('other') })).statusCode, 403);
     assert.equal((await app.inject({ method: 'DELETE', url: `/v1/community/comments/${c.id}`, headers: as('pro') })).statusCode, 200);
-    const page = (await app.inject({ method: 'GET', url: `/v1/community/decks/${id}` })).json().data;
+    const page = (await app.inject({ method: 'GET', url: `/v1/community/decks/${id}`, headers: as('other') })).json().data;
     assert.equal(page.thread.length, 0);
     await app.close();
   });
@@ -185,16 +193,16 @@ describe('reports and moderation', () => {
   test('three reports hide a deck; the owner still sees it; an admin dismisses and it’s back', async () => {
     const { app, store } = await setup();
     const id = await publish(app);
-    for (const u of ['free', 'other']) {
+    for (const u of ['reader', 'other']) {
       await app.inject({ method: 'POST', url: '/v1/community/reports', headers: as(u), payload: { kind: 'deck', targetId: id, reason: 'spam' } });
     }
     // A repeat report from the same reader doesn't count twice.
-    await app.inject({ method: 'POST', url: '/v1/community/reports', headers: as('free'), payload: { kind: 'deck', targetId: id } });
-    assert.equal((await app.inject({ method: 'GET', url: `/v1/community/decks/${id}` })).statusCode, 200, 'two reports: still live');
+    await app.inject({ method: 'POST', url: '/v1/community/reports', headers: as('reader'), payload: { kind: 'deck', targetId: id } });
+    assert.equal((await app.inject({ method: 'GET', url: `/v1/community/decks/${id}`, headers: as('other') })).statusCode, 200, 'two reports: still live');
     const third = await app.inject({ method: 'POST', url: '/v1/community/reports', headers: as('third'), payload: { kind: 'deck', targetId: id } });
     assert.equal(third.json().data.hidden, true);
-    assert.equal((await app.inject({ method: 'GET', url: `/v1/community/decks/${id}` })).statusCode, 404);
-    assert.equal((await app.inject({ method: 'GET', url: '/v1/community/decks' })).json().data.decks.length, 0);
+    assert.equal((await app.inject({ method: 'GET', url: `/v1/community/decks/${id}`, headers: as('other') })).statusCode, 404);
+    assert.equal((await app.inject({ method: 'GET', url: '/v1/community/decks', headers: as('other') })).json().data.decks.length, 0);
     const own = (await app.inject({ method: 'GET', url: `/v1/community/decks/${id}`, headers: as('pro') })).json().data;
     assert.equal(own.hidden, true);
 
@@ -206,7 +214,7 @@ describe('reports and moderation', () => {
     assert.equal(queue[0].preview.bookTitle, 'The Lighthouse Keeper');
 
     await app.inject({ method: 'POST', url: '/v1/admin/moderate', headers: as('admin'), payload: { kind: 'deck', targetId: id, action: 'dismiss' } });
-    assert.equal((await app.inject({ method: 'GET', url: `/v1/community/decks/${id}` })).statusCode, 200);
+    assert.equal((await app.inject({ method: 'GET', url: `/v1/community/decks/${id}`, headers: as('other') })).statusCode, 200);
     assert.equal((await app.inject({ method: 'GET', url: '/v1/admin/reports', headers: as('admin') })).json().data.items.length, 0);
     assert.equal((await store.findUser('pro'))!.banned, false);
     await app.close();
@@ -216,13 +224,13 @@ describe('reports and moderation', () => {
     const { app, pusher } = await setup();
     const id = await publish(app);
     const c = (await app.inject({ method: 'POST', url: `/v1/community/decks/${id}/comments`, headers: as('other'), payload: { text: 'rude words' } })).json().data;
-    await app.inject({ method: 'POST', url: '/v1/community/reports', headers: as('free'), payload: { kind: 'comment', targetId: c.id } });
+    await app.inject({ method: 'POST', url: '/v1/community/reports', headers: as('reader'), payload: { kind: 'comment', targetId: c.id } });
     pusher.sent.length = 0;
     await app.inject({ method: 'POST', url: '/v1/admin/moderate', headers: as('admin'), payload: { kind: 'comment', targetId: c.id, action: 'remove' } });
     await new Promise((r) => setTimeout(r, 10));
     assert.equal(pusher.sent[0]!.message.title, 'Your comment was removed');
-    assert.deepEqual((await app.inject({ method: 'GET', url: `/v1/community/decks/${id}` })).json().data.thread, [], 'gone from the page');
-    const deck = (await app.inject({ method: 'GET', url: '/v1/community/decks' })).json().data.decks[0];
+    assert.deepEqual((await app.inject({ method: 'GET', url: `/v1/community/decks/${id}`, headers: as('other') })).json().data.thread, [], 'gone from the page');
+    const deck = (await app.inject({ method: 'GET', url: '/v1/community/decks', headers: as('other') })).json().data.decks[0];
     assert.equal(deck.comments, 0);
     await app.close();
   });
@@ -248,7 +256,7 @@ describe('admin', () => {
     assert.equal((await app.inject({ method: 'POST', url: `/v1/community/decks/${id}/save`, headers: as('other') })).statusCode, 200);
 
     pusher.sent.length = 0;
-    const up = (await app.inject({ method: 'PATCH', url: '/v1/admin/users/free', headers: as('admin'), payload: { tier: 'super' } })).json().data;
+    const up = (await app.inject({ method: 'PATCH', url: '/v1/admin/users/basic', headers: as('admin'), payload: { tier: 'super' } })).json().data;
     assert.equal(up.tier, 'super');
     await new Promise((r) => setTimeout(r, 10));
     assert.equal(pusher.sent[0]!.message.title, 'You’re on Super now ✨');
@@ -259,7 +267,7 @@ describe('admin', () => {
   test('broadcast reaches every reader with a phone, or one tier', async () => {
     const { app, pusher } = await setup();
     const all = (await app.inject({ method: 'POST', url: '/v1/admin/broadcast', headers: as('admin'), payload: { title: 'New in Arth', body: 'Community is here' } })).json().data;
-    assert.deepEqual(all, { readers: 3, sent: 3 });
+    assert.deepEqual(all, { readers: 4, sent: 4 });
     pusher.sent.length = 0;
     const pro = (await app.inject({ method: 'POST', url: '/v1/admin/broadcast', headers: as('admin'), payload: { title: 'Thanks', body: 'For being Pro', tier: 'pro', route: '/community' } })).json().data;
     assert.equal(pro.readers, 1);

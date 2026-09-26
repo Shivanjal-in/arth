@@ -5,6 +5,7 @@
 
 import 'dart:async';
 
+import 'package:arth/app/account_providers.dart';
 import 'package:arth/app/feel.dart';
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/strings.dart';
@@ -15,6 +16,7 @@ import 'package:arth/data/community.dart';
 import 'package:arth/data/local_store.dart';
 import 'package:arth/features/account/account_card.dart';
 import 'package:arth/features/cards/card_face.dart';
+import 'package:arth/features/community/community_lock.dart';
 import 'package:arth/features/library/book_cover.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -55,7 +57,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
     _scroll.addListener(() {
       if (_scroll.position.pixels > _scroll.position.maxScrollExtent - 600) unawaited(_load());
     });
-    unawaited(_load(reset: true));
+    if (ref.read(communityAccessProvider) == CommunityAccess.open) unawaited(_load(reset: true));
   }
 
   @override
@@ -89,6 +91,8 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
       });
     } on ApiFailure catch (e) {
       if (!mounted || gen != _generation) return;
+      // The plan changed under us: refresh the account and the lock shows.
+      if (e.code == 'NEEDS_PLAN' || e.code == 'UNAUTHORIZED') ref.invalidate(accountProvider);
       setState(() {
         _error = ref.read(stringsProvider).errorFor(e.code, e.message);
         _loading = false;
@@ -120,11 +124,19 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
     final c = context.colors;
     final t = ref.watch(stringsProvider);
     final scale = ref.watch(settingsProvider).hindiScale;
+    // Signing in or upgrading opens the community: load it then.
+    ref.listen(communityAccessProvider, (was, now) {
+      if (now == CommunityAccess.open && was != CommunityAccess.open) unawaited(_load(reset: true));
+    });
+    final access = ref.watch(communityAccessProvider);
+    final appBar = AppBar(
+      title: Text(t.communityTitle, style: uiTitle(hindi: t.isHindi, color: c.ink, scale: scale).copyWith(fontSize: 26)),
+      toolbarHeight: 64,
+    );
+    if (access == CommunityAccess.loading) return Scaffold(appBar: appBar, body: const Center(child: CircularProgressIndicator()));
+    if (access == CommunityAccess.locked) return Scaffold(appBar: appBar, body: const CommunityLock());
     return Scaffold(
-      appBar: AppBar(
-        title: Text(t.communityTitle, style: uiTitle(hindi: t.isHindi, color: c.ink, scale: scale).copyWith(fontSize: 26)),
-        toolbarHeight: 64,
-      ),
+      appBar: appBar,
       body: RefreshIndicator(
         color: c.accent,
         onRefresh: () => _load(reset: true),

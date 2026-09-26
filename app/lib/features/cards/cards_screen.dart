@@ -96,6 +96,8 @@ class DeckTile extends ConsumerWidget {
     final scale = ref.watch(settingsProvider).hindiScale;
     final ink = deckInk(deck.bookTitle);
     final ref0 = (bookId: deck.bookId, bookTitle: deck.bookTitle);
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    // The cards under the top one: a shade more of the book's colour at night.
     Widget sheet(double inset, double drop, double alpha) => Positioned(
           left: inset,
           right: inset,
@@ -103,9 +105,9 @@ class DeckTile extends ConsumerWidget {
           bottom: -drop,
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: Color.lerp(c.card, ink, alpha),
+              color: Color.lerp(c.card, ink, dark ? alpha * 1.8 : alpha),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: c.rule),
+              border: Border.all(color: dark ? Color.lerp(c.rule, ink, 0.4)! : c.rule),
             ),
           ),
         );

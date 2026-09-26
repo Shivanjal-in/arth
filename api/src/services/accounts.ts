@@ -10,9 +10,15 @@
  */
 import type { Claims } from '../auth/verifier.js';
 import type { Allowance } from './quota.js';
+import { ApiError, messages } from '../lib/errors.js';
 
 export type Role = 'user' | 'admin';
 export type Tier = 'free' | 'pro' | 'super';
+
+const rank: Record<Tier, number> = { free: 0, pro: 1, super: 2 };
+
+/** The better of two plans: a purchase never takes away a granted plan, nor the reverse. */
+export const higherTier = (a: Tier, b: Tier): Tier => (rank[a] >= rank[b] ? a : b);
 
 export type User = {
   uid: string;
@@ -22,7 +28,12 @@ export type User = {
   photoUrl: string | null;
   bio: string;
   role: Role;
+  /** The plan in effect: the higher of [grantTier] and [storeTier]. */
   tier: Tier;
+  /** A plan given by an admin (set-tier, the Readers tab). */
+  grantTier: Tier;
+  /** The plan bought in the app store (RevenueCat), while it's active. */
+  storeTier: Tier;
   /** AI uses ever (the free allowance counts these). */
   aiTotal: number;
   /** The UTC month ("2026-09") [aiMonthUses] counts. */
@@ -125,6 +136,14 @@ export interface AccountStore {
   /** Free-plan AI uses counted against a phone so far. */
   deviceAiUsed(deviceId: string): Promise<number>;
   /**
+   * A deleted account: the user, their synced cards and bookmarks. Phones
+   * keep their Free-plan count (so a new account can't reset it) but forget
+   * the account.
+   */
+  deleteUser(uid: string): Promise<void>;
+  /** Whether [uid] belonged to a deleted account (see [deleteUser]). */
+  wasDeleted(uid: string): Promise<boolean>;
+  /**
    * Saves [device] for [uid]. A token belongs to one phone, so it's first
    * removed from any other user (a phone that changed accounts).
    */
@@ -152,6 +171,10 @@ export interface AccountStore {
 /** The user for a verified sign-in, created the first time. */
 export async function signIn(store: AccountStore, claims: Claims, now = Date.now()): Promise<User> {
   const existing = await store.findUser(claims.uid);
+  // A deleted account's sign-in stays valid for up to an hour; it mustn't
+  // bring the account back (a sync from another phone, say). Signing up
+  // again gets a new Firebase uid.
+  if (!existing && (await store.wasDeleted(claims.uid))) throw new ApiError('UNAUTHORIZED', messages.accountDeleted);
   if (existing) {
     // Fill in what the provider knows that we don't (e.g. a phone user
     // who later links Google). Never overwrite what the user set.
@@ -172,6 +195,8 @@ export async function signIn(store: AccountStore, claims: Claims, now = Date.now
     bio: '',
     role: 'user',
     tier: 'free',
+    grantTier: 'free',
+    storeTier: 'free',
     aiTotal: 0,
     aiMonth: null,
     aiMonthUses: 0,
@@ -243,6 +268,7 @@ export async function sync(store: AccountStore, uid: string, req: SyncRequest, l
 export function memoryAccountStore(): AccountStore & { users: Map<string, User>; devices: Map<string, PushDevice[]> } {
   const users = new Map<string, User>();
   const phones = new Map<string, { used: number; accounts: string[] }>();
+  const deleted = new Set<string>();
   const devices = new Map<string, PushDevice[]>();
   const seqs = new Map<string, number>();
   const rows = { cards: new Map<string, { owner: string; row: CardRow; seq: number }>(), bookmarks: new Map<string, { owner: string; row: BookmarkRow; seq: number }>() };
@@ -342,6 +368,19 @@ export function memoryAccountStore(): AccountStore & { users: Map<string, User>;
     },
     async deviceAiUsed(deviceId) {
       return phones.get(deviceId)?.used ?? 0;
+    },
+    async wasDeleted(uid) {
+      return deleted.has(uid);
+    },
+    async deleteUser(uid) {
+      deleted.add(uid);
+      users.delete(uid);
+      devices.delete(uid);
+      seqs.delete(uid);
+      for (const table of [rows.cards, rows.bookmarks] as Map<string, { owner: string }>[]) {
+        for (const [id, r] of table) if (r.owner === uid) table.delete(id);
+      }
+      for (const [id, p] of phones) if (p.accounts.includes(uid)) phones.set(id, { ...p, accounts: p.accounts.filter((a) => a !== uid) });
     },
     async reserveSeqs(uid, n) {
       const first = (seqs.get(uid) ?? 0) + 1;

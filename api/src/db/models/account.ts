@@ -11,6 +11,9 @@ const userSchema = new Schema(
     bio: { type: String, default: '' },
     role: { type: String, enum: ['user', 'admin'], default: 'user' },
     tier: { type: String, enum: ['free', 'pro', 'super'], default: 'free' },
+    /** Absent on users from before purchases: their tier was granted. */
+    grantTier: { type: String, enum: ['free', 'pro', 'super'] },
+    storeTier: { type: String, enum: ['free', 'pro', 'super'] },
     aiTotal: { type: Number, default: 0 },
     aiMonth: { type: String, default: null },
     aiMonthUses: { type: Number, default: 0 },
@@ -107,3 +110,9 @@ const phoneSchema = new Schema(
 );
 
 export const PhoneModel = model('Phone', phoneSchema);
+
+/** Uids of deleted accounts: their still-valid sign-ins mustn't recreate them. */
+export const DeletedUserModel = model(
+  'DeletedUser',
+  new Schema({ _id: { type: String, required: true }, at: { type: Number, required: true } }, { versionKey: false, collection: 'deleted_users' }),
+);

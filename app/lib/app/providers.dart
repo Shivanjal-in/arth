@@ -80,10 +80,7 @@ String deviceIdFrom(String platformId) {
 }
 
 final apiClientProvider = Provider<ApiClient>((ref) {
-  final override = ref.watch(settingsProvider.select((s) => s.apiBaseUrl));
-  final url = (override == null || override.trim().isEmpty) ? kApiBaseUrl : override.trim();
   return ApiClient(
-    baseUrl: url,
     deviceId: ref.watch(deviceIdProvider),
     idToken: ref.watch(authServiceProvider)?.idToken,
     onUsage: (usage) => ref.read(usageProvider.notifier).report(usage),

@@ -155,7 +155,6 @@ enum AppStrings {
         'How Arth reads with you.',
         'Arth आपके साथ कैसे पढ़े।',
       );
-  String get serverTitle => _('API server', 'API सर्वर');
   String get tooltipDetail => _('Tooltip', 'टूलटिप');
   String get tooltipCompact => _('Compact', 'छोटा');
   String get tooltipDetailed => _('Detailed', 'विस्तार से');
@@ -216,10 +215,6 @@ enum AppStrings {
     }
     return b.toString();
   }
-  String get serverHelp => _(
-        'Leave empty to use the build default',
-        'खाली छोड़ें तो बिल्ड का डिफ़ॉल्ट इस्तेमाल होगा',
-      );
 
   // ---- seed ----
   String get seedTitle => _('Preparing the dictionary', 'शब्दकोश तैयार हो रहा है');
@@ -437,8 +432,50 @@ enum AppStrings {
   String get plans => _('Plans', 'प्लान');
   String get plansIntro => _('The dictionary on your phone is always free. AI answers — the meaning in this sentence, sentence translations, rare words — depend on your plan.', 'फ़ोन का शब्दकोश हमेशा मुफ़्त है। AI जवाब — इस वाक्य में मतलब, वाक्य का अनुवाद, दुर्लभ शब्द — आपके प्लान पर निर्भर हैं।');
   String get planFreeAi => _('100 AI answers, to try it out', 'आज़माने के लिए 100 AI जवाब');
-  String get planProAi => _('1,000 AI answers every month', 'हर महीने 1,000 AI जवाब');
-  String get planSuperAi => _('Unlimited AI answers', 'असीमित AI जवाब');
+  String get planProAi => _('500 AI answers every month', 'हर महीने 500 AI जवाब');
+  String get planSuperAi => _('5,000 AI answers every month', 'हर महीने 5,000 AI जवाब');
+  String get yearly => _('Yearly', 'सालाना');
+  String get monthly => _('Monthly', 'मासिक');
+  String saveUpTo(int pct) => _('Save $pct%', '$pct% बचत');
+  String perYear(String price) => _('$price a year', '$price प्रति वर्ष');
+  String perMonth(String price) => _('$price a month', '$price प्रति माह');
+  String aboutPerMonth(String price) => _('about $price a month', 'लगभग $price प्रति माह');
+  String daysFree(int n) => _('$n days free', '$n दिन मुफ़्त');
+  String introOffer(String price, int months, String then) => _(
+        '$price a month for your first $months months, then $then',
+        'पहले $months महीने $price प्रति माह, फिर $then',
+      );
+  String startTrial(int n) => _('Start $n-day free trial', '$n दिन का मुफ़्त ट्रायल शुरू करें');
+  String subscribeTo(String plan) => _('Get $plan', '$plan लें');
+  String get manageSubscription => _('Manage subscription', 'सदस्यता बदलें या रद्द करें');
+  String get deleteAccount => _('Delete account', 'खाता हटाएँ');
+  String get deleteAccountTitle => _('Delete your account?', 'अपना खाता हटाएँ?');
+  String get deleteAccountBody => _(
+        'This permanently deletes your account, profile and photo, your synced cards and bookmarks, and the recaps, comments and likes you shared. It can’t be undone.',
+        'इससे आपका खाता, प्रोफ़ाइल और फ़ोटो, सिंक किए कार्ड और बुकमार्क, और आपके साझा किए सार, टिप्पणियाँ और पसंद हमेशा के लिए हट जाएँगे। इसे वापस नहीं किया जा सकता।',
+      );
+  String get deleteAccountLocal => _(
+        'Cards and bookmarks already on this phone stay here.',
+        'इस फ़ोन पर पहले से मौजूद कार्ड और बुकमार्क यहीं रहेंगे।',
+      );
+  String deleteAccountSubscription(String store) => _(
+        'Deleting your account doesn’t cancel a subscription. If you subscribed, cancel it in $store first, or you’ll keep being charged.',
+        'खाता हटाने से सदस्यता रद्द नहीं होती। अगर आपने सदस्यता ली है, तो पहले $store में रद्द करें, वरना पैसे कटते रहेंगे।',
+      );
+  String get deleteForever => _('Delete forever', 'हमेशा के लिए हटाएँ');
+  String get accountDeleted => _('Your account has been deleted.', 'आपका खाता हटा दिया गया है।');
+  String get termsOfUse => _('Terms of Use', 'उपयोग की शर्तें');
+  String get privacyPolicy => _('Privacy Policy', 'निजता नीति');
+  String get restorePurchases => _('Restore purchases', 'पिछली ख़रीद वापस लाएँ');
+  String get restored => _('Purchases restored.', 'ख़रीद वापस आ गई।');
+  String renewNote(String store) => _(
+        'Subscriptions renew automatically until cancelled. Cancel anytime in $store, at least a day before renewal. A free trial becomes a paid subscription unless you cancel before it ends.',
+        'सदस्यता रद्द करने तक अपने-आप नवीनीकृत होती है। $store में कभी भी रद्द करें, नवीनीकरण से कम से कम एक दिन पहले। मुफ़्त ट्रायल ख़त्म होने से पहले रद्द न करने पर सशुल्क सदस्यता शुरू हो जाती है।',
+      );
+  String welcomeTo(String plan) => _('Welcome to $plan!', '$plan में आपका स्वागत है!');
+  String get purchaseFailed => _('The purchase didn’t go through. You haven’t been charged; try again.', 'ख़रीद पूरी नहीं हुई। आपसे पैसे नहीं लिए गए; फिर कोशिश करें।');
+  String get signInToBuy => _('Sign in first, so your plan stays with your account on every phone.', 'पहले साइन इन करें, ताकि आपका प्लान हर फ़ोन पर आपके खाते के साथ रहे।');
+  String get plansUnavailable => _('Plans can’t be loaded right now. Check your connection and try again.', 'प्लान अभी लोड नहीं हो पा रहे। इंटरनेट देखें और फिर कोशिश करें।');
   String get planOfflineDictionary => _('Offline dictionary, flashcards, sync', 'ऑफ़लाइन शब्दकोश, फ़्लैशकार्ड, सिंक');
   String get planAds => _('Ads outside the reader', 'रीडर के बाहर विज्ञापन');
   String get planNoAds => _('No ads', 'कोई विज्ञापन नहीं');
@@ -504,6 +541,15 @@ enum AppStrings {
   String get selectNone => _('None', 'कोई नहीं');
   String get publish => _('Publish', 'प्रकाशित करें');
   String get published => _('Published to the community', 'समुदाय में प्रकाशित हुआ');
+  String get communityLockedTitle => _('Community is part of Pro and Super', 'समुदाय Pro और Super में है');
+  String get communityLockedBody => _(
+        'Readers share recaps of the books they finish: the ideas, quotes and words that stayed with them.',
+        'पाठक अपनी पढ़ी किताबों के सार साझा करते हैं: वे विचार, उद्धरण और शब्द जो उनके साथ रह गए।',
+      );
+  String get communityPerkBrowse => _('Browse recaps of books you’re reading or about to', 'जो किताबें आप पढ़ रहे हैं या पढ़ेंगे, उनके सार देखें');
+  String get communityPerkSave => _('Save any recap as your own cards to practise', 'कोई भी सार अपने कार्ड के रूप में सहेजें और दोहराएँ');
+  String get communityPerkTalk => _('Like and comment, and hear when someone replies', 'पसंद करें, टिप्पणी करें, और जवाब आने पर सूचना पाएँ');
+  String get communityPerkShare => _('Publish your own recaps, in your card font', 'अपने सार अपने कार्ड फ़ॉन्ट में प्रकाशित करें');
   String get publishNeedsPlan => _('Sharing recaps is part of Pro and Super. Anyone can browse, save and comment.', 'सार साझा करना Pro और Super में है। ब्राउज़, सहेजना और टिप्पणी सभी कर सकते हैं।');
   String get scanTitlePaid => _('Scan printed pages', 'छपे पन्ने स्कैन करें');
   String get scanNeedsPlan => _(

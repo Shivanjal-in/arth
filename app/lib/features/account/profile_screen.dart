@@ -2,16 +2,19 @@
 // name and a short line about what you read. Also where you sign out.
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:arth/app/account_providers.dart';
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/theme.dart';
+import 'package:arth/data/account.dart';
 import 'package:arth/data/api_client.dart';
 import 'package:arth/features/account/account_card.dart';
 import 'package:arth/features/settings/settings_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -97,6 +100,81 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     await ref.read(pushServiceProvider)?.unregister();
     await ref.read(authServiceProvider)?.signOut();
     if (mounted) await Navigator.of(context).maybePop();
+  }
+
+  /// Deletes the account (as the stores require, from inside the app). The
+  /// server forgets everything it keeps; this phone then signs out without
+  /// asking the API for anything more, which it would now refuse.
+  Future<void> _deleteAccount() async {
+    final t = ref.read(stringsProvider);
+    final c = context.colors;
+    final scale = ref.read(settingsProvider).hindiScale;
+    final paid = (ref.read(accountProvider).valueOrNull?.tier ?? Tier.free) != Tier.free;
+    final store = Platform.isIOS ? 'the App Store' : 'Google Play';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: c.card,
+        title: Text(t.deleteAccountTitle, style: uiHeading(hindi: t.isHindi, color: c.ink, scale: scale)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (paid) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: c.marigold.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(t.deleteAccountSubscription(store), style: uiBody(hindi: t.isHindi, color: c.ink, scale: scale, size: 14)),
+                      TextButton(
+                        onPressed: () async {
+                          final url = await ref.read(billingProvider).managementUrl() ??
+                              (Platform.isIOS ? 'https://apps.apple.com/account/subscriptions' : 'https://play.google.com/store/account/subscriptions');
+                          await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                        },
+                        style: TextButton.styleFrom(padding: EdgeInsets.zero, foregroundColor: c.accent),
+                        child: Text(t.manageSubscription),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
+              Text(t.deleteAccountBody, style: uiBody(hindi: t.isHindi, color: c.ink, scale: scale, size: 14.5)),
+              const SizedBox(height: 8),
+              Text(t.deleteAccountLocal, style: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: scale, size: 13.5)),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: c.accent),
+            child: Text(t.deleteForever),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      await ref.read(apiClientProvider).deleteAccount();
+    } on ApiFailure catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(t.errorFor(e.code, e.message))));
+      }
+      return;
+    }
+    await ref.read(pushServiceProvider)?.forgetLocally();
+    await ref.read(authServiceProvider)?.signOut();
+    if (!mounted) return;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(t.accountDeleted)));
+    await Navigator.of(context).maybePop();
   }
 
   @override
@@ -235,6 +313,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   icon: Icon(Icons.logout_rounded, color: c.accent),
                   label: Text(t.signOut, style: uiLabel(hindi: t.isHindi, color: c.accent, scale: scale)),
                   style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48), side: BorderSide(color: c.rule)),
+                ),
+                const SizedBox(height: 28),
+                Center(
+                  child: TextButton.icon(
+                    onPressed: _saving ? null : _deleteAccount,
+                    style: TextButton.styleFrom(foregroundColor: c.accent),
+                    icon: const Icon(Icons.delete_forever_outlined, size: 18),
+                    label: Text(t.deleteAccount, style: uiLabel(hindi: t.isHindi, color: c.accent, scale: scale).copyWith(fontSize: 13.5)),
+                  ),
                 ),
               ],
             ),

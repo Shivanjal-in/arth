@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:arth/app/feel.dart';
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/theme.dart';
+import 'package:arth/features/plans/plans_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -72,7 +73,9 @@ class AboutScreen extends ConsumerWidget {
             'PDF rendering by pdfrx / PDFium. Fonts: Montserrat, Literata, Mukta, Noto Sans Devanagari, Quintessential and Bricolage Grotesque (SIL Open Font License).',
             style: EnglishText.body(c.ink),
           ),
-          const SizedBox(height: 36),
+          const SizedBox(height: 16),
+          const LegalLinks(),
+          const SizedBox(height: 20),
           Divider(color: c.rule),
           const SizedBox(height: 24),
           // The signature: who made it, the name set as the one bright thing.

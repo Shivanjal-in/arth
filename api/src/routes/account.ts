@@ -88,7 +88,7 @@ const bookmarkDefaults = { bookKey: null, bookTitle: null, block: null, label: n
 
 /** The user as the app sees them: profile, tier, and AI usage. */
 const view = (user: User, limits: Limits, phoneUsed = 0) => {
-  const { aiTotal: _t, aiMonth: _m, aiMonthUses: _u, lastReviewNudgeAt: _r, lowAiNoticeFor: _l, ...profile } = user;
+  const { aiTotal: _t, aiMonth: _m, aiMonthUses: _u, lastReviewNudgeAt: _r, lowAiNoticeFor: _l, grantTier: _g, storeTier: _s, ...profile } = user;
   return { ...profile, usage: withPhone(usageOf(user, limits), user.role === 'admin' ? 0 : phoneUsed) };
 };
 

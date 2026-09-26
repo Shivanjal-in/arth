@@ -1,7 +1,6 @@
 import 'package:arth/app/account_providers.dart';
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/theme.dart';
-import 'package:arth/data/api_client.dart';
 import 'package:arth/data/seed_loader.dart';
 import 'package:arth/features/account/account_card.dart';
 import 'package:arth/features/settings/settings_controls.dart';
@@ -134,30 +133,6 @@ class SettingsScreen extends ConsumerWidget {
             // a day (app.dart), and an unfinished first download resumes.
             if (seed.phase == SeedPhase.failed && seed.message != null)
               SettingsCaption(seed.message!),
-
-            SettingsHeading(t.serverTitle),
-            TextFormField(
-              initialValue: s.apiBaseUrl ?? '',
-              style: EnglishText.body(c.ink, size: 16),
-              decoration: InputDecoration(
-                hintText: kApiBaseUrl,
-                hintStyle: EnglishText.body(c.inkMuted, size: 16),
-                helperText: t.serverHelp,
-                helperStyle: uiBody(
-                  hindi: t.isHindi,
-                  color: c.inkMuted,
-                  scale: s.hindiScale,
-                  size: 13,
-                ),
-              ),
-              keyboardType: TextInputType.url,
-              autocorrect: false,
-              onFieldSubmitted: (v) => n.update(
-                (s) => s.copyWith(
-                  apiBaseUrl: () => v.trim().isEmpty ? null : v.trim(),
-                ),
-              ),
-            ),
 
             const SizedBox(height: 28),
             Material(

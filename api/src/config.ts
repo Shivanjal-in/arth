@@ -40,11 +40,19 @@ const EnvSchema = z.object({
   /** Service-account key (JSON, or base64 of it), for sending notifications. Unset: none are sent. */
   FIREBASE_SERVICE_ACCOUNT: z.string().default(''),
 
+  // --- plans bought in the app stores (RevenueCat) ---
+  /** Secret API key (sk_…): reads a buyer's entitlements. Unset: store purchases aren't applied. */
+  REVENUECAT_SECRET_KEY: z.string().default(''),
+  /** The Authorization header value RevenueCat sends with its webhooks. */
+  REVENUECAT_WEBHOOK_AUTH: z.string().default(''),
+
   // --- AI allowances (enforced only when accounts are on) ---
   AI_FREE_LIMIT: z.coerce.number().int().positive().default(100),
   /** Free accounts that may share one phone's allowance (a new email doesn't reset it). */
+  /** Super's fair-use cap per calendar month. */
+  AI_SUPER_MONTHLY: z.coerce.number().int().positive().default(5000),
   AI_FREE_ACCOUNTS_PER_DEVICE: z.coerce.number().int().positive().default(3),
-  AI_PRO_MONTHLY: z.coerce.number().int().positive().default(1000),
+  AI_PRO_MONTHLY: z.coerce.number().int().positive().default(500),
 });
 
 export type Config = z.infer<typeof EnvSchema>;

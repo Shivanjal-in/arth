@@ -54,3 +54,12 @@ export function avatarTicket(cfg: CloudinaryConfig, uid: string, now = Date.now(
     params,
   };
 }
+
+/** Deletes a user's avatar (see [avatarTicket]); a missing one is fine. */
+export async function destroyAvatar(cfg: CloudinaryConfig, uid: string, fetchImpl: typeof fetch = fetch, now = Date.now()): Promise<void> {
+  const timestamp = Math.floor(now / 1000);
+  const params = { invalidate: 'true', public_id: `arth/avatars/${uid}`, timestamp };
+  const body = new URLSearchParams({ ...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])), api_key: cfg.apiKey, signature: signParams(params, cfg.apiSecret) });
+  const res = await fetchImpl(`https://api.cloudinary.com/v1_1/${cfg.cloudName}/image/destroy`, { method: 'POST', body });
+  if (!res.ok) throw new Error(`Cloudinary ${res.status}`);
+}

@@ -100,6 +100,12 @@ export interface CommunityStore {
   findReport(id: string): Promise<Report | null>;
   /** Closes every open report on a target. */
   resolveReports(kind: ReportKind, targetId: string, resolution: 'removed' | 'dismissed', at: number): Promise<void>;
+  /**
+   * A deleted account: its recaps (with everything on them), its comments
+   * (replies to them stay, as top-level comments), its likes and saves (the
+   * counts follow) and its reports all go.
+   */
+  forgetUser(uid: string): Promise<void>;
 }
 
 /** Reports that hide an item until an admin looks. */
@@ -107,6 +113,11 @@ export const HIDE_AT = 3;
 export const MAX_CARDS = 300;
 
 const newId = () => crypto.randomUUID();
+
+/** Browsing and taking part: Pro, Super or admin (banned readers can still read). */
+export function canBrowse(user: User): boolean {
+  return user.tier === 'pro' || user.tier === 'super' || user.role === 'admin';
+}
 
 export function canPublish(user: User): boolean {
   return !user.banned && (user.tier === 'pro' || user.tier === 'super' || user.role === 'admin');
@@ -290,6 +301,34 @@ export function memoryCommunityStore(): CommunityStore & { decks: Map<string, De
         .filter((d) => !needle || d.bookTitle.toLowerCase().includes(needle) || d.title.toLowerCase().includes(needle))
         .sort((a, b) => (sort === 'popular' ? score(b) - score(a) || b.createdAt - a.createdAt : b.createdAt - a.createdAt))
         .slice(page * limit, page * limit + limit);
+    },
+    async forgetUser(uid) {
+      const gone = new Set([...decks.values()].filter((d) => d.owner === uid).map((d) => d.id));
+      const goneComments = new Set([...comments.values()].filter((c) => gone.has(c.deckId) || c.owner === uid).map((c) => c.id));
+      for (const c of comments.values()) {
+        if (c.owner !== uid || gone.has(c.deckId)) continue;
+        const d = decks.get(c.deckId);
+        if (d && c.status === 'live') d.comments = Math.max(0, d.comments - 1);
+      }
+      for (const [id, c] of comments) {
+        if (goneComments.has(id)) comments.delete(id);
+        else if (c.parentId !== null && goneComments.has(c.parentId)) comments.set(id, { ...c, parentId: null });
+      }
+      for (const [set, field] of [[likes, 'likes'], [saves, 'saves']] as const) {
+        for (const key of [...set]) {
+          const [deckId, who] = key.split(':') as [string, string];
+          if (gone.has(deckId)) set.delete(key);
+          else if (who === uid) {
+            set.delete(key);
+            const d = decks.get(deckId);
+            if (d) d[field] = Math.max(0, d[field] - 1);
+          }
+        }
+      }
+      for (const [id, r] of reports) {
+        if (r.reporter === uid || gone.has(r.targetId) || goneComments.has(r.targetId)) reports.delete(id);
+      }
+      for (const id of gone) decks.delete(id);
     },
     async toggleLike(deckId, uid) {
       const key = `${deckId}:${uid}`;

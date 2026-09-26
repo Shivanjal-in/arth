@@ -39,10 +39,16 @@ services:
         sync: false          # accounts: the Firebase project whose ID tokens are accepted
       - key: CLOUDINARY_URL
         sync: false          # profile photos: cloudinary://<api_key>:<api_secret>@<cloud_name>
+      - key: REVENUECAT_SECRET_KEY
+        sync: false          # RevenueCat secret key (sk_…), reads buyers' entitlements
+      - key: REVENUECAT_WEBHOOK_AUTH
+        sync: false          # the Authorization header value set on RevenueCat's webhook
       - key: AI_FREE_LIMIT
         value: "100"
       - key: AI_PRO_MONTHLY
-        value: "1000"
+        value: "500"
+      - key: AI_SUPER_MONTHLY
+        value: "5000"
       - key: AI_FREE_ACCOUNTS_PER_DEVICE
         value: "3"
       - key: FIREBASE_SERVICE_ACCOUNT

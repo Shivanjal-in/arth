@@ -321,9 +321,14 @@ class _Actions extends ConsumerWidget {
     final t = ref.watch(stringsProvider);
     final scale = ref.watch(settingsProvider).hindiScale;
     final due = cards.where((card) => card.isDue).length;
+    // The main action is dark ink by day; at night it takes the book's colour
+    // rather than turning into a bright cream block.
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final primaryFill = dark ? Color.lerp(c.card, ink, 0.55)! : c.ink;
+    final onPrimary = dark ? c.ink : c.paper;
     Widget action({required IconData icon, required String title, required String hint, required String mode, required bool primary}) => Expanded(
           child: Material(
-            color: primary ? c.ink : c.card,
+            color: primary ? primaryFill : c.card,
             borderRadius: BorderRadius.circular(16),
             child: InkWell(
               borderRadius: BorderRadius.circular(16),
@@ -336,9 +341,9 @@ class _Actions extends ConsumerWidget {
                   children: [
                     Icon(icon, color: primary ? c.marigold : c.accent),
                     const SizedBox(height: 10),
-                    Text(title, style: uiLabel(hindi: t.isHindi, color: primary ? c.paper : c.ink, scale: scale).copyWith(fontSize: 15)),
+                    Text(title, style: uiLabel(hindi: t.isHindi, color: primary ? onPrimary : c.ink, scale: scale).copyWith(fontSize: 15)),
                     const SizedBox(height: 2),
-                    Text(hint, style: uiBody(hindi: t.isHindi, color: primary ? c.paper.withValues(alpha: 0.7) : c.inkMuted, scale: scale, size: 12.5)),
+                    Text(hint, style: uiBody(hindi: t.isHindi, color: primary ? onPrimary.withValues(alpha: 0.75) : c.inkMuted, scale: scale, size: 12.5)),
                   ],
                 ),
               ),

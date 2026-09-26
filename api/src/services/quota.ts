@@ -5,8 +5,8 @@
  * in the dictionary, on the device or the server, are free.
  *
  *   free   100 uses, lifetime
- *   pro    1,000 uses per calendar month (UTC)
- *   super  unlimited
+ *   pro    500 uses per calendar month (UTC)
+ *   super  5,000 uses per calendar month (a fair-use cap)
  *
  * A use is reserved atomically before the work and refunded if the answer
  * didn't need AI after all (single-sense words) or failed.
@@ -18,8 +18,8 @@ import type { Tier, User } from './accounts.js';
  * accounts use it, and [freeAccountsPerDevice] how many Free accounts may
  * share a phone's allowance: signing in with a fresh email doesn't reset it.
  */
-export type Limits = { free: number; proMonthly: number; freeAccountsPerDevice?: number };
-export const defaultLimits: Limits = { free: 100, proMonthly: 1000, freeAccountsPerDevice: 3 };
+export type Limits = { free: number; proMonthly: number; superMonthly?: number; freeAccountsPerDevice?: number };
+export const defaultLimits: Limits = { free: 100, proMonthly: 500, superMonthly: 5000, freeAccountsPerDevice: 3 };
 
 /** How a tier is limited: a lifetime cap, a monthly cap, or none. */
 export type Allowance = { period: 'lifetime'; max: number } | { period: 'month'; max: number } | { period: 'none' };
@@ -31,7 +31,8 @@ export function allowanceFor(tier: Tier, limits: Limits = defaultLimits): Allowa
     case 'pro':
       return { period: 'month', max: limits.proMonthly };
     case 'super':
-      return { period: 'none' };
+      // Unset: unlimited (tests and older configs).
+      return limits.superMonthly === undefined ? { period: 'none' } : { period: 'month', max: limits.superMonthly };
   }
 }
 

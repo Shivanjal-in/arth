@@ -92,6 +92,20 @@ class PushService {
     _registeredLang = lang;
   }
 
+  /// After the account was deleted: the server has already forgotten this
+  /// phone's token, so only drop it here (asking the API would be refused).
+  Future<void> forgetLocally() async {
+    await _refresh?.cancel();
+    _refresh = null;
+    _registered = null;
+    _registeredLang = null;
+    try {
+      await _messaging.deleteToken();
+    } on Exception catch (e) {
+      debugPrint('push forget failed: $e');
+    }
+  }
+
   /// Signing out: stop this phone getting the account's pushes. Called
   /// while still signed in, so the API accepts the request.
   Future<void> unregister() async {

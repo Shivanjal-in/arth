@@ -15,6 +15,10 @@ import { healthRoutes } from './routes/health.js';
 import { lookupRoutes } from './routes/lookup.js';
 import { phraseRoutes } from './routes/phrases.js';
 import { seedRoutes } from './routes/seed.js';
+import { legalRoutes } from './routes/legal.js';
+import { billingRoutes } from './routes/billing.js';
+import { accountDeleteRoutes, type LoginRemover } from './routes/account-delete.js';
+import { disabledBilling, type Billing } from './billing/revenuecat.js';
 import { translateRoutes } from './routes/translate.js';
 import type { CacheStore } from './cache/cache.js';
 import type { Config } from './config.js';
@@ -55,6 +59,10 @@ export type AppOptions = {
   /** Published decks, comments, reports. In memory when omitted (tests). */
   community?: CommunityStore;
   limits?: Limits;
+  /** Removes a Firebase sign-in when an account is deleted; none in tests. */
+  removeLogin?: LoginRemover;
+  /** Store purchases (RevenueCat); off when omitted. */
+  billing?: { billing: Billing; webhookAuth: string };
   /** Entries in the on-device dictionary (SEED_LIMIT); 20000 when omitted. */
   seedLimit?: number;
   config: Pick<
@@ -138,6 +146,9 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     errorResponseBuilder: () => new ApiError('RATE_LIMITED', message),
   });
 
+  // Public pages the stores and the app link to.
+  app.register(legalRoutes);
+
   app.register(
     async (v1) => {
       await v1.register(rateLimit, { global: false });
@@ -186,6 +197,8 @@ export function buildApp(opts: AppOptions): FastifyInstance {
         const community = opts.community ?? memoryCommunityStore();
         await accountScope.register(communityRoutes, { ...accounts, community });
         await accountScope.register(adminRoutes, { ...accounts, community, limits: limitsAi });
+        await accountScope.register(accountDeleteRoutes, { ...accounts, community, removeLogin: opts.removeLogin });
+        await accountScope.register(billingRoutes, { ...accounts, ...(opts.billing ?? { billing: disabledBilling, webhookAuth: '' }) });
       });
     },
     { prefix: '/v1' },

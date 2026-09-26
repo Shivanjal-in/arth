@@ -40,6 +40,28 @@ export const mongoCommunityStore: CommunityStore = {
       .lean();
     return docs.map((d) => toDeck(d as Record<string, unknown>));
   },
+  async forgetUser(uid) {
+    const gone = (await DeckModel.find({ owner: uid }, { _id: 1 }).lean()).map((d) => d._id);
+    const onGone = (await CommentModel.find({ deckId: { $in: gone } }, { _id: 1 }).lean()).map((c) => c._id);
+    const mine = await CommentModel.find({ owner: uid, deckId: { $nin: gone } }, { _id: 1, deckId: 1, status: 1 }).lean();
+    const mineIds = mine.map((c) => c._id);
+    // Their comments on others' recaps: the counts go down, replies stay.
+    for (const c of mine) {
+      if (c.status === 'live') await DeckModel.updateOne({ _id: c.deckId, comments: { $gt: 0 } }, { $inc: { comments: -1 } });
+    }
+    await CommentModel.updateMany({ parentId: { $in: mineIds } }, { $set: { parentId: null } });
+    // Their likes and saves on others' recaps: the counts go down.
+    const reactions = await ReactionModel.find({ uid, deckId: { $nin: gone } }).lean();
+    for (const r of reactions) {
+      const field = r.kind === 'like' ? 'likes' : 'saves';
+      await DeckModel.updateOne({ _id: r.deckId, [field]: { $gt: 0 } }, { $inc: { [field]: -1 } });
+      await refreshScore(r.deckId);
+    }
+    await ReportModel.deleteMany({ $or: [{ reporter: uid }, { targetId: { $in: [...gone, ...onGone, ...mineIds] } }] });
+    await ReactionModel.deleteMany({ $or: [{ uid }, { deckId: { $in: gone } }] });
+    await CommentModel.deleteMany({ $or: [{ owner: uid }, { deckId: { $in: gone } }] });
+    await DeckModel.deleteMany({ _id: { $in: gone } });
+  },
   async toggleLike(deckId, uid) {
     const _id = `like:${deckId}:${uid}`;
     const removed = await ReactionModel.deleteOne({ _id });

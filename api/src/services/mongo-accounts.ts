@@ -1,4 +1,4 @@
-import { BookmarkModel, FlashcardModel, PhoneModel, UserModel } from '../db/models/account.js';
+import { BookmarkModel, DeletedUserModel, FlashcardModel, PhoneModel, UserModel } from '../db/models/account.js';
 import type { AccountStore, BookmarkRow, CardRow, SyncKind, User } from './accounts.js';
 
 const models = { cards: FlashcardModel, bookmarks: BookmarkModel } as const;
@@ -13,6 +13,9 @@ function toUser(doc: Record<string, unknown>): User {
     bio: (doc.bio as string) ?? '',
     role: (doc.role as User['role']) ?? 'user',
     tier: (doc.tier as User['tier']) ?? 'free',
+    // Before plans could be bought, every plan was granted.
+    grantTier: (doc.grantTier as User['tier'] | undefined) ?? (doc.storeTier ? 'free' : ((doc.tier as User['tier']) ?? 'free')),
+    storeTier: (doc.storeTier as User['tier'] | undefined) ?? 'free',
     aiTotal: (doc.aiTotal as number) ?? 0,
     aiMonth: (doc.aiMonth as string | null) ?? null,
     aiMonthUses: (doc.aiMonthUses as number) ?? 0,
@@ -109,6 +112,16 @@ export const mongoAccountStore: AccountStore = {
   },
   async refundDeviceAi(deviceId) {
     await PhoneModel.updateOne({ _id: deviceId, aiUsed: { $gt: 0 } }, { $inc: { aiUsed: -1 } });
+  },
+  async wasDeleted(uid) {
+    return (await DeletedUserModel.exists({ _id: uid })) !== null;
+  },
+  async deleteUser(uid) {
+    await DeletedUserModel.updateOne({ _id: uid }, { $setOnInsert: { at: Date.now() } }, { upsert: true });
+    await FlashcardModel.deleteMany({ owner: uid });
+    await BookmarkModel.deleteMany({ owner: uid });
+    await PhoneModel.updateMany({ accounts: uid }, { $pull: { accounts: uid } });
+    await UserModel.deleteOne({ _id: uid });
   },
   async deviceAiUsed(deviceId) {
     return (await PhoneModel.findById(deviceId, { aiUsed: 1 }).lean())?.aiUsed ?? 0;

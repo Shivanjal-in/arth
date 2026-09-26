@@ -22,7 +22,6 @@ class Settings {
     this.prefetch = true,
     this.haptics = true,
     this.language = UiLanguage.en,
-    this.apiBaseUrl,
     this.cardReminders = true,
     this.reminderHours = defaultReminderHours,
     this.cardFont = CardFont.montserrat,
@@ -42,9 +41,6 @@ class Settings {
   /// Interface language. Dictionary content is always Hindi.
   final UiLanguage language;
 
-  /// Runtime override of the API base URL (Settings → सर्वर), for testing on a
-  /// phone without rebuilding with --dart-define.
-  final String? apiBaseUrl;
 
   /// Remind the reader to review new cards (see card_reminders.dart).
   final bool cardReminders;
@@ -68,7 +64,6 @@ class Settings {
     bool? prefetch,
     bool? haptics,
     UiLanguage? language,
-    String? Function()? apiBaseUrl,
     bool? cardReminders,
     List<int>? reminderHours,
     CardFont? cardFont,
@@ -81,7 +76,6 @@ class Settings {
         prefetch: prefetch ?? this.prefetch,
         haptics: haptics ?? this.haptics,
         language: language ?? this.language,
-        apiBaseUrl: apiBaseUrl == null ? this.apiBaseUrl : apiBaseUrl(),
         cardReminders: cardReminders ?? this.cardReminders,
         reminderHours: reminderHours ?? this.reminderHours,
         cardFont: cardFont ?? this.cardFont,
@@ -97,7 +91,6 @@ class Settings {
         prefetch: (await store.get('prefetch') ?? 'true') == 'true',
         haptics: (await store.get('haptics') ?? 'true') == 'true',
         language: UiLanguage.values.byName(await store.get('language') ?? 'en'),
-        apiBaseUrl: await store.get('api_base_url'),
         cardReminders: (await store.get('card_reminders') ?? 'true') == 'true',
         reminderHours: _hours(await store.get('reminder_hours')),
         cardFont: CardFont.values.asNameMap()[await store.get('card_font')] ?? CardFont.montserrat,
@@ -116,7 +109,6 @@ class Settings {
     await store.set('prefetch', prefetch.toString());
     await store.set('haptics', haptics.toString());
     await store.set('language', language.name);
-    await store.set('api_base_url', apiBaseUrl);
     await store.set('card_reminders', cardReminders.toString());
     await store.set('reminder_hours', reminderHours.join(','));
     await store.set('card_font', cardFont.name);

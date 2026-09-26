@@ -1,10 +1,11 @@
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { ok } from '../lib/envelope.js';
-import { ApiError } from '../lib/errors.js';
+import { ApiError, messages } from '../lib/errors.js';
 import { authenticate, type AccountDeps } from './account.js';
 import type { User } from '../services/accounts.js';
 import {
   addComment,
+  canBrowse,
   canPublish,
   editDeck,
   publishDeck,
@@ -26,10 +27,15 @@ import { commentMessage, replyMessage } from '../push/community-messages.js';
 
 export type CommunityDeps = AccountDeps & { community: CommunityStore };
 
-/** The signed-in reader, if the request carries a sign-in; browsing needs none. */
-async function viewer(req: FastifyRequest, deps: AccountDeps): Promise<User | null> {
-  if (!req.headers.authorization) return null;
-  return authenticate(req, deps);
+/**
+ * The community is part of Pro and Super: a signed-in reader on one of
+ * those plans (or an admin). Free readers are told what it takes, by
+ * `reason: 'plan'`, so the app can show them the plans.
+ */
+async function member(req: FastifyRequest, deps: AccountDeps): Promise<User> {
+  const user = await authenticate(req, deps);
+  if (!canBrowse(user)) throw new ApiError('FORBIDDEN', messages.communityNeedsPlan, { reason: 'plan' });
+  return user;
 }
 
 export type Author = { uid: string; name: string; photoUrl: string | null; tier: User['tier'] };
@@ -113,7 +119,7 @@ export const communityRoutes: FastifyPluginAsync<CommunityDeps> = async (app, de
       },
     },
     async (req) => {
-      const me = await viewer(req, deps);
+      const me = await member(req, deps);
       const { sort = 'recent', q, page = 0, owner } = req.query;
       const limit = 20;
       const decks = await store.listDecks({ sort, q, owner, page, limit });
@@ -128,7 +134,7 @@ export const communityRoutes: FastifyPluginAsync<CommunityDeps> = async (app, de
   );
 
   app.get<{ Params: { id: string } }>('/community/decks/:id', async (req) => {
-    const me = await viewer(req, deps);
+    const me = await member(req, deps);
     const deck = await visibleDeck(store, req.params.id, me);
     const comments = await visibleComments(store, deck.id, me);
     const users = await authors([deck.owner, ...comments.map((c) => c.owner)]);
@@ -167,7 +173,7 @@ export const communityRoutes: FastifyPluginAsync<CommunityDeps> = async (app, de
       },
     },
     async (req) => {
-      const me = await signedIn(req);
+      const me = await member(req, deps);
       const b = req.body;
       const deck = await publishDeck(store, me, {
         title: b.title ?? '',
@@ -194,7 +200,7 @@ export const communityRoutes: FastifyPluginAsync<CommunityDeps> = async (app, de
       },
     },
     async (req) => {
-      const me = await signedIn(req);
+      const me = await member(req, deps);
       const b = req.body;
       await editDeck(store, me, req.params.id, {
         ...(b.title !== undefined ? { title: b.title } : {}),
@@ -212,14 +218,14 @@ export const communityRoutes: FastifyPluginAsync<CommunityDeps> = async (app, de
   });
 
   app.post<{ Params: { id: string } }>('/community/decks/:id/like', async (req) => {
-    const me = await signedIn(req);
+    const me = await member(req, deps);
     await visibleDeck(store, req.params.id, me);
     return ok(await store.toggleLike(req.params.id, me.uid));
   });
 
   /** Counts the save; the app copies the cards (it already has them from the deck page). */
   app.post<{ Params: { id: string } }>('/community/decks/:id/save', async (req) => {
-    const me = await signedIn(req);
+    const me = await member(req, deps);
     await visibleDeck(store, req.params.id, me);
     return ok({ saves: await store.addSave(req.params.id, me.uid) });
   });
@@ -237,7 +243,7 @@ export const communityRoutes: FastifyPluginAsync<CommunityDeps> = async (app, de
       },
     },
     async (req) => {
-      const me = await signedIn(req);
+      const me = await member(req, deps);
       if (!req.body.text.trim()) throw new ApiError('BAD_REQUEST', 'खाली टिप्पणी नहीं भेज सकते।');
       const { comment, deck, parent } = await addComment(store, me, req.params.id, req.body.text, req.body.parentId ?? null);
       const route = `/community/deck/${deck.id}`;
@@ -266,7 +272,7 @@ export const communityRoutes: FastifyPluginAsync<CommunityDeps> = async (app, de
       },
     },
     async (req) => {
-      const me = await signedIn(req);
+      const me = await member(req, deps);
       return ok(await report(store, me, req.body.kind, req.body.targetId, req.body.reason ?? ''));
     },
   );

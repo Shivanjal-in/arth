@@ -80,22 +80,43 @@ class IndexCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    // At night a card is lit from within: a wash of the book's colour at the
+    // top fading into the card, an edge in that colour, a deeper shadow and a
+    // faint glow — rather than a navy hole in a navy page.
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: c.card,
+        color: dark ? null : c.card,
+        gradient: dark
+            ? LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                stops: const [0, 0.35, 1],
+                colors: [Color.lerp(c.card, ink, 0.16)!, Color.lerp(c.card, ink, 0.04)!, c.card],
+              )
+            : null,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: c.rule),
+        border: Border.all(color: dark ? Color.lerp(c.rule, ink, 0.40)! : c.rule),
         boxShadow: elevated
-            ? [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.10), blurRadius: 24, offset: const Offset(0, 10)),
-                BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 1)),
-              ]
+            ? dark
+                ? [
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 28, offset: const Offset(0, 12)),
+                    BoxShadow(color: ink.withValues(alpha: 0.14), blurRadius: 22, spreadRadius: -4),
+                  ]
+                : [
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.10), blurRadius: 24, offset: const Offset(0, 10)),
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 1)),
+                  ]
             : null,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(18),
         child: CustomPaint(
-          painter: _RuledPaper(rule: c.rule, margin: c.accent, ink: ink),
+          painter: _RuledPaper(
+            rule: dark ? Color.lerp(c.rule, ink, 0.30)!.withValues(alpha: 0.75) : c.rule,
+            margin: c.accent,
+            ink: ink,
+          ),
           child: Padding(padding: padding, child: child),
         ),
       ),

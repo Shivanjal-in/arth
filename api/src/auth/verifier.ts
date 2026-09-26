@@ -47,3 +47,15 @@ export const disabledVerifier: TokenVerifier = {
     throw new ApiError('UNAVAILABLE', messages.accountsUnavailable);
   },
 };
+
+/** Deletes a Firebase sign-in (an account being deleted); already gone is fine. */
+export function firebaseLoginRemover(app: App) {
+  const auth = getAuth(app);
+  return async (uid: string) => {
+    try {
+      await auth.deleteUser(uid);
+    } catch (err) {
+      if ((err as { code?: string }).code !== 'auth/user-not-found') throw err;
+    }
+  };
+}

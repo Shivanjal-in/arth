@@ -12,6 +12,9 @@ import 'package:dio/dio.dart';
 /// Base URL, set at build time:
 ///   flutter run --dart-define=ARTH_API_URL=http://192.168.1.10:3000
 /// A physical phone cannot reach `localhost` on the Mac; use the LAN IP.
+/// The Terms of Use and Privacy Policy, served by the API (routes/legal.ts).
+Uri legalUrl(String page) => Uri.parse('$kApiBaseUrl/legal/$page');
+
 const String kApiBaseUrl = String.fromEnvironment(
   'ARTH_API_URL',
   defaultValue: 'http://localhost:3000',
@@ -164,6 +167,14 @@ class ApiClient {
       throw _failure(e);
     }
   }
+
+  /// Deletes the account and everything the server keeps for it
+  /// (api/src/routes/account-delete.ts). Sign out locally straight after.
+  Future<void> deleteAccount() => _call(() => _dio.delete('/me'), (_) {});
+
+  /// Apply a store purchase or restore now, rather than when RevenueCat's
+  /// webhook reaches the API. The plan it gives is returned.
+  Future<String> billingSync() => _call(() => _dio.post('/billing/sync'), (d) => d['tier'] as String);
 
   Future<void> unregisterPushToken(String token) async {
     try {
@@ -399,8 +410,14 @@ class ApiClient {
       // The phone, not the account, is out: its own message (a new account
       // on a spent phone hasn't "used" anything).
       final phone = code == 'QUOTA_EXCEEDED' && (err['reason'] == 'phone' || err['reason'] == 'phone_accounts');
+      // The community (and publishing) needs Pro or Super.
+      final plan = code == 'FORBIDDEN' && err['reason'] == 'plan';
       return ApiFailure(
-        phone ? 'QUOTA_PHONE' : code,
+        phone
+            ? 'QUOTA_PHONE'
+            : plan
+                ? 'NEEDS_PLAN'
+                : code,
         (err['message'] as String?) ?? 'कुछ गड़बड़ हो गई।',
         suggestions: ((err['suggestions'] as List<dynamic>?) ?? const [])
             .cast<String>(),

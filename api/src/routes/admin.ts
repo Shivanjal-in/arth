@@ -3,7 +3,7 @@ import { ok } from '../lib/envelope.js';
 import { ApiError } from '../lib/errors.js';
 import { authenticate } from './account.js';
 import type { CommunityDeps } from './community.js';
-import type { Tier, User } from '../services/accounts.js';
+import { higherTier, type Tier, type User } from '../services/accounts.js';
 import { moderate, type ReportKind } from '../services/community.js';
 import { usageOf, type Limits } from '../services/quota.js';
 import { notifyUser, tierMessage } from '../push/notify.js';
@@ -105,7 +105,11 @@ export const adminRoutes: FastifyPluginAsync<CommunityDeps & { limits: Limits }>
       if (!before) throw new ApiError('NOT_FOUND', 'यह उपयोगकर्ता नहीं मिला।');
       if (req.params.uid === req.user!.uid && req.body.banned) throw new ApiError('BAD_REQUEST', 'खुद को प्रतिबंधित नहीं कर सकते।');
       const set: Partial<User> = { updatedAt: Date.now() };
-      if (req.body.tier !== undefined) set.tier = req.body.tier;
+      // An admin grants a plan; a store purchase can still lift it higher.
+      if (req.body.tier !== undefined) {
+        set.grantTier = req.body.tier;
+        set.tier = higherTier(req.body.tier, before.storeTier);
+      }
       if (req.body.banned !== undefined) set.banned = req.body.banned;
       const after = (await deps.store.updateUser(req.params.uid, set))!;
       if (after.tier !== before.tier) void notifyUser(deps.store, pusher, after.uid, tierMessage(after.tier)).catch(() => {});

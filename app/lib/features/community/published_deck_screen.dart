@@ -11,6 +11,7 @@ import 'package:arth/app/theme.dart';
 import 'package:arth/data/api_client.dart';
 import 'package:arth/data/community.dart';
 import 'package:arth/features/cards/card_face.dart';
+import 'package:arth/features/community/community_lock.dart';
 import 'package:arth/features/community/community_screen.dart';
 import 'package:arth/features/library/book_cover.dart';
 import 'package:flutter/material.dart';
@@ -66,6 +67,7 @@ class _PublishedDeckScreenState extends ConsumerState<PublishedDeckScreen> {
         _error = null;
       });
     } on ApiFailure catch (e) {
+      if (e.code == 'NEEDS_PLAN' || e.code == 'UNAUTHORIZED') ref.invalidate(accountProvider);
       if (mounted) setState(() => _error = ref.read(stringsProvider).errorFor(e.code, e.message));
     }
   }
@@ -222,6 +224,12 @@ class _PublishedDeckScreenState extends ConsumerState<PublishedDeckScreen> {
     final t = ref.watch(stringsProvider);
     final scale = ref.watch(settingsProvider).hindiScale;
     final d = _deck;
+    // Opened from a notification or a link without a plan: say what it takes.
+    ref.listen(communityAccessProvider, (was, now) {
+      if (now == CommunityAccess.open && was != CommunityAccess.open && _deck == null) unawaited(_load());
+    });
+    final access = ref.watch(communityAccessProvider);
+    if (access == CommunityAccess.locked) return Scaffold(appBar: AppBar(), body: const CommunityLock());
     if (d == null) {
       return Scaffold(
         appBar: AppBar(),
