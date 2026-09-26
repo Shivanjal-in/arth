@@ -15,6 +15,7 @@ class Settings {
     this.hindiSize = HindiSize.medium,
     this.ttsEnabled = true,
     this.prefetch = true,
+    this.haptics = true,
     this.language = UiLanguage.en,
     this.apiBaseUrl,
   });
@@ -26,6 +27,9 @@ class Settings {
 
   /// Resolve hard words on the current and next page in the background.
   final bool prefetch;
+
+  /// Vibration feedback on taps (see app/feel.dart).
+  final bool haptics;
 
   /// Interface language. Dictionary content is always Hindi.
   final UiLanguage language;
@@ -46,6 +50,7 @@ class Settings {
     HindiSize? hindiSize,
     bool? ttsEnabled,
     bool? prefetch,
+    bool? haptics,
     UiLanguage? language,
     String? Function()? apiBaseUrl,
   }) =>
@@ -55,6 +60,7 @@ class Settings {
         hindiSize: hindiSize ?? this.hindiSize,
         ttsEnabled: ttsEnabled ?? this.ttsEnabled,
         prefetch: prefetch ?? this.prefetch,
+        haptics: haptics ?? this.haptics,
         language: language ?? this.language,
         apiBaseUrl: apiBaseUrl == null ? this.apiBaseUrl : apiBaseUrl(),
       );
@@ -67,6 +73,7 @@ class Settings {
         hindiSize: HindiSize.values.byName(await store.get('hindi_size') ?? 'medium'),
         ttsEnabled: (await store.get('tts') ?? 'true') == 'true',
         prefetch: (await store.get('prefetch') ?? 'true') == 'true',
+        haptics: (await store.get('haptics') ?? 'true') == 'true',
         language: UiLanguage.values.byName(await store.get('language') ?? 'en'),
         apiBaseUrl: await store.get('api_base_url'),
       );
@@ -77,6 +84,7 @@ class Settings {
     await store.set('hindi_size', hindiSize.name);
     await store.set('tts', ttsEnabled.toString());
     await store.set('prefetch', prefetch.toString());
+    await store.set('haptics', haptics.toString());
     await store.set('language', language.name);
     await store.set('api_base_url', apiBaseUrl);
   }

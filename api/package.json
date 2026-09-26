@@ -14,12 +14,15 @@
     "test": "node --import tsx --test test/*.test.ts",
     "seed": "node --env-file=.env --import tsx scripts/seed.ts",
     "bench:context": "node --env-file=.env --import tsx scripts/context-bench.ts",
-    "start:local": "node --env-file=.env dist/src/server.js"
+    "start:local": "node --env-file=.env dist/src/server.js",
+    "set-tier": "node --env-file=.env --import tsx scripts/set-tier.ts",
+    "review-reminders": "node --env-file-if-exists=.env --import tsx scripts/review-reminders.ts"
   },
   "dependencies": {
     "@fastify/rate-limit": "^11.2.0",
     "ajv": "^8.17.1",
     "fastify": "^5.3.0",
+    "firebase-admin": "^14.5.0",
     "mongoose": "^8.14.0",
     "openai": "^7.15.0",
     "zod": "^3.24.0"

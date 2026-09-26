@@ -5,3 +5,7 @@ node_modules/
 __pycache__/
 .venv/
 dist/
+
+docs/
+# Firebase dart-defines for the app (see app/lib/app/firebase_setup.dart)
+app/firebase.json

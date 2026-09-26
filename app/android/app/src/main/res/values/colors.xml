@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Lac red, the app's accent: tints the notification icon. -->
+    <color name="notification_accent">#A3271F</color>
+</resources>

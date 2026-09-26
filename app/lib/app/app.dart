@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:arth/app/account_providers.dart';
 import 'package:arth/app/dev_hooks.dart';
+import 'package:arth/app/feel.dart';
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/router.dart';
 import 'package:arth/app/strings.dart';
@@ -24,10 +27,19 @@ class ArthApp extends ConsumerStatefulWidget {
 
 class _ArthAppState extends ConsumerState<ArthApp> {
   late final GoRouter router = buildRouter(needsSeed: widget.needsSeed);
+  StreamSubscription<String>? _pushRoutes;
 
   @override
   void initState() {
     super.initState();
+    // A tapped notification opens its screen (the app may have been closed).
+    final push = ref.read(pushServiceProvider);
+    if (push != null) {
+      _pushRoutes = push.routes.stream.listen(router.go);
+      final pending = push.pendingRoute;
+      push.pendingRoute = null;
+      if (pending != null && !widget.needsSeed) WidgetsBinding.instance.addPostFrameCallback((_) => router.go(pending));
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) => _refreshDictionaryIfStale());
     DevHooks.on('nav', (p) async {
       final lang = p['lang'];
@@ -56,6 +68,12 @@ class _ArthAppState extends ConsumerState<ArthApp> {
     });
   }
 
+  @override
+  void dispose() {
+    unawaited(_pushRoutes?.cancel());
+    super.dispose();
+  }
+
   /// Pull the entry delta quietly once a day so the on-device dictionary
   /// follows the server (the full build landed after some phones seeded).
   Future<void> _refreshDictionaryIfStale() async {
@@ -73,6 +91,7 @@ class _ArthAppState extends ConsumerState<ArthApp> {
   @override
   Widget build(BuildContext context) {
     final mode = ref.watch(settingsProvider.select((s) => s.themeMode));
+    Haptics.enabled = ref.watch(settingsProvider.select((s) => s.haptics));
     return MaterialApp.router(
       title: 'Arth',
       debugShowCheckedModeBanner: false,

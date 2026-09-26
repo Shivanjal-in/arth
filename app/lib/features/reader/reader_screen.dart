@@ -2,13 +2,20 @@
 //
 // Tap a word → WordTooltip (local entry now, /context pinned when it lands).
 // Long-press/drag (pdfrx's own selection) → SentenceTooltip (streamed
-// translation). The tooltip hangs off a LayerLink target that we place in the
-// viewer overlay at the anchor's current on-screen rect, so it tracks scroll
-// and zoom; the follower lives in an OverlayPortal above everything.
+// translation), whose colour row saves the selection as a highlight. The
+// tooltip hangs off a LayerLink target that we place in the viewer overlay at
+// the anchor's current on-screen rect, so it tracks scroll and zoom; the
+// follower lives in an OverlayPortal above everything.
+//
+// Highlights are anchored to (page, word range) in the page's PageTextIndex
+// and painted in the viewer overlay from rects resolved per page.
 
 import 'dart:async';
+import 'dart:math' as math;
 
+import 'package:arth/app/account_providers.dart';
 import 'package:arth/app/dev_hooks.dart';
+import 'package:arth/app/feel.dart';
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/theme.dart';
 import 'package:arth/core/normalize.dart';
@@ -16,14 +23,22 @@ import 'package:arth/core/text/page_text_index.dart';
 import 'package:arth/data/api_client.dart';
 import 'package:arth/data/dictionary_repo.dart';
 import 'package:arth/data/local_store.dart';
+import 'package:arth/features/ads/interstitials.dart';
+import 'package:arth/features/cards/card_editor.dart';
+import 'package:arth/features/cards/deck_screen.dart';
+import 'package:arth/features/reader/bookmarks_sheet.dart';
 import 'package:arth/features/reader/details_sheet.dart';
+import 'package:arth/features/reader/highlights/highlight_colors.dart';
+import 'package:arth/features/reader/highlights/highlights_sheet.dart';
 import 'package:arth/features/reader/page_text_cache.dart';
 import 'package:arth/features/reader/reader_controller.dart';
+import 'package:arth/features/reader/reader_menu.dart';
 import 'package:arth/features/reader/tooltip/tooltip_layer.dart';
 import 'package:arth/features/settings/reading_settings_sheet.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:pdfrx/pdfrx.dart';
 
 const _pronouns = {
@@ -32,9 +47,12 @@ const _pronouns = {
 };
 
 class ReaderScreen extends ConsumerStatefulWidget {
-  const ReaderScreen({required this.book, required this.filePath, super.key});
+  const ReaderScreen({required this.book, required this.filePath, super.key, this.initialPage});
 
   final Book book;
+
+  /// Open here instead of where the reader left off.
+  final int? initialPage;
 
   /// Absolute path, resolved against the documents directory at open time.
   final String filePath;
@@ -43,7 +61,7 @@ class ReaderScreen extends ConsumerStatefulWidget {
   ConsumerState<ReaderScreen> createState() => _ReaderScreenState();
 }
 
-class _ReaderScreenState extends ConsumerState<ReaderScreen> {
+class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose {
   final _controller = PdfViewerController();
   final _link = LayerLink();
   final _portal = OverlayPortalController();
@@ -56,6 +74,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   /// null = not checked yet; true = the first pages had no text at all.
   bool? _documentIsScanned;
   int? _page;
+
+  /// The word range behind the sentence card, when it came from a selection
+  /// we could place; the card's colour row highlights it.
+  ({int page, int start, int end})? _selectionWords;
+
+  /// Document-space bands per highlight id, resolved for pages near the
+  /// current one (see _resolveHighlightRects).
+  final Map<int, List<Rect>> _highlightRects = {};
+  List<Highlight> _highlightsSeen = const [];
 
   /// Prefetch (Section 7): sentences already sent for /context this session.
   final Set<String> _prefetched = {};
@@ -106,6 +133,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       if (from < 0 || to < 0) return {'ok': false, 'reason': 'words not on page'};
       final span = SentenceSpan(firstWord: from, lastWord: to);
       final text = normalizeSentence(idx.rawSentence(span));
+      _selectionWords = (page: page, start: from, end: to);
       _portal.show();
       ref.read(readerControllerProvider.notifier).showSentence(
             text: text,
@@ -124,6 +152,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         'tooltip': s?.runtimeType.toString(),
         'page': _page,
         'ready': _cache != null,
+        'highlights': ref.read(highlightsProvider(widget.book.id)).valueOrNull?.map((h) => {'id': h.id, 'page': h.page, 'start': h.startWord, 'end': h.endWord, 'color': h.color.name}).toList(),
+        'highlightRects': _highlightRects.length,
         if (s is WordTooltipState)
           'word': {
             'key': s.key,
@@ -139,10 +169,140 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     });
   }
 
+  // ---- highlights ----
+
+  /// Resolve bands for highlights on pages near [page] that aren't resolved
+  /// yet; drop entries for highlights that no longer exist.
+  Future<void> _resolveHighlightRects(List<Highlight> highlights, int page) async {
+    final cache = _cache;
+    if (cache == null) return;
+    _highlightRects.removeWhere((id, _) => !highlights.any((h) => h.id == id));
+    var changed = false;
+    for (final h in highlights) {
+      if ((h.page - page).abs() > 3 || _highlightRects.containsKey(h.id)) continue;
+      final PageTextIndex idx;
+      try {
+        idx = await cache.page(h.page);
+      } on Exception {
+        continue;
+      }
+      if (!mounted) return;
+      final to = math.min(h.endWord, idx.words.length - 1);
+      _highlightRects[h.id] = highlightBands([for (var i = h.startWord; i <= to; i++) idx.words[i].rect]);
+      changed = true;
+    }
+    if (changed && mounted) setState(() {});
+  }
+
+  /// Map pdfrx's selection onto our word index. pdfrx's character offsets
+  /// come from a different text extraction and don't always line up, so the
+  /// first and last selected tokens are matched by text near the offsets.
+  ({int page, int start, int end})? _wordsForSelection(List<PdfPageTextRange> ranges, PageTextIndex idx, String text) {
+    if (ranges.map((r) => r.pageNumber).toSet().length != 1 || idx.words.isEmpty) return null;
+    final tokens = text.split(' ');
+    final firstKey = normalizeWord(tokens.first);
+    final lastKey = normalizeWord(tokens.last);
+    int? nearest(String key, int charIndex, {int from = 0}) {
+      final at = idx.wordAtChar(charIndex);
+      if (at != null && at.key == key && at.index >= from) return at.index;
+      int? best;
+      var bestDist = 1 << 30;
+      for (final w in idx.words.skip(from)) {
+        if (w.key != key) continue;
+        final d = (w.start - charIndex).abs();
+        if (d < bestDist) {
+          best = w.index;
+          bestDist = d;
+        }
+      }
+      return best;
+    }
+
+    final start = nearest(firstKey, ranges.first.start);
+    if (start == null) return null;
+    final end = nearest(lastKey, ranges.last.end - 1, from: start);
+    if (end == null) return null;
+    return (page: ranges.first.pageNumber, start: start, end: end);
+  }
+
+  Future<void> _highlightSelection(SentenceTooltipState s, HighlightColor color) async {
+    final words = _selectionWords;
+    if (words == null) return;
+    await ref.read(highlightsProvider(widget.book.id).notifier).add(
+          page: words.page,
+          startWord: words.start,
+          endWord: words.end,
+          text: s.text,
+          color: color,
+        );
+    if (!mounted) return;
+    unawaited(_controller.textSelectionDelegate.clearTextSelection());
+    ref.read(readerControllerProvider.notifier).dismiss();
+  }
+
+  Future<void> _showHighlights() async {
+    final t = ref.read(stringsProvider);
+    await showHighlightsSheet(
+      context,
+      bookId: widget.book.id,
+      emptyText: t.highlightsEmptyPdf,
+      locationOf: (h) => t.page(h.page, _controller.isReady ? _controller.pageCount : h.page),
+      onJump: (h) => unawaited(_controller.goToPage(pageNumber: h.page)),
+    );
+  }
+
+  // ---- progress, bookmarks, cards ----
+
+  Future<void> _reportProgress(int page) async {
+    final count = _controller.isReady ? _controller.pageCount : 0;
+    if (count == 0) return;
+    final finished = await ref.read(libraryProvider.notifier).reportProgress(widget.book.id, page / count, lastPage: page);
+    if (finished && mounted) await showFinishedSheet(context, ref, widget.book);
+  }
+
+  Future<void> _toggleBookmark() async {
+    final page = _page ?? 1;
+    final t = ref.read(stringsProvider);
+    final notifier = ref.read(bookmarksProvider(widget.book.id).notifier);
+    final existing = (ref.read(bookmarksProvider(widget.book.id)).valueOrNull ?? const <Bookmark>[]).where((b) => b.page == page).toList();
+    if (existing.isNotEmpty) {
+      for (final b in existing) {
+        await notifier.remove(b.id);
+      }
+      return;
+    }
+    await notifier.add(page: page, label: t.pageLabel(page));
+    if (mounted) ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(t.bookmarkAdded), duration: const Duration(seconds: 1)));
+  }
+
+  Future<void> _makeCard(CardDraft draft) async {
+    final page = ref.read(readerControllerProvider)?.page ?? _page ?? 1;
+    ref.read(readerControllerProvider.notifier).dismiss();
+    unawaited(_controller.textSelectionDelegate.clearTextSelection());
+    final t = ref.read(stringsProvider);
+    final saved = await showCardEditor(
+      context,
+      draft: draft.at(bookId: widget.book.id, bookTitle: widget.book.title, page: page, location: t.pageLabel(page)),
+    );
+    if (saved != null && mounted) ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(t.cardSaved), duration: const Duration(seconds: 1)));
+  }
+
   void _onViewerChanged() {
     // The overlay target moves with the document; rebuild so the follower's
     // above/below decision and clamp track it.
-    if (mounted && ref.read(readerControllerProvider) != null) setState(() {});
+    if (mounted && ref.read(readerControllerProvider) != null) _afterLayout(() => setState(() {}));
+  }
+
+  /// pdfrx can notify from its own layout, when neither setState nor the
+  /// portal may be touched; wait for the frame then.
+  void _afterLayout(VoidCallback fn) {
+    if (SchedulerBinding.instance.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (mounted) fn();
+      });
+    } else {
+      fn();
+    }
   }
 
   // ---- geometry ----
@@ -221,7 +381,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     }
     if (!_selectionHaptic) {
       _selectionHaptic = true;
-      unawaited(HapticFeedback.selectionClick());
+      Haptics.choose();
     }
     _selectionDebounce?.cancel();
     _selectionDebounce = Timer(const Duration(milliseconds: 350), () => _handleSelection(sel));
@@ -243,6 +403,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     }
     final page = ranges.first.pageNumber;
     final idx = await cache.page(page);
+    _selectionWords = _wordsForSelection(ranges, idx, text);
 
     // A single selected word gets the word card (speaker, save), with its
     // sentence. pdfrx's character offsets don't always line up with our
@@ -327,6 +488,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   /// Fire-and-forget: no retries, never blocks rendering, errors ignored.
   Future<void> _prefetch(int page) async {
     if (!ref.read(settingsProvider).prefetch) return;
+    // Prefetch is free, but only for readers who could tap for these answers.
+    final access = ref.read(aiAccessProvider);
+    if (access != AiAccess.open && access != AiAccess.allowed) return;
     final cache = _cache;
     if (cache == null) return;
     final gen = ++_prefetchGeneration; // a newer page turn cancels this pass
@@ -438,7 +602,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final c = context.colors;
     final t = ref.watch(stringsProvider);
     final tooltip = ref.watch(readerControllerProvider);
-    if (tooltip == null && _portal.isShowing) _portal.hide();
+    if (tooltip == null && _portal.isShowing) {
+      _afterLayout(() {
+        if (_portal.isShowing && ref.read(readerControllerProvider) == null) _portal.hide();
+      });
+    }
+    final highlights = ref.watch(highlightsProvider(widget.book.id)).valueOrNull ?? const <Highlight>[];
+    if (!identical(highlights, _highlightsSeen)) {
+      _highlightsSeen = highlights;
+      unawaited(_resolveHighlightRects(highlights, _page ?? 1));
+    }
+    final brightness = Theme.of(context).brightness;
 
     return Scaffold(
       appBar: AppBar(
@@ -454,10 +628,24 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 ),
               ),
             ),
+          BookmarkButton(
+            marked: (ref.watch(bookmarksProvider(widget.book.id)).valueOrNull ?? const <Bookmark>[]).any((b) => b.page == (_page ?? 1)),
+            onPressed: _page == null ? null : () => unawaited(_toggleBookmark()),
+          ),
           IconButton(
             icon: const Icon(Icons.text_fields_rounded),
             tooltip: t.readingSettings,
             onPressed: () => showReadingSettingsSheet(context),
+          ),
+          ReaderMoreMenu(
+            onHighlights: _showHighlights,
+            onBookmarks: () => showBookmarksSheet(
+              context,
+              bookId: widget.book.id,
+              onJump: (b) => unawaited(_controller.goToPage(pageNumber: b.page)),
+            ),
+            onNote: () => unawaited(_makeCard(const CardDraft(kind: CardKind.idea))),
+            onCards: () => context.push(deckRoute((bookId: widget.book.id, bookTitle: widget.book.title))),
           ),
         ],
       ),
@@ -467,7 +655,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             widget.filePath,
             key: _viewerKey,
             controller: _controller,
-            initialPageNumber: widget.book.lastPage,
+            initialPageNumber: widget.initialPage ?? widget.book.lastPage,
             params: PdfViewerParams(
               backgroundColor: c.paper,
               textSelectionParams: PdfTextSelectionParams(
@@ -489,6 +677,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               onGeneralTap: _onTap,
               onViewerReady: (doc, controller) {
                 _cache = PageTextCache(controller);
+                unawaited(_resolveHighlightRects(_highlightsSeen, controller.pageNumber ?? 1));
                 unawaited(_checkForTextLayer(doc.pages.length));
                 unawaited(
                   ref.read(libraryProvider.notifier).touch(widget.book.id, pageCount: doc.pages.length),
@@ -499,11 +688,26 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               onPageChanged: (p) {
                 if (p == null) return;
                 setState(() => _page = p);
-                unawaited(ref.read(libraryProvider.notifier).touch(widget.book.id, lastPage: p));
+                unawaited(_reportProgress(p));
                 unawaited(_prefetch(p));
+                unawaited(_resolveHighlightRects(_highlightsSeen, p));
               },
-              viewerOverlayBuilder: (ctx, size, _) =>
-                  tooltipOverlays(context: ctx, tooltip: tooltip, link: _link, toLocal: _docToViewer),
+              viewerOverlayBuilder: (ctx, size, _) => [
+                for (final h in highlights)
+                  for (final band in _highlightRects[h.id] ?? const <Rect>[])
+                    Positioned.fromRect(
+                      rect: _docToViewer(band).inflate(1.5),
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: HighlightPalette.fill(h.color, brightness),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      ),
+                    ),
+                ...tooltipOverlays(context: ctx, tooltip: tooltip, link: _link, toLocal: _docToViewer),
+              ],
             ),
           ),
           OverlayPortal(
@@ -517,6 +721,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               onShowDetails: _showDetails,
               onSuggestion: _lookupTyped,
               onTranslateSentence: _translateSentence,
+              highlightActions: HighlightActions(
+                onSentenceColor: _selectionWords == null ? null : _highlightSelection,
+              ),
+              onMakeCard: (d) => unawaited(_makeCard(d)),
             ),
           ),
         ],
@@ -525,6 +733,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }
 
   void _translateSentence(WordTooltipState s) {
+    _selectionWords = null; // the card's sentence isn't a placed selection
     _portal.show();
     ref.read(readerControllerProvider.notifier).showSentence(text: s.sentence, anchor: s.anchor, page: s.page);
   }

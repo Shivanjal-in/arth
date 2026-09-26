@@ -2,6 +2,7 @@
 
 import 'dart:math';
 
+import 'package:arth/app/account_providers.dart';
 import 'package:arth/app/settings.dart';
 import 'package:arth/app/strings.dart';
 import 'package:arth/app/tts.dart';
@@ -62,7 +63,12 @@ Future<String> loadDeviceId(LocalStore store) async {
 final apiClientProvider = Provider<ApiClient>((ref) {
   final override = ref.watch(settingsProvider.select((s) => s.apiBaseUrl));
   final url = (override == null || override.trim().isEmpty) ? kApiBaseUrl : override.trim();
-  return ApiClient(baseUrl: url, deviceId: ref.watch(deviceIdProvider));
+  return ApiClient(
+    baseUrl: url,
+    deviceId: ref.watch(deviceIdProvider),
+    idToken: ref.watch(authServiceProvider)?.idToken,
+    onUsage: (usage) => ref.read(usageProvider.notifier).report(usage),
+  );
 });
 
 final dictionaryRepoProvider = Provider<DictionaryRepo>(
@@ -114,9 +120,118 @@ class LibraryNotifier extends AsyncNotifier<List<Book>> {
     ref.invalidateSelf();
   }
 
-  Future<void> touch(int id, {int? lastPage, int? pageCount}) async {
-    await ref.read(localStoreProvider).touchBook(id, lastPage: lastPage, pageCount: pageCount);
+  Future<void> touch(int id, {int? lastPage, int? pageCount, double? progress}) async {
+    await ref.read(localStoreProvider).touchBook(id, lastPage: lastPage, pageCount: pageCount, progress: progress);
     ref.invalidateSelf();
+  }
+
+  /// Records how far through the book the reader is. True the first time
+  /// the reader reaches the end, so the reader can offer the recap.
+  Future<bool> reportProgress(int id, double progress, {int? lastPage}) async {
+    final store = ref.read(localStoreProvider);
+    await store.touchBook(id, progress: progress, lastPage: lastPage);
+    final finished = progress >= kFinishedAt && await store.markFinished(id);
+    ref.invalidateSelf();
+    return finished;
+  }
+}
+
+/// A book counts as read once the reader gets this far (the last pages are
+/// often notes and adverts).
+const kFinishedAt = 0.97;
+
+/// Which deck: a book in the library, or a removed book's cards by title.
+typedef DeckRef = ({int? bookId, String? bookTitle});
+
+/// A deck's cards in reading order.
+final FutureProviderFamily<List<Flashcard>, DeckRef> flashcardsProvider = FutureProvider.family<List<Flashcard>, DeckRef>(
+  (ref, deck) => ref.watch(localStoreProvider).flashcards(bookId: deck.bookId, bookTitle: deck.bookId == null ? deck.bookTitle : null),
+);
+
+/// Every deck with its counts, most recently touched first.
+final decksProvider = FutureProvider<List<DeckSummary>>((ref) => ref.watch(localStoreProvider).decks());
+
+/// Card writes; every change refreshes the decks and card lists.
+final cardsProvider = Provider<CardsService>(CardsService.new);
+
+class CardsService {
+  CardsService(this._ref);
+
+  final Ref _ref;
+
+  LocalStore get _store => _ref.read(localStoreProvider);
+
+  void _changed() {
+    _ref
+      ..invalidate(flashcardsProvider)
+      ..invalidate(decksProvider);
+    _ref.read(syncProvider.notifier).schedule();
+  }
+
+  Future<Flashcard> add({
+    required CardKind kind,
+    required String front,
+    String back = '',
+    String note = '',
+    String? context,
+    int? bookId,
+    String? bookTitle,
+    int? page,
+    int? block,
+    String? location,
+  }) async {
+    final card = await _store.addFlashcard(
+      kind: kind,
+      front: front,
+      back: back,
+      note: note,
+      context: context,
+      bookId: bookId,
+      bookTitle: bookTitle,
+      page: page,
+      block: block,
+      location: location,
+    );
+    _changed();
+    return card;
+  }
+
+  Future<void> update(Flashcard card) async {
+    await _store.updateFlashcard(card);
+    _changed();
+  }
+
+  Future<void> delete(String id) async {
+    await _store.deleteFlashcard(id);
+    _changed();
+  }
+
+  /// A community deck, copied into this reader's cards.
+  Future<int> saveDeck({required String bookTitle, required String? bookKey, required List<({CardKind kind, String front, String back, String note, String? location})> cards}) async {
+    final n = await _store.saveDeckCards(bookTitle: bookTitle, bookKey: bookKey, cards: cards);
+    _changed();
+    return n;
+  }
+}
+
+/// A book's bookmarks, in reading order.
+final AsyncNotifierProviderFamily<BookmarksNotifier, List<Bookmark>, int> bookmarksProvider =
+    AsyncNotifierProvider.family<BookmarksNotifier, List<Bookmark>, int>(BookmarksNotifier.new);
+
+class BookmarksNotifier extends FamilyAsyncNotifier<List<Bookmark>, int> {
+  @override
+  Future<List<Bookmark>> build(int arg) => ref.watch(localStoreProvider).bookmarks(arg);
+
+  Future<void> add({required int page, int? block, String? label, String? excerpt}) async {
+    await ref.read(localStoreProvider).addBookmark(bookId: arg, page: page, block: block, label: label, excerpt: excerpt);
+    ref.invalidateSelf();
+    ref.read(syncProvider.notifier).schedule();
+  }
+
+  Future<void> remove(String id) async {
+    await ref.read(localStoreProvider).deleteBookmark(id);
+    ref.invalidateSelf();
+    ref.read(syncProvider.notifier).schedule();
   }
 }
 
@@ -139,6 +254,46 @@ class SavedWordsNotifier extends AsyncNotifier<List<SavedWord>> {
 
   bool contains(String lemma) =>
       state.valueOrNull?.any((w) => w.lemma == lemma) ?? false;
+}
+
+/// A book's highlights, in reading order.
+final AsyncNotifierProviderFamily<HighlightsNotifier, List<Highlight>, int> highlightsProvider =
+    AsyncNotifierProvider.family<HighlightsNotifier, List<Highlight>, int>(HighlightsNotifier.new);
+
+class HighlightsNotifier extends FamilyAsyncNotifier<List<Highlight>, int> {
+  @override
+  Future<List<Highlight>> build(int arg) => ref.watch(localStoreProvider).highlights(arg);
+
+  Future<Highlight> add({
+    required int page,
+    required int startWord,
+    required int endWord,
+    required String text,
+    required HighlightColor color,
+    int? block,
+  }) async {
+    final h = await ref.read(localStoreProvider).addHighlight(
+          bookId: arg,
+          page: page,
+          block: block,
+          startWord: startWord,
+          endWord: endWord,
+          text: text,
+          color: color,
+        );
+    ref.invalidateSelf();
+    return h;
+  }
+
+  Future<void> recolor(int id, HighlightColor color) async {
+    await ref.read(localStoreProvider).recolorHighlight(id, color);
+    ref.invalidateSelf();
+  }
+
+  Future<void> remove(int id) async {
+    await ref.read(localStoreProvider).removeHighlight(id);
+    ref.invalidateSelf();
+  }
 }
 
 final recentLookupsProvider = FutureProvider<List<String>>(

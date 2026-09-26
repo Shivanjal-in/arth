@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class SavedScreen extends ConsumerWidget {
-  const SavedScreen({super.key});
+/// Saved words, newest first; swipe to remove. Lives in the Cards tab.
+class SavedWordsList extends ConsumerWidget {
+  const SavedWordsList({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -14,12 +15,7 @@ class SavedScreen extends ConsumerWidget {
     final h = HindiText(scale);
     final t = ref.watch(stringsProvider);
     final saved = ref.watch(savedWordsProvider);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(t.savedTitle, style: uiTitle(hindi: t.isHindi, color: c.ink, scale: scale).copyWith(fontSize: 26)),
-        toolbarHeight: 64,
-      ),
-      body: saved.when(
+    return saved.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, _) => Center(child: Text(t.somethingWrong, style: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: scale))),
         data: (list) => list.isEmpty
@@ -78,7 +74,6 @@ class SavedScreen extends ConsumerWidget {
                   );
                 },
               ),
-      ),
     );
   }
 }

@@ -4,6 +4,9 @@
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/theme.dart';
 import 'package:arth/core/models/contracts.dart';
+import 'package:arth/data/local_store.dart';
+import 'package:arth/features/plans/ai_prompt.dart';
+import 'package:arth/features/reader/highlights/highlight_bar.dart';
 import 'package:arth/features/reader/reader_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,10 +16,18 @@ class SentenceTooltip extends ConsumerWidget {
     required this.state,
     required this.onTapWord,
     super.key,
+    this.onHighlight,
+    this.onMakeCard,
   });
 
   final SentenceTooltipState state;
   final ValueChanged<String> onTapWord;
+
+  /// Highlight this sentence in the book; null when the reader can't place it.
+  final ValueChanged<HighlightColor>? onHighlight;
+
+  /// Keep this sentence and its translation as a quote card.
+  final VoidCallback? onMakeCard;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -60,7 +71,9 @@ class SentenceTooltip extends ConsumerWidget {
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 8),
-        if (state.error != null && state.hindi == null)
+        if (isAiBlock(state.errorCode))
+          AiPrompt(code: state.errorCode!, feature: AiFeature.translate)
+        else if (state.error != null && state.hindi == null)
           Text(
             state.errorCode == null ? state.error! : t.errorFor(state.errorCode!, state.error!),
             style: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: settings.hindiScale),
@@ -123,6 +136,28 @@ class SentenceTooltip extends ConsumerWidget {
             show: (state.difficultWords ?? const []).isNotEmpty,
           ),
         ],
+        if (onHighlight != null || onMakeCard != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Row(
+              children: [
+                if (onHighlight != null) ...[
+                  Text(t.highlight, style: label(c.inkMuted)),
+                  const SizedBox(width: 12),
+                  HighlightColorDots(onPick: onHighlight!, size: 22),
+                ],
+                const Spacer(),
+                if (onMakeCard != null)
+                  TextButton.icon(
+                    // The quote's back is the translation: wait for it.
+                    onPressed: state.done ? onMakeCard : null,
+                    style: TextButton.styleFrom(foregroundColor: c.accent, visualDensity: VisualDensity.compact),
+                    icon: const Icon(Icons.style_outlined, size: 18),
+                    label: Text(t.makeCard, style: label(state.done ? c.accent : c.inkMuted)),
+                  ),
+              ],
+            ),
+          ),
       ],
     );
   }

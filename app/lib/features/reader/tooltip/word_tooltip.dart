@@ -6,6 +6,7 @@ import 'package:arth/app/settings.dart';
 import 'package:arth/app/theme.dart';
 import 'package:arth/data/dictionary_repo.dart';
 import 'package:arth/features/dictionary/entry_widgets.dart';
+import 'package:arth/features/plans/ai_prompt.dart';
 import 'package:arth/features/reader/reader_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,6 +20,7 @@ class WordTooltip extends ConsumerWidget {
     super.key,
     this.bookId,
     this.bookTitle,
+    this.onMakeCard,
   });
 
   final WordTooltipState state;
@@ -27,6 +29,7 @@ class WordTooltip extends ConsumerWidget {
   final VoidCallback onTranslateSentence;
   final int? bookId;
   final String? bookTitle;
+  final VoidCallback? onMakeCard;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -59,12 +62,16 @@ class WordTooltip extends ConsumerWidget {
     }
 
     return switch (outcome) {
-      LookupMissing(:final word, :final suggestions, :final offline) => Column(
+      LookupMissing(:final word, :final suggestions, :final offline, :final blockedCode) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(word.isEmpty ? state.token : word, style: EnglishText.word(c.ink)),
-            const SizedBox(height: 6),
-            Text(offline ? t.offline : t.notFound, style: body),
+            if (isAiBlock(blockedCode))
+              AiPrompt(code: blockedCode!, feature: AiFeature.rareWord)
+            else ...[
+              const SizedBox(height: 6),
+              Text(offline ? t.offline : t.notFound, style: body),
+            ],
             if (suggestions.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(t.didYouMean, style: label),
@@ -100,11 +107,14 @@ class WordTooltip extends ConsumerWidget {
                 padding: const EdgeInsets.only(top: 2),
                 child: Text('${t.phrase} · ${phrase.phrase}', style: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: settings.hindiScale, size: 13)),
               ),
-            InContextBlock(
-              result: state.context,
-              loading: state.contextLoading,
-              entry: entry,
-            ),
+            if (isAiBlock(state.contextErrorCode))
+              AiPrompt(code: state.contextErrorCode!, feature: AiFeature.context)
+            else
+              InContextBlock(
+                result: state.context,
+                loading: state.contextLoading,
+                entry: entry,
+              ),
             SenseList(
               senses: entry.senses,
               max: settings.tooltipDetail == TooltipDetail.compact ? 3 : 5,
@@ -114,13 +124,23 @@ class WordTooltip extends ConsumerWidget {
             const SizedBox(height: 8),
             Row(
               children: [
-                SaveWordButton(
-                  entry: entry,
-                  sentence: state.sentence,
-                  bookId: bookId,
-                  bookTitle: bookTitle,
-                  labelled: true,
-                ),
+                // Saving is the bookmark in the header; the reader's own
+                // action here is the card.
+                if (onMakeCard != null)
+                  TextButton.icon(
+                    onPressed: onMakeCard,
+                    style: TextButton.styleFrom(foregroundColor: c.accent),
+                    icon: const Icon(Icons.style_outlined, size: 20),
+                    label: Text(t.makeCard, style: uiLabel(hindi: t.isHindi, color: c.accent, scale: settings.hindiScale)),
+                  )
+                else
+                  SaveWordButton(
+                    entry: entry,
+                    sentence: state.sentence,
+                    bookId: bookId,
+                    bookTitle: bookTitle,
+                    labelled: true,
+                  ),
                 const Spacer(),
                 IconButton(
                   tooltip: t.translateSentence,

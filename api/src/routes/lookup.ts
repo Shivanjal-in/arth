@@ -7,6 +7,7 @@ import { resolveLemma, resolveLemmaKey } from '../services/lemma.js';
 import { generateOnDemand, morphologySuggestions, type OnDemandDeps } from '../services/ondemand.js';
 import type { Store } from '../services/mongo-store.js';
 import { cacheStats } from '../cache/cache.js';
+import { openGate, type AiGate } from '../auth/ai-gate.js';
 
 const Query = z.object({
   word: z.string().trim().min(1).max(64),
@@ -18,9 +19,11 @@ export type LookupOptions = {
   ondemand?: Omit<OnDemandDeps, 'staging' | 'spend'> & {
     spend: (request: { headers: Record<string, unknown>; ip: string }) => void;
   };
+  /** Generating an entry is an AI use; looking up an existing one isn't. */
+  gate?: AiGate;
 };
 
-export const lookupRoutes: FastifyPluginAsync<LookupOptions> = async (app, { store, ondemand }) => {
+export const lookupRoutes: FastifyPluginAsync<LookupOptions> = async (app, { store, ondemand, gate = openGate }) => {
   app.get(
     '/lookup',
     {
@@ -34,7 +37,7 @@ export const lookupRoutes: FastifyPluginAsync<LookupOptions> = async (app, { sto
         },
       },
     },
-    async (request) => {
+    async (request, reply) => {
       const parsed = Query.safeParse(request.query);
       if (!parsed.success) throw new ApiError('BAD_REQUEST', messages.badRequest);
 
@@ -53,8 +56,10 @@ export const lookupRoutes: FastifyPluginAsync<LookupOptions> = async (app, { sto
           word,
         );
         if (stagedLemma) {
+          const use = await gate(request, reply);
           try {
             const out = await generateOnDemand({ ...ondemand, staging: store, spend: () => ondemand.spend(request) }, stagedLemma);
+            if (!out) await use?.refund();
             if (out) {
               cacheStats.misses++;
               request.meta.lookup = { word, lemma: stagedLemma, via: 'generated' };
@@ -63,6 +68,7 @@ export const lookupRoutes: FastifyPluginAsync<LookupOptions> = async (app, { sto
               return ok(out.entry);
             }
           } catch (err) {
+            await use?.refund();
             if (err instanceof ApiError) throw err;
             request.log.error({ err, lemma: stagedLemma }, 'ondemand generation failed');
           }

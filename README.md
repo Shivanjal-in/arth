@@ -1,6 +1,6 @@
 # Arth
 
-A mobile PDF reader for Hindi-speaking readers of English books. Tap a word or select
+A mobile PDF/EPUB reader for Hindi-speaking readers of English books. Tap a word or select
 a sentence and get the Hindi meaning — explained in plain Hindi, for *this* sentence.
 
 ```
@@ -78,9 +78,10 @@ flutter test && flutter analyze
 # A phone can't reach localhost on the Mac: pass the LAN IP (or set it later in Settings → सर्वर).
 flutter run --release -d <device-id> --dart-define=ARTH_API_URL=http://192.168.x.x:3000
 
-# Simulator smoke test: import a PDF automatically and drive the reader over the VM service
-flutter run -d <simulator-id> --dart-define=ARTH_API_URL=http://127.0.0.1:3000 \
-  --dart-define=ARTH_DEV_PDF_URL=http://127.0.0.1:8765/book.pdf
+# Simulator smoke test: import a PDF (or .epub) automatically and drive the reader over the VM service.
+# The iOS simulator can't link ML Kit; use an Android emulator (host is 10.0.2.2 there).
+flutter run -d <emulator-id> --dart-define=ARTH_API_URL=http://10.0.2.2:3000 \
+  --dart-define=ARTH_DEV_PDF_URL=http://10.0.2.2:8765/book.pdf
 ```
 
 The interface is English by default; **You → Interface language** switches to Hindi. Dictionary
@@ -96,6 +97,37 @@ simulator without touch automation. App icon: `python3 tool/make_icon.py`.
 `contracts/README.md`. Every language's `normalize()` must pass
 `contracts/normalize-vectors.json` — TypeScript (`api/test/normalize.test.ts`) and Python
 (`pipeline/tests/test_normalize.py`) do; Dart is added in Phase 4.
+
+## EPUBs
+
+Library → **+** → *Add a PDF or EPUB*. An EPUB is opened in place from the zip
+(`app/lib/core/epub/epub_book.dart`: container → OPF spine → EPUB 3 nav or NCX table of
+contents), and each chapter's XHTML is parsed off the main isolate into text blocks
+(`epub_html.dart`: paragraphs, headings, quotes, lists, `pre`; emphasis kept, images dropped).
+`EpubReaderScreen` lays the blocks out as a scrolling column, one chapter per swipe, painting
+each block with its own `TextPainter` (`epub_paragraph.dart`) so the word rects handed to the
+tooltip are exactly where the glyphs are; a block is the unit for `PageTextIndex`, so sentences
+never cross a paragraph. The Contents sheet jumps by title; `lastPage` is the chapter and the
+scroll offset is kept in the kv table. Same tooltip layer, `/context` and `/translate` as the PDF
+reader; no drag selection (the word card's translate action handles the sentence) and no prefetch.
+
+## Highlighter
+
+Four colours, saved per book in the `highlights` table (`app/lib/data/local_store.dart`, schema
+v3) as `(page, block?, startWord, endWord)` — word indices in the page's (PDF) or block's (EPUB)
+`PageTextIndex`, which are deterministic for a given file — plus the text for the list. Shared
+pieces live in `app/lib/features/reader/highlights/`: the palette, the colour bar, and the
+per-book Highlights sheet (reader ⋮ menu → Highlights: jump to a highlight, remove one).
+
+- **EPUB**: press and hold a word and drag to extend within the paragraph; release for the
+  colour bar (translate is there too). Long-press an existing highlight to recolour or remove
+  it. Bands are painted by the block's render object under the text.
+- **PDF**: select text (pdfrx's long-press selection); the translation card gets a *Highlight*
+  colour row. The selection is mapped to word indices by matching its first and last tokens
+  near pdfrx's character offsets; bands are drawn in the viewer overlay from rects resolved
+  for pages near the current one.
+- The word card's translate action also offers the colour row for that sentence.
+- Not on scans: OCR word positions aren't stable enough to anchor to.
 
 ## Photographed pages (scan reader)
 
@@ -117,6 +149,117 @@ generates its Hindi layer live with the pipeline's prompt and validation, stores
 `entries` for good and returns it (3–7 s the first time, instant after). A word that isn't
 staged either gets a 404 whose `suggestions` are morphological bases (`brimlessness` →
 `brimless`, `brim`). Generation spends the per-device LLM budget like any model call.
+
+## Flashcards, bookmarks, progress
+
+Cards are made while reading — *Make card* on the word card (word + its meaning in this
+sentence) or the translation card (quote + translation), or ⋮ → *Add a note card* for the
+reader's own idea — and remember where in the book they came from. The **Cards** tab has a deck
+per book; a deck is a **recap**: its cards as a timeline in reading order, grouped by chapter,
+with *Replay the book* (every card, in order) and *Practice* (due first, flip, rate; Leitner
+boxes in `app/lib/features/cards/review_schedule.dart`). Finishing a book (97%) offers its recap.
+
+The reader's ribbon bookmarks the current page (EPUB: the first paragraph on screen, which
+survives font-size changes); ⋮ → *Bookmarks* lists them. `books.progress` is a 0–1 fraction —
+for EPUBs it counts the scroll position within the chapter — and drives the library's
+*Continue reading* card and per-book percentages. Tables: `flashcards`, `bookmarks` (schema v4+).
+
+## Accounts and sync
+
+Sign in (You tab) with Google or a phone number + SMS code, via Firebase Auth. The API accepts
+the Firebase ID token as `Authorization: Bearer …`, creates the user on first sight (`users`
+collection: profile, `role` user/admin, `tier` free/pro/super) and serves `GET/PATCH /v1/me`,
+`POST /v1/me/avatar` (a signed Cloudinary upload ticket — the photo goes straight from the phone
+to Cloudinary, the secret stays on the server) and `POST /v1/sync`.
+
+Sync covers flashcards and bookmarks: rows carry UUIDs, `updatedAt` and tombstones; the newer
+`updatedAt` wins; every accepted write takes the user's next sequence number and a device pulls
+"everything after the sequence I last saw" (`api/src/services/accounts.ts`). A book is
+identified across devices by a content key — SHA-256 of its size and first MiB
+(`app/lib/core/book_key.dart`) — so a synced card attaches to the same book on another phone, even
+one imported later. The app syncs on sign-in, on resume, a few seconds after an edit, and from
+*Sync now*. On first sign-in, what's already on the phone joins the account.
+
+Setup (accounts stay hidden until this is done):
+
+1. Firebase console → create a project; enable **Authentication → Google** and **Phone**.
+   Add an Android app (`com.zethyst.arth`, with the debug and release SHA-1/SHA-256 —
+   `cd app/android && ./gradlew signingReport`) and an iOS app (`com.zethyst.arth`).
+2. API: set `FIREBASE_PROJECT_ID` (and `CLOUDINARY_URL` for photos) in `api/.env` / Render.
+3. App: pass the Firebase values as dart-defines (see `app/lib/app/firebase_setup.dart`), e.g.
+   `flutter run --dart-define-from-file=firebase.json` (copy `app/firebase.json.example`) with the project's API keys, sender id,
+   Android/iOS app ids, the iOS OAuth client id and the **Web** OAuth client id (Android's
+   Google sign-in needs it to get an ID token).
+4. iOS: copy `app/ios/Flutter/Firebase.xcconfig.example` to `Firebase.xcconfig` and fill in the
+   reversed client id and encoded app id (URL schemes for the sign-in callbacks). Phone sign-in
+   on a real iPhone also wants an APNs key uploaded to Firebase (else it falls back to reCAPTCHA).
+
+## Tiers, AI allowance, ads
+
+| Tier  | AI answers                     | Ads                  |
+|-------|--------------------------------|----------------------|
+| Free  | 100, lifetime                  | banners outside the reader |
+| Pro   | 1,000 per calendar month (UTC) | none                 |
+| Super | unlimited                      | none                 |
+
+Only AI answers count: `/context` (meaning in this sentence), `/translate`, and a dictionary
+entry generated live by `/lookup`. The on-device dictionary is always free. When accounts are on
+(`FIREBASE_PROJECT_ID` set), those routes need sign-in; a use is reserved atomically before the
+work and refunded when no AI answer was served (single-sense words, failures). Background
+prefetch is free but only while allowance remains. Responses carry `x-ai-used` / `x-ai-limit` /
+`x-ai-period`; `402 QUOTA_EXCEEDED` includes the usage. Limits: `AI_FREE_LIMIT`,
+`AI_PRO_MONTHLY` (`api/src/services/quota.ts`). Without a Firebase project nothing is enforced.
+
+Tiers are set by hand until there are payments and an admin screen:
+
+```sh
+cd api && npm run set-tier -- reader@example.com pro      # or a uid / phone; add --admin for the admin role
+```
+
+In the app, a signed-out or out-of-allowance reader sees *Sign in* / *See plans* where the AI
+answer would be (`app/lib/features/plans/`); the You tab shows what's left. **Plans** compares
+the tiers; *Ask for an upgrade* emails `ARTH_SUPPORT_EMAIL` (dart-define).
+
+Ads (`app/lib/features/ads/ads.dart`): Google Mobile Ads, a banner above the tab bar on Library,
+Dictionary and Cards for free/signed-out readers, never in a reader. Google's UMP consent form
+runs first where the law requires it; content is capped at PG. Without configuration Google's
+**test** units serve (safe to tap). For real ads:
+
+- Full-screen interstitials (`app/lib/features/ads/interstitials.dart`), free tier only, at natural
+  breaks: leaving a book read for 2+ minutes, finishing a Replay/Practice session. Never in the
+  first 2 minutes after launch, at most one per 6 minutes (`AdPacing`); one is kept preloaded.
+- Ad units: `--dart-define=ADMOB_BANNER_ANDROID=…` / `ADMOB_BANNER_IOS=…`,
+  `ADMOB_INTERSTITIAL_ANDROID=…` / `ADMOB_INTERSTITIAL_IOS=…`
+- App id: Android `ADMOB_APP_ID=…` in `android/key.properties`; iOS `ADMOB_APP_ID = …` in
+  `ios/Flutter/Firebase.xcconfig` (overrides the test id in `AdMob.xcconfig`).
+- Play Console: declare that the app contains ads; App Store: the privacy label.
+
+## Push notifications
+
+Firebase Cloud Messaging. What sends one (`api/src/push/notify.ts`), each in the phone's own
+interface language, to every phone the reader is signed in on:
+
+| When | Message | Opens |
+|---|---|---|
+| Cards are due (daily cron, at most once a day) | "5 cards are ready — most from “Emma”" | Cards |
+| An admin changes their plan (`npm run set-tier`) | "You're on Pro now ✨" | Plans |
+| 10 free AI answers left (or 50 of a Pro month), once | "10 AI answers left" | Plans |
+| The reader taps *Send a test notification* (Profile) | "Notifications are working" | You |
+
+The app registers its token only after sign-in is restored (`app/lib/data/push_service.dart`),
+again when FCM rotates it or the language changes, and removes it on sign-out; the API keeps up
+to ten phones per user and drops tokens FCM reports dead. While the app is open Android shows
+the banner itself (a local notification), iOS presents its own. *Review reminders* can be turned
+off in Profile.
+
+Setup: `FIREBASE_SERVICE_ACCOUNT` (Firebase → Project settings → Service accounts → Generate new
+private key; the JSON, or base64 of it) in `api/.env`, on Render's `arth-api`, and on the
+`arth-review-reminders` cron job (in `render.yaml`, 13:00 UTC daily). iOS also needs the APNs key
+uploaded to Firebase (setup guide §4) and a real device: the simulator can't receive pushes.
+
+```sh
+cd api && npm run review-reminders          # send today's reminders now
+```
 
 ## Android release builds
 

@@ -1,11 +1,23 @@
+import 'package:arth/app/feel.dart';
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/theme.dart';
+import 'package:arth/data/local_store.dart';
 import 'package:arth/features/about/about_screen.dart';
+import 'package:arth/features/account/profile_screen.dart';
+import 'package:arth/features/account/sign_in_screen.dart';
+import 'package:arth/features/admin/admin_screen.dart';
+import 'package:arth/features/ads/ads.dart';
+import 'package:arth/features/cards/cards_screen.dart';
+import 'package:arth/features/cards/deck_screen.dart';
+import 'package:arth/features/cards/review_screen.dart';
+import 'package:arth/features/community/community_screen.dart';
+import 'package:arth/features/community/published_deck_screen.dart';
 import 'package:arth/features/dictionary/dictionary_screen.dart';
 import 'package:arth/features/dictionary/word_screen.dart';
+import 'package:arth/features/epub/epub_reader_screen.dart';
 import 'package:arth/features/library/library_screen.dart';
+import 'package:arth/features/plans/plans_screen.dart';
 import 'package:arth/features/reader/reader_screen.dart';
-import 'package:arth/features/saved/saved_screen.dart';
 import 'package:arth/features/scan/scan_reader_screen.dart';
 import 'package:arth/features/seed/seed_screen.dart';
 import 'package:arth/features/settings/settings_screen.dart';
@@ -19,17 +31,36 @@ GoRouter buildRouter({required bool needsSeed}) => GoRouter(
       routes: [
         GoRoute(path: '/seed', builder: (_, _) => const SeedScreen()),
         GoRoute(path: '/about', builder: (_, _) => const AboutScreen()),
+        GoRoute(path: '/signin', builder: (_, _) => const SignInScreen()),
+        GoRoute(path: '/profile', builder: (_, _) => const ProfileScreen()),
+        GoRoute(path: '/plans', builder: (_, _) => const PlansScreen()),
+        GoRoute(path: '/admin', builder: (_, _) => const AdminScreen()),
+        GoRoute(path: '/community/deck/:id', builder: (_, s) => PublishedDeckScreen(id: s.pathParameters['id']!)),
         GoRoute(
           path: '/word/:lemma',
           builder: (_, s) => WordScreen(word: s.pathParameters['lemma']!),
         ),
+        // Readers take ?page= (EPUB: chapter) and ?block= to open at a place
+        // other than where the reader left off (a card, a bookmark).
         GoRoute(
           path: '/read/:id',
-          builder: (_, s) => _ReaderRoute(id: int.parse(s.pathParameters['id']!)),
+          builder: (_, s) => _ReaderRoute(id: int.parse(s.pathParameters['id']!), at: _placeOf(s)),
+        ),
+        GoRoute(
+          path: '/epub/:id',
+          builder: (_, s) => _EpubRoute(id: int.parse(s.pathParameters['id']!), at: _placeOf(s)),
         ),
         GoRoute(
           path: '/scan/:id',
-          builder: (_, s) => _ScanRoute(id: int.parse(s.pathParameters['id']!)),
+          builder: (_, s) => _ScanRoute(id: int.parse(s.pathParameters['id']!), at: _placeOf(s)),
+        ),
+        GoRoute(path: '/deck', builder: (_, s) => DeckScreen(deck: deckRefFrom(s.uri.queryParameters))),
+        GoRoute(
+          path: '/deck/review',
+          builder: (_, s) => ReviewScreen(
+            deck: deckRefFrom(s.uri.queryParameters),
+            mode: s.uri.queryParameters['mode'] == 'practice' ? ReviewMode.practice : ReviewMode.replay,
+          ),
         ),
         StatefulShellRoute.indexedStack(
           builder: (_, _, shell) => _Shell(shell: shell),
@@ -38,7 +69,8 @@ GoRouter buildRouter({required bool needsSeed}) => GoRouter(
             StatefulShellBranch(
               routes: [GoRoute(path: '/dictionary', builder: (_, _) => const DictionaryScreen())],
             ),
-            StatefulShellBranch(routes: [GoRoute(path: '/saved', builder: (_, _) => const SavedScreen())]),
+            StatefulShellBranch(routes: [GoRoute(path: '/cards', builder: (_, _) => const CardsScreen())]),
+            StatefulShellBranch(routes: [GoRoute(path: '/community', builder: (_, _) => const CommunityScreen())]),
             StatefulShellBranch(
               routes: [GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen())],
             ),
@@ -60,9 +92,12 @@ class _Shell extends ConsumerWidget {
     final items = [
       (Icons.menu_book_outlined, Icons.menu_book_rounded, t.tabLibrary),
       (Icons.search_rounded, Icons.search_rounded, t.tabDictionary),
-      (Icons.bookmark_border_rounded, Icons.bookmark_rounded, t.tabSaved),
+      (Icons.style_outlined, Icons.style_rounded, t.tabCards),
+      (Icons.forum_outlined, Icons.forum_rounded, t.tabCommunity),
       (Icons.person_outline_rounded, Icons.person_rounded, t.tabYou),
     ];
+    // Free tier: a banner above the tabs, except on You (settings, account).
+    final ads = ref.watch(showAdsProvider) && shell.currentIndex != 4;
     return Scaffold(
       body: shell,
       bottomNavigationBar: Container(
@@ -70,27 +105,36 @@ class _Shell extends ConsumerWidget {
           color: c.paper,
           border: Border(top: BorderSide(color: c.rule)),
         ),
-        child: SafeArea(
-          top: false,
-          child: SizedBox(
-            height: 62,
-            child: Row(
-              children: [
-                for (var i = 0; i < items.length; i++)
-                  Expanded(
-                    child: _NavItem(
-                      icon: items[i].$1,
-                      selectedIcon: items[i].$2,
-                      label: items[i].$3,
-                      selected: shell.currentIndex == i,
-                      hindi: t.isHindi,
-                      scale: scale,
-                      onTap: () => shell.goBranch(i, initialLocation: i == shell.currentIndex),
-                    ),
-                  ),
-              ],
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (ads) const Center(child: AdBanner()),
+            SafeArea(
+              top: false,
+              child: SizedBox(
+                height: 62,
+                child: Row(
+                  children: [
+                    for (var i = 0; i < items.length; i++)
+                      Expanded(
+                        child: _NavItem(
+                          icon: items[i].$1,
+                          selectedIcon: items[i].$2,
+                          label: items[i].$3,
+                          selected: shell.currentIndex == i,
+                          hindi: t.isHindi,
+                          scale: scale,
+                          onTap: () {
+                            if (i != shell.currentIndex) Haptics.choose();
+                            shell.goBranch(i, initialLocation: i == shell.currentIndex);
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -129,7 +173,14 @@ class _NavItem extends StatelessWidget {
         children: [
           Icon(selected ? selectedIcon : icon, size: 22, color: color),
           const SizedBox(height: 3),
-          Text(label, style: uiLabel(hindi: hindi, color: color, scale: scale).copyWith(fontSize: hindi ? null : 12)),
+          // Five tabs: a long label shrinks to fit rather than wrapping.
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(label, maxLines: 1, style: uiLabel(hindi: hindi, color: color, scale: scale).copyWith(fontSize: hindi ? null : 12)),
+            ),
+          ),
           const SizedBox(height: 4),
           AnimatedContainer(
             duration: const Duration(milliseconds: 180),
@@ -143,10 +194,17 @@ class _NavItem extends StatelessWidget {
   }
 }
 
+/// Where a reader route asks to open: `?page=` and `?block=`.
+BookPlace? _placeOf(GoRouterState s) {
+  final page = int.tryParse(s.uri.queryParameters['page'] ?? '');
+  return page == null ? null : (page: page, block: int.tryParse(s.uri.queryParameters['block'] ?? ''));
+}
+
 class _ReaderRoute extends ConsumerWidget {
-  const _ReaderRoute({required this.id});
+  const _ReaderRoute({required this.id, this.at});
 
   final int id;
+  final BookPlace? at;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -155,14 +213,32 @@ class _ReaderRoute extends ConsumerWidget {
     if (book == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    return ReaderScreen(book: book, filePath: p.join(ref.read(documentsDirProvider), book.path));
+    return ReaderScreen(book: book, filePath: p.join(ref.read(documentsDirProvider), book.path), initialPage: at?.page);
+  }
+}
+
+class _EpubRoute extends ConsumerWidget {
+  const _EpubRoute({required this.id, this.at});
+
+  final int id;
+  final BookPlace? at;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final books = ref.watch(libraryProvider).valueOrNull;
+    final book = books?.where((b) => b.id == id).firstOrNull;
+    if (book == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    return EpubReaderScreen(book: book, filePath: p.join(ref.read(documentsDirProvider), book.path), initialPlace: at);
   }
 }
 
 class _ScanRoute extends ConsumerWidget {
-  const _ScanRoute({required this.id});
+  const _ScanRoute({required this.id, this.at});
 
   final int id;
+  final BookPlace? at;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -171,6 +247,6 @@ class _ScanRoute extends ConsumerWidget {
     if (book == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    return ScanReaderScreen(book: book);
+    return ScanReaderScreen(book: book, initialPage: at?.page);
   }
 }

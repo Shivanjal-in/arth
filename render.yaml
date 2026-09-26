@@ -33,3 +33,31 @@ services:
         value: "20"
       - key: RATE_LIMIT_PREFETCH
         value: "40"
+      - key: FIREBASE_PROJECT_ID
+        sync: false          # accounts: the Firebase project whose ID tokens are accepted
+      - key: CLOUDINARY_URL
+        sync: false          # profile photos: cloudinary://<api_key>:<api_secret>@<cloud_name>
+      - key: AI_FREE_LIMIT
+        value: "100"
+      - key: AI_PRO_MONTHLY
+        value: "1000"
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false          # push notifications: the service-account key JSON (or base64 of it)
+
+  # Review reminders: once a day, 18:30 IST (13:00 UTC), when readers wind down.
+  - type: cron
+    name: arth-review-reminders
+    runtime: node
+    region: singapore
+    schedule: "0 13 * * *"
+    buildCommand: cd api && npm ci
+    startCommand: cd api && npm run review-reminders
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: MONGODB_URI
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false

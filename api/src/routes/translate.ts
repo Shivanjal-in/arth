@@ -14,8 +14,9 @@ function sse(ev: TranslateEvent): string {
 }
 
 import type { LlmSpend } from './context.js';
+import { openGate, type AiGate } from '../auth/ai-gate.js';
 
-export const translateRoutes: FastifyPluginAsync<{ deps: TranslateDeps; spend: LlmSpend }> = async (app, { deps, spend }) => {
+export const translateRoutes: FastifyPluginAsync<{ deps: TranslateDeps; spend: LlmSpend; gate?: AiGate }> = async (app, { deps, spend, gate = openGate }) => {
   /**
    * Server-sent events: `hindi`, `simpleMeaning`, `difficultWords`, then `done`
    * with the full TranslationResult — or `error` with the envelope's error shape.
@@ -25,8 +26,12 @@ export const translateRoutes: FastifyPluginAsync<{ deps: TranslateDeps; spend: L
     const parsed = Body.safeParse(request.body);
     if (!parsed.success) throw new ApiError('BAD_REQUEST', messages.badRequest);
     const { text, context } = parsed.data;
+    // Before the stream opens: signed out / out of allowance is a plain JSON error.
+    const use = await gate(request, reply);
 
     reply.raw.writeHead(200, {
+      // Usage headers the gate set (writeHead bypasses Fastify's reply headers).
+      ...(reply.getHeaders() as Record<string, string>),
       'content-type': 'text/event-stream; charset=utf-8',
       'cache-control': 'no-store',
       connection: 'keep-alive',
@@ -61,6 +66,7 @@ export const translateRoutes: FastifyPluginAsync<{ deps: TranslateDeps; spend: L
         reply.raw.write(sse(ev));
       }
     } catch (err) {
+      await use?.refund();
       const e = err instanceof ApiError ? err : new ApiError('UPSTREAM_FAILED', messages.upstreamFailed, {}, { cause: err });
       if (e.status >= 500) request.log.error({ err }, 'translate failed');
       if (!abort.signal.aborted) reply.raw.write(sse({ event: 'error', data: { code: e.code, message: e.message } }));

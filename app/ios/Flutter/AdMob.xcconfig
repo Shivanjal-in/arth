@@ -1,0 +1,4 @@
+// AdMob app id for Info.plist (GADApplicationIdentifier). This is Google's
+// test app id, which serves only test ads; set your own in the gitignored
+// Firebase.xcconfig (included after this file, so it wins).
+ADMOB_APP_ID = ca-app-pub-3940256099942544~1458002511

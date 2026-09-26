@@ -1,7 +1,9 @@
+import 'package:arth/app/account_providers.dart';
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/theme.dart';
 import 'package:arth/data/api_client.dart';
 import 'package:arth/data/seed_loader.dart';
+import 'package:arth/features/account/account_card.dart';
 import 'package:arth/features/settings/settings_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,20 +30,47 @@ class SettingsScreen extends ConsumerWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text('अ', style: const HindiText(1).headline(c.accent).copyWith(fontSize: 56, height: 1)),
                 const SizedBox(width: 14),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 6),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(t.settingsTitle, style: uiTitle(hindi: t.isHindi, color: c.ink, scale: s.hindiScale)),
-                      Text(t.settingsIntro, style: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: s.hindiScale)),
+                      Text(
+                        t.settingsTitle,
+                        style: uiTitle(
+                          hindi: t.isHindi,
+                          color: c.ink,
+                          scale: s.hindiScale,
+                        ),
+                      ),
+                      Text(
+                        t.settingsIntro,
+                        style: uiBody(
+                          hindi: t.isHindi,
+                          color: c.inkMuted,
+                          scale: s.hindiScale,
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ],
             ),
+            const AccountCard(),
+            if (ref.watch(accountProvider).valueOrNull?.isAdmin ?? false)
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: ListTile(
+                  onTap: () => context.push('/admin'),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: c.rule)),
+                  tileColor: c.card,
+                  leading: Icon(Icons.admin_panel_settings_outlined, color: c.accent),
+                  title: Text(t.adminTitle, style: uiLabel(hindi: t.isHindi, color: c.ink, scale: s.hindiScale).copyWith(fontSize: 15)),
+                  subtitle: Text(t.adminOpen, style: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: s.hindiScale, size: 13)),
+                  trailing: Icon(Icons.chevron_right_rounded, color: c.inkMuted),
+                ),
+              ),
 
             SettingsHeading(t.language),
             const LanguageTiles(),
@@ -64,6 +93,11 @@ class SettingsScreen extends ConsumerWidget {
               onChanged: (v) => n.update((s) => s.copyWith(ttsEnabled: v)),
             ),
             SettingsSwitch(
+              title: t.haptics,
+              value: s.haptics,
+              onChanged: (v) => n.update((s) => s.copyWith(haptics: v)),
+            ),
+            SettingsSwitch(
               title: t.prefetch,
               subtitle: t.prefetchHelp,
               value: s.prefetch,
@@ -73,7 +107,12 @@ class SettingsScreen extends ConsumerWidget {
             SettingsHeading(t.sectionDictionary),
             Text(
               count == null ? '…' : t.wordsOnDevice(count),
-              style: uiBody(hindi: t.isHindi, color: c.ink, scale: s.hindiScale, size: 16.5),
+              style: uiBody(
+                hindi: t.isHindi,
+                color: c.ink,
+                scale: s.hindiScale,
+                size: 16.5,
+              ),
             ),
             const SizedBox(height: 12),
             if (seed.phase == SeedPhase.downloading)
@@ -91,12 +130,23 @@ class SettingsScreen extends ConsumerWidget {
                 alignment: Alignment.centerLeft,
                 child: FilledButton.icon(
                   icon: const Icon(Icons.sync_rounded, size: 18),
-                  label: Text(t.updateDictionary, style: uiLabel(hindi: t.isHindi, color: c.onAccent, scale: s.hindiScale)),
+                  label: Text(
+                    t.updateDictionary,
+                    style: uiLabel(
+                      hindi: t.isHindi,
+                      color: c.onAccent,
+                      scale: s.hindiScale,
+                    ),
+                  ),
                   onPressed: () async {
-                    final r = await ref.read(seedProvider.notifier).run(delta: count != 0);
+                    final r = await ref
+                        .read(seedProvider.notifier)
+                        .run(delta: count != 0);
                     ref.invalidate(localEntryCountProvider);
                     if (context.mounted && r.phase == SeedPhase.failed) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r.message ?? t.downloadFailed)));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(r.message ?? t.downloadFailed)),
+                      );
                     }
                   },
                 ),
@@ -112,11 +162,20 @@ class SettingsScreen extends ConsumerWidget {
                 hintText: kApiBaseUrl,
                 hintStyle: EnglishText.body(c.inkMuted, size: 16),
                 helperText: t.serverHelp,
-                helperStyle: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: s.hindiScale, size: 13),
+                helperStyle: uiBody(
+                  hindi: t.isHindi,
+                  color: c.inkMuted,
+                  scale: s.hindiScale,
+                  size: 13,
+                ),
               ),
               keyboardType: TextInputType.url,
               autocorrect: false,
-              onFieldSubmitted: (v) => n.update((s) => s.copyWith(apiBaseUrl: () => v.trim().isEmpty ? null : v.trim())),
+              onFieldSubmitted: (v) => n.update(
+                (s) => s.copyWith(
+                  apiBaseUrl: () => v.trim().isEmpty ? null : v.trim(),
+                ),
+              ),
             ),
 
             const SizedBox(height: 28),
@@ -131,9 +190,21 @@ class SettingsScreen extends ConsumerWidget {
                   child: Row(
                     children: [
                       Expanded(
-                        child: Text(t.about, style: uiBody(hindi: t.isHindi, color: c.ink, scale: s.hindiScale, size: 16.5)),
+                        child: Text(
+                          t.about,
+                          style: uiBody(
+                            hindi: t.isHindi,
+                            color: c.ink,
+                            scale: s.hindiScale,
+                            size: 16.5,
+                          ),
+                        ),
                       ),
-                      Icon(Icons.arrow_forward_rounded, color: c.accent, size: 20),
+                      Icon(
+                        Icons.arrow_forward_rounded,
+                        color: c.accent,
+                        size: 20,
+                      ),
                     ],
                   ),
                 ),

@@ -5,6 +5,8 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:arth/core/models/contracts.dart';
+import 'package:arth/data/account.dart';
+import 'package:arth/data/community.dart';
 import 'package:dio/dio.dart';
 
 /// Base URL, set at build time:
@@ -42,7 +44,18 @@ class SseEvent {
 }
 
 class ApiClient {
-  ApiClient({Dio? dio, String baseUrl = kApiBaseUrl, String? deviceId})
+  /// [idToken] supplies the signed-in user's Firebase ID token (null when
+  /// signed out); every request carries it, so the server can count and
+  /// attribute usage.
+  ///
+  /// [onUsage] hears the AI allowance each AI response reports.
+  ApiClient({
+    Dio? dio,
+    String baseUrl = kApiBaseUrl,
+    String? deviceId,
+    Future<String?> Function()? idToken,
+    void Function(Usage usage)? onUsage,
+  })
       : _dio = dio ??
             Dio(
               BaseOptions(
@@ -54,9 +67,208 @@ class ApiClient {
                   'x-device-id': ?deviceId,
                 },
               ),
-            );
+            ) {
+    if (onUsage != null) {
+      _dio.interceptors.add(
+        InterceptorsWrapper(
+          onResponse: (res, handler) {
+            final usage = Usage.fromHeaders(res.headers.value('x-ai-used'), res.headers.value('x-ai-limit'), res.headers.value('x-ai-period'));
+            if (usage != null) onUsage(usage);
+            handler.next(res);
+          },
+        ),
+      );
+    }
+    if (idToken != null) {
+      _dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) async {
+            try {
+              final token = await idToken();
+              if (token != null) options.headers['authorization'] = 'Bearer $token';
+            } on Exception {
+              // No token (offline refresh failed): send the request signed out.
+            }
+            handler.next(options);
+          },
+        ),
+      );
+    }
+  }
 
   final Dio _dio;
+
+  // ---- account ----
+
+  Future<Account> me() async {
+    try {
+      return Account.fromJson(_data(await _dio.get<Map<String, dynamic>>('/me')));
+    } on DioException catch (e) {
+      throw _failure(e);
+    }
+  }
+
+  /// Changes the profile; pass [clearPhoto] to remove the photo.
+  Future<Account> updateMe({String? displayName, String? bio, String? photoUrl, bool clearPhoto = false}) async {
+    try {
+      final res = await _dio.patch<Map<String, dynamic>>(
+        '/me',
+        data: {
+          'displayName': ?displayName,
+          'bio': ?bio,
+          if (photoUrl != null || clearPhoto) 'photoUrl': photoUrl,
+        },
+      );
+      return Account.fromJson(_data(res));
+    } on DioException catch (e) {
+      throw _failure(e);
+    }
+  }
+
+  /// Uploads a profile photo: the API signs the upload, the image goes
+  /// straight to Cloudinary. Returns the image's https URL.
+  Future<String> uploadAvatar(String filePath) async {
+    final Map<String, dynamic> ticket;
+    try {
+      ticket = _data(await _dio.post<Map<String, dynamic>>('/me/avatar'));
+    } on DioException catch (e) {
+      throw _failure(e);
+    }
+    try {
+      final res = await Dio(BaseOptions(sendTimeout: const Duration(minutes: 1), receiveTimeout: const Duration(minutes: 1))).post<Map<String, dynamic>>(
+        ticket['uploadUrl'] as String,
+        data: FormData.fromMap({
+          ...(ticket['params'] as Map<String, dynamic>),
+          'api_key': ticket['apiKey'],
+          'timestamp': ticket['timestamp'],
+          'signature': ticket['signature'],
+          'file': await MultipartFile.fromFile(filePath),
+        }),
+      );
+      final url = res.data?['secure_url'] as String?;
+      if (url == null) throw const ApiFailure('UPSTREAM_FAILED', 'तस्वीर अपलोड नहीं हो पाई।');
+      return url;
+    } on DioException catch (e) {
+      throw e.response == null ? _failure(e) : const ApiFailure('UPSTREAM_FAILED', 'तस्वीर अपलोड नहीं हो पाई।');
+    }
+  }
+
+  Future<void> registerPushToken({required String token, required String platform, required String lang}) async {
+    try {
+      _data(await _dio.post<Map<String, dynamic>>('/me/push-token', data: {'token': token, 'platform': platform, 'lang': lang}));
+    } on DioException catch (e) {
+      throw _failure(e);
+    }
+  }
+
+  Future<void> unregisterPushToken(String token) async {
+    try {
+      _data(await _dio.delete<Map<String, dynamic>>('/me/push-token', data: {'token': token}));
+    } on DioException catch (e) {
+      throw _failure(e);
+    }
+  }
+
+  /// Sends a test notification to the signed-in reader's phones.
+  Future<({int devices, int sent})> testPush() async {
+    try {
+      final d = _data(await _dio.post<Map<String, dynamic>>('/me/push-test'));
+      return (devices: d['devices'] as int, sent: d['sent'] as int);
+    } on DioException catch (e) {
+      throw _failure(e);
+    }
+  }
+
+  Future<Account> setReviewReminders({required bool on}) async {
+    try {
+      return Account.fromJson(_data(await _dio.patch<Map<String, dynamic>>('/me', data: {'reviewReminders': on})));
+    } on DioException catch (e) {
+      throw _failure(e);
+    }
+  }
+
+  // ---- community ----
+
+  Future<T> _call<T>(Future<Response<Map<String, dynamic>>> Function() request, T Function(Map<String, dynamic> data) parse) async {
+    try {
+      return parse(_data(await request()));
+    } on DioException catch (e) {
+      throw _failure(e);
+    }
+  }
+
+  Future<DeckPage> communityDecks({String sort = 'recent', String? query, int page = 0, String? owner}) => _call(
+        () => _dio.get('/community/decks', queryParameters: {'sort': sort, 'page': page, if (query != null && query.trim().isNotEmpty) 'q': query.trim(), 'owner': ?owner}),
+        (d) => DeckPage(
+          decks: [for (final x in d['decks'] as List<dynamic>) PublishedDeckSummary.fromJson(x as Map<String, dynamic>)],
+          more: (d['more'] as bool?) ?? false,
+          canPublish: (d['canPublish'] as bool?) ?? false,
+        ),
+      );
+
+  Future<PublishedDeck> communityDeck(String id) => _call(() => _dio.get('/community/decks/$id'), PublishedDeck.fromJson);
+
+  Future<String> publishDeck({required String bookTitle, required List<DeckCard> cards, String title = '', String blurb = '', String? bookKey}) => _call(
+        () => _dio.post(
+          '/community/decks',
+          data: {'title': title, 'bookTitle': bookTitle, 'bookKey': bookKey, 'blurb': blurb, 'cards': [for (final c in cards) c.toJson()]},
+        ),
+        (d) => d['id'] as String,
+      );
+
+  Future<void> updatePublishedDeck(String id, {String? title, String? blurb, List<DeckCard>? cards}) => _call(
+        () => _dio.patch('/community/decks/$id', data: {'title': ?title, 'blurb': ?blurb, if (cards != null) 'cards': [for (final c in cards) c.toJson()]}),
+        (_) {},
+      );
+
+  Future<void> deletePublishedDeck(String id) => _call(() => _dio.delete('/community/decks/$id'), (_) {});
+
+  Future<({bool liked, int likes})> toggleLike(String deckId) =>
+      _call(() => _dio.post('/community/decks/$deckId/like'), (d) => (liked: d['liked'] as bool, likes: d['likes'] as int));
+
+  Future<int> markSaved(String deckId) => _call(() => _dio.post('/community/decks/$deckId/save'), (d) => d['saves'] as int);
+
+  Future<CommunityComment> addComment(String deckId, String text, {String? parentId}) =>
+      _call(() => _dio.post('/community/decks/$deckId/comments', data: {'text': text, 'parentId': parentId}), CommunityComment.fromJson);
+
+  Future<void> deleteComment(String id) => _call(() => _dio.delete('/community/comments/$id'), (_) {});
+
+  /// Returns whether the item is now hidden for review.
+  Future<bool> report({required String kind, required String targetId, String reason = ''}) =>
+      _call(() => _dio.post('/community/reports', data: {'kind': kind, 'targetId': targetId, 'reason': reason}), (d) => (d['hidden'] as bool?) ?? false);
+
+  // ---- admin ----
+
+  Future<List<AdminReportItem>> adminReports() =>
+      _call(() => _dio.get('/admin/reports'), (d) => [for (final x in d['items'] as List<dynamic>) AdminReportItem.fromJson(x as Map<String, dynamic>)]);
+
+  Future<void> moderate({required String kind, required String targetId, required bool remove}) =>
+      _call(() => _dio.post('/admin/moderate', data: {'kind': kind, 'targetId': targetId, 'action': remove ? 'remove' : 'dismiss'}), (_) {});
+
+  Future<List<AdminUser>> adminUsers(String query) =>
+      _call(() => _dio.get('/admin/users', queryParameters: {'q': query}), (d) => [for (final x in d['users'] as List<dynamic>) AdminUser.fromJson(x as Map<String, dynamic>)]);
+
+  Future<AdminUser> adminUpdateUser(String uid, {String? tier, bool? banned}) =>
+      _call(() => _dio.patch('/admin/users/$uid', data: {'tier': ?tier, 'banned': ?banned}), AdminUser.fromJson);
+
+  Future<({int readers, int sent})> broadcast({required String title, required String body, String? tier}) => _call(
+        () => _dio.post('/admin/broadcast', data: {'title': title, 'body': body, 'tier': ?tier}),
+        (d) => (readers: d['readers'] as int, sent: d['sent'] as int),
+      );
+
+  /// One sync round: send local changes, get the server's since [cursor].
+  Future<SyncPage> sync({required int cursor, required List<Map<String, Object?>> cards, required List<Map<String, Object?>> bookmarks}) async {
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/sync',
+        data: {'cursor': cursor, 'cards': cards, 'bookmarks': bookmarks},
+        options: Options(receiveTimeout: const Duration(seconds: 60)),
+      );
+      return SyncPage.fromJson(_data(res));
+    } on DioException catch (e) {
+      throw _failure(e);
+    }
+  }
 
   /// Entry, or null with the server's suggestions (morphological bases the
   /// reader can open) on a miss. Throws [ApiFailure] for anything else.
@@ -202,6 +414,10 @@ class ApiClient {
           'और अर्थ देखने के लिए इंटरनेट चाहिए।',
         );
       case DioExceptionType.badResponse:
+        if (e.response?.statusCode == 401) return const ApiFailure('UNAUTHORIZED', 'इसके लिए साइन इन करें।');
+        if (e.response?.statusCode == 402) return const ApiFailure('QUOTA_EXCEEDED', 'आपके AI उपयोग खत्म हो गए हैं।');
+        if (e.response?.statusCode == 403) return const ApiFailure('FORBIDDEN', 'इसकी अनुमति नहीं है।');
+        if (e.response?.statusCode == 404) return const ApiFailure('NOT_FOUND', 'यह अब उपलब्ध नहीं है।');
         if (e.response?.statusCode == 429) {
           return const ApiFailure(
             'RATE_LIMITED',

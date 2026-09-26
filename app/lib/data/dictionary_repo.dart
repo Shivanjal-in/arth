@@ -35,6 +35,7 @@ class LookupMissing extends LookupOutcome {
     required this.word,
     required this.suggestions,
     required this.offline,
+    this.blockedCode,
   });
 
   final String word;
@@ -43,6 +44,10 @@ class LookupMissing extends LookupOutcome {
   /// True when the API could not be reached, so the miss may just be
   /// "not in the top 20k" rather than "not a word".
   final bool offline;
+
+  /// `UNAUTHORIZED` / `QUOTA_EXCEEDED`: the word exists but its entry would
+  /// have to be written by AI, which needs sign-in or allowance.
+  final String? blockedCode;
 }
 
 class _LocalSource implements LemmaSource {
@@ -109,6 +114,7 @@ class DictionaryRepo {
 
     // 3. API: phrase first, then word (which may be generated on demand).
     var offline = false;
+    String? blocked;
     var serverSuggestions = const <String>[];
     try {
       if (windows.isNotEmpty) {
@@ -136,12 +142,14 @@ class DictionaryRepo {
       serverSuggestions = r.suggestions;
     } on ApiFailure catch (e) {
       offline = e.isOffline;
+      if (e.code == 'UNAUTHORIZED' || e.code == 'QUOTA_EXCEEDED') blocked = e.code;
     }
 
     return LookupMissing(
       word: key,
       suggestions: _merge(serverSuggestions, await suggestions(key)),
       offline: offline,
+      blockedCode: blocked,
     );
   }
 
@@ -167,6 +175,7 @@ class DictionaryRepo {
       );
     }
     var offline = false;
+    String? blocked;
     var serverSuggestions = const <String>[];
     try {
       final r = await api.lookup(key);
@@ -180,11 +189,13 @@ class DictionaryRepo {
       serverSuggestions = r.suggestions;
     } on ApiFailure catch (e) {
       offline = e.isOffline;
+      if (e.code == 'UNAUTHORIZED' || e.code == 'QUOTA_EXCEEDED') blocked = e.code;
     }
     return LookupMissing(
       word: key,
       suggestions: _merge(serverSuggestions, await suggestions(key)),
       offline: offline,
+      blockedCode: blocked,
     );
   }
 

@@ -22,8 +22,12 @@ class _SeedScreenState extends ConsumerState<SeedScreen> {
   }
 
   Future<void> _start() async {
-    final r = await ref.read(seedProvider.notifier).run(delta: false);
-    ref.invalidate(localEntryCountProvider);
+    // Keep the notifier: the reader may leave this screen (Skip) before the
+    // download finishes, and `ref` is unusable once it's gone.
+    final seed = ref.read(seedProvider.notifier);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final r = await seed.run(delta: false);
+    container.invalidate(localEntryCountProvider);
     if (mounted && r.phase == SeedPhase.done) context.go('/');
   }
 
@@ -79,6 +83,17 @@ class _SeedScreenState extends ConsumerState<SeedScreen> {
                       child: Text(t.skipForNow, style: uiLabel(hindi: t.isHindi, color: c.inkMuted, scale: scale)),
                     ),
                   ],
+                ),
+              ] else if (p.phase != SeedPhase.done) ...[
+                // The download lives in seedProvider, not this screen, so it
+                // keeps going after the reader moves on.
+                const SizedBox(height: 28),
+                Text(t.seedKeepsGoing, style: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: scale, size: 14)),
+                const SizedBox(height: 8),
+                TextButton(
+                  style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                  onPressed: () => context.go('/'),
+                  child: Text(t.skipForNow, style: uiLabel(hindi: t.isHindi, color: c.accent, scale: scale)),
                 ),
               ],
             ],

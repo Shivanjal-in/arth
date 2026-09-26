@@ -27,6 +27,18 @@ const EnvSchema = z.object({
   RATE_LIMIT_LLM: z.coerce.number().int().default(20),
   /** Background prefetch (X-Prefetch: 1) has its own bucket so it never starves taps. */
   RATE_LIMIT_PREFETCH: z.coerce.number().int().default(40),
+
+  // --- accounts ---
+  /** Firebase project whose ID tokens we accept. Unset: account routes answer 503. */
+  FIREBASE_PROJECT_ID: z.string().default(''),
+  /** cloudinary://<api_key>:<api_secret>@<cloud_name>. Unset: avatar uploads answer 503. */
+  CLOUDINARY_URL: z.string().default(''),
+  /** Service-account key (JSON, or base64 of it), for sending notifications. Unset: none are sent. */
+  FIREBASE_SERVICE_ACCOUNT: z.string().default(''),
+
+  // --- AI allowances (enforced only when accounts are on) ---
+  AI_FREE_LIMIT: z.coerce.number().int().positive().default(100),
+  AI_PRO_MONTHLY: z.coerce.number().int().positive().default(1000),
 });
 
 export type Config = z.infer<typeof EnvSchema>;

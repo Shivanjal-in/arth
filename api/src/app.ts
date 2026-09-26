@@ -2,6 +2,14 @@ import Fastify, { LogController, type FastifyInstance, type FastifyRequest } fro
 import { ApiError, messages } from './lib/errors.js';
 import { fail } from './lib/envelope.js';
 import { schemas } from './contracts.js';
+import { accountRoutes, type AccountDeps } from './routes/account.js';
+import { disabledVerifier } from './auth/verifier.js';
+import { memoryAccountStore } from './services/accounts.js';
+import { memoryCommunityStore, type CommunityStore } from './services/community.js';
+import { communityRoutes } from './routes/community.js';
+import { adminRoutes } from './routes/admin.js';
+import { aiGate, openGate } from './auth/ai-gate.js';
+import { defaultLimits, type Limits } from './services/quota.js';
 import { contextRoutes } from './routes/context.js';
 import { healthRoutes } from './routes/health.js';
 import { lookupRoutes } from './routes/lookup.js';
@@ -40,6 +48,13 @@ export type AppOptions = {
   cache: CacheStore;
   llm: LLMProvider;
   rateLimits?: { lookups: number; llm: number; prefetch: number };
+  /** Sign-in, profile and sync. Omitted: those routes answer 503. */
+  accounts?: AccountDeps;
+  /** Require sign-in and count AI uses against the tier's allowance. */
+  enforceQuota?: boolean;
+  /** Published decks, comments, reports. In memory when omitted (tests). */
+  community?: CommunityStore;
+  limits?: Limits;
   config: Pick<
     Config,
     | 'CONTEXT_MODE'
@@ -133,6 +148,8 @@ export function buildApp(opts: AppOptions): FastifyInstance {
       // (see services): cache hits and single-sense bypasses are free.
       // Interactive taps and background prefetch have separate budgets, so a
       // reader flipping pages never finds their own tap refused.
+      const limitsAi = opts.limits ?? defaultLimits;
+      const gate = opts.enforceQuota && opts.accounts ? aiGate(opts.accounts, limitsAi) : openGate;
       const interactive = new LlmBudget(limits.llm);
       const prefetch = new LlmBudget(limits.prefetch);
       const spend = (req: { headers: Record<string, unknown>; ip: string }) => {
@@ -145,6 +162,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
         await dbRoutes.register(lookupRoutes, {
           store: opts.store,
           ondemand: { config: opts.config, llm: opts.llm, log, spend },
+          gate,
         });
         await dbRoutes.register(phraseRoutes, { store: opts.store });
       });
@@ -152,10 +170,20 @@ export function buildApp(opts: AppOptions): FastifyInstance {
       await v1.register(contextRoutes, {
         deps: { config: opts.config, llm: opts.llm, cache: opts.cache, store: opts.store, log },
         spend,
+        gate,
       });
       await v1.register(translateRoutes, {
         deps: { config: opts.config, llm: opts.llm, cache: opts.cache, log },
         spend,
+        gate,
+      });
+      await v1.register(async (accountScope) => {
+        accountScope.addHook('onRequest', accountScope.rateLimit(limited(limits.lookups, messages.rateLimited, deviceKey)));
+        const accounts = opts.accounts ?? { store: memoryAccountStore(), verifier: disabledVerifier, cloudinary: null };
+        await accountScope.register(accountRoutes, { ...accounts, limits: limitsAi });
+        const community = opts.community ?? memoryCommunityStore();
+        await accountScope.register(communityRoutes, { ...accounts, community });
+        await accountScope.register(adminRoutes, { ...accounts, community, limits: limitsAi });
       });
     },
     { prefix: '/v1' },

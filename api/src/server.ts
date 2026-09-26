@@ -4,8 +4,16 @@ import { connectMongo, disconnectMongo } from './db/connect.js';
 import { mongoStore } from './services/mongo-store.js';
 import { mongoCache, withMemory } from './cache/cache.js';
 import { OpenAIProvider } from './llm/openai.js';
+import { disabledVerifier, firebaseVerifier } from './auth/verifier.js';
+import { firebaseApp, parseServiceAccount } from './auth/firebase-app.js';
+import { disabledPusher, fcmPusher } from './push/pusher.js';
+import { parseCloudinaryUrl } from './lib/cloudinary.js';
+import { mongoAccountStore } from './services/mongo-accounts.js';
+import { mongoCommunityStore } from './services/mongo-community.js';
 
 const config = loadConfig();
+const serviceAccount = parseServiceAccount(config.FIREBASE_SERVICE_ACCOUNT);
+const fbApp = config.FIREBASE_PROJECT_ID ? firebaseApp(config.FIREBASE_PROJECT_ID, serviceAccount) : null;
 const app = buildApp({
   logLevel: config.LOG_LEVEL,
   store: mongoStore,
@@ -13,6 +21,16 @@ const app = buildApp({
   llm: new OpenAIProvider(config.OPENAI_API_KEY),
   config,
   rateLimits: { lookups: config.RATE_LIMIT_LOOKUPS, llm: config.RATE_LIMIT_LLM, prefetch: config.RATE_LIMIT_PREFETCH },
+  accounts: {
+    store: mongoAccountStore,
+    verifier: fbApp ? firebaseVerifier(fbApp) : disabledVerifier,
+    pusher: fbApp && serviceAccount ? fcmPusher(fbApp) : disabledPusher,
+    cloudinary: parseCloudinaryUrl(config.CLOUDINARY_URL),
+  },
+  // Without a Firebase project nobody can sign in, so AI stays open.
+  enforceQuota: config.FIREBASE_PROJECT_ID !== '',
+  community: mongoCommunityStore,
+  limits: { free: config.AI_FREE_LIMIT, proMonthly: config.AI_PRO_MONTHLY },
 });
 
 try {

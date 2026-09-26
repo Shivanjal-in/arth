@@ -4,11 +4,14 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:arth/app/account_providers.dart';
+import 'package:arth/app/feel.dart';
 import 'package:arth/app/providers.dart';
 import 'package:arth/core/models/contracts.dart';
 import 'package:arth/core/text/page_text_index.dart';
 import 'package:arth/data/api_client.dart';
 import 'package:arth/data/dictionary_repo.dart';
+import 'package:arth/data/local_store.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 sealed class ReaderTooltip {
@@ -30,6 +33,7 @@ class WordTooltipState extends ReaderTooltip {
     this.context,
     this.contextLoading = false,
     this.contextError,
+    this.contextErrorCode,
     this.highlight,
   });
 
@@ -44,6 +48,10 @@ class WordTooltipState extends ReaderTooltip {
   final bool contextLoading;
   final String? contextError;
 
+  /// The API's code when /context failed; `UNAUTHORIZED` or
+  /// `QUOTA_EXCEEDED` turn the in-context block into a prompt.
+  final String? contextErrorCode;
+
   /// Word rects to highlight (the phrase, when one matched).
   final List<Rect>? highlight;
 
@@ -54,6 +62,7 @@ class WordTooltipState extends ReaderTooltip {
     ContextResult? context,
     bool? contextLoading,
     String? contextError,
+    String? contextErrorCode,
     List<Rect>? highlight,
     Rect? anchor,
   }) =>
@@ -67,6 +76,7 @@ class WordTooltipState extends ReaderTooltip {
         context: context ?? this.context,
         contextLoading: contextLoading ?? this.contextLoading,
         contextError: contextError ?? this.contextError,
+        contextErrorCode: contextErrorCode ?? this.contextErrorCode,
         highlight: highlight ?? this.highlight,
       );
 }
@@ -114,6 +124,23 @@ class SentenceTooltipState extends ReaderTooltip {
       );
 }
 
+/// The highlighter's colour bar, over a selected run of words or an existing
+/// highlight.
+class HighlightBarState extends ReaderTooltip {
+  const HighlightBarState({
+    required super.anchor,
+    required super.page,
+    required this.text,
+    this.existing,
+  });
+
+  /// The selected text (for the translate action).
+  final String text;
+
+  /// The highlight being edited, or null for a new selection.
+  final Highlight? existing;
+}
+
 final AutoDisposeNotifierProvider<ReaderController, ReaderTooltip?> readerControllerProvider =
     NotifierProvider.autoDispose<ReaderController, ReaderTooltip?>(ReaderController.new);
 
@@ -148,6 +175,7 @@ class ReaderController extends AutoDisposeNotifier<ReaderTooltip?> {
   }) async {
     final gen = ++_generation;
     unawaited(_translation?.cancel());
+    Haptics.open();
     state = WordTooltipState(
       anchor: word.rect,
       page: page,
@@ -173,6 +201,12 @@ class ReaderController extends AutoDisposeNotifier<ReaderTooltip?> {
       // Step 4: context, in parallel with showing the entry. Single-sense
       // entries have nothing to disambiguate.
       if (outcome.entry.senses.length > 1) {
+        // Signed out or out of allowance: say so rather than ask the server.
+        final blocked = _blockedCode();
+        if (blocked != null) {
+          state = s.copyWith(contextErrorCode: blocked);
+          return;
+        }
         s = s.copyWith(contextLoading: true);
         state = s;
         unawaited(_resolveContext(gen, outcome.lemma, sentence));
@@ -192,12 +226,40 @@ class ReaderController extends AutoDisposeNotifier<ReaderTooltip?> {
       }
     } on ApiFailure catch (e) {
       // Step 5: the dictionary entry stays; never replace a meaning with an error.
+      _onAiFailure(e);
       if (gen != _generation) return;
       final s = state;
       if (s is WordTooltipState) {
-        state = s.copyWith(contextLoading: false, contextError: e.message);
+        state = s.copyWith(contextLoading: false, contextError: e.message, contextErrorCode: e.code);
       }
     }
+  }
+
+  /// `UNAUTHORIZED` / `QUOTA_EXCEEDED` when AI answers aren't available to
+  /// this reader right now; null when they are.
+  String? _blockedCode() => switch (ref.read(aiAccessProvider)) {
+        AiAccess.signedOut => 'UNAUTHORIZED',
+        AiAccess.exhausted => 'QUOTA_EXCEEDED',
+        AiAccess.open || AiAccess.allowed => null,
+      };
+
+  /// The server says the allowance ran out (another device used it, say):
+  /// refetch the account so every screen shows the real count.
+  void _onAiFailure(ApiFailure e) {
+    if (e.code == 'QUOTA_EXCEEDED') ref.invalidate(accountProvider);
+  }
+
+  /// A run of words was selected (or an existing highlight long-pressed).
+  void showHighlightBar({
+    required Rect anchor,
+    required int page,
+    required String text,
+    Highlight? existing,
+  }) {
+    _generation++;
+    unawaited(_translation?.cancel());
+    Haptics.choose();
+    state = HighlightBarState(anchor: anchor, page: page, text: text, existing: existing);
   }
 
   /// Selection → translation, streamed.
@@ -209,6 +271,11 @@ class ReaderController extends AutoDisposeNotifier<ReaderTooltip?> {
   }) {
     final gen = ++_generation;
     unawaited(_translation?.cancel());
+    final blocked = _blockedCode();
+    if (blocked != null) {
+      state = SentenceTooltipState(anchor: anchor, page: page, text: text, error: '', errorCode: blocked, done: true);
+      return;
+    }
     state = SentenceTooltipState(anchor: anchor, page: page, text: text);
     _translation = _repo.translate(text: text, context: context).listen(
       (ev) {
@@ -244,6 +311,7 @@ class ReaderController extends AutoDisposeNotifier<ReaderTooltip?> {
         }
       },
       onError: (Object e) {
+        if (e is ApiFailure) _onAiFailure(e);
         if (gen != _generation) return;
         final s = state;
         if (s is! SentenceTooltipState) return;

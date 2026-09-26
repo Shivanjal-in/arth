@@ -4,6 +4,7 @@
 // of small page thumbnails; the segmented pill is ink-on-paper rather than the
 // Material default; Hindi size shows a live sample line.
 
+import 'package:arth/app/feel.dart';
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/settings.dart';
 import 'package:arth/app/strings.dart';
@@ -109,7 +110,10 @@ class _LanguageTile extends StatelessWidget {
       color: selected ? c.accent : c.card,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
-        onTap: onTap,
+        onTap: () {
+          Haptics.choose();
+          onTap();
+        },
         borderRadius: BorderRadius.circular(14),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
@@ -178,7 +182,10 @@ class _PageThumb extends ConsumerWidget {
     final t = ref.watch(stringsProvider);
     final scale = ref.watch(settingsProvider).hindiScale;
     return InkWell(
-      onTap: onTap,
+      onTap: () {
+        Haptics.choose();
+        onTap();
+      },
       borderRadius: BorderRadius.circular(12),
       child: Column(
         children: [
@@ -307,7 +314,10 @@ class InkSegmented<T> extends StatelessWidget {
           for (final (value, child) in options)
             Expanded(
               child: GestureDetector(
-                onTap: () => onChanged(value),
+                onTap: () {
+                  Haptics.choose();
+                  onChanged(value);
+                },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 160),
                   height: 40,
@@ -418,7 +428,10 @@ class SettingsSwitch extends ConsumerWidget {
     final s = ref.watch(settingsProvider);
     final t = ref.watch(stringsProvider);
     return InkWell(
-      onTap: () => onChanged(!value),
+      onTap: () {
+        Haptics.choose();
+        onChanged(!value);
+      },
       borderRadius: BorderRadius.circular(8),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
@@ -441,7 +454,13 @@ class SettingsSwitch extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: 16),
-            Switch(value: value, onChanged: onChanged),
+            Switch(
+              value: value,
+              onChanged: (v) {
+                Haptics.choose();
+                onChanged(v);
+              },
+            ),
           ],
         ),
       ),

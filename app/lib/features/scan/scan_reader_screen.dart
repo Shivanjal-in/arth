@@ -12,24 +12,32 @@ import 'package:arth/core/normalize.dart';
 import 'package:arth/core/text/page_text_index.dart';
 import 'package:arth/data/dictionary_repo.dart';
 import 'package:arth/data/local_store.dart';
+import 'package:arth/features/ads/interstitials.dart';
+import 'package:arth/features/cards/card_editor.dart';
+import 'package:arth/features/cards/deck_screen.dart';
 import 'package:arth/features/reader/details_sheet.dart';
 import 'package:arth/features/reader/reader_controller.dart';
+import 'package:arth/features/reader/reader_menu.dart';
 import 'package:arth/features/reader/tooltip/tooltip_layer.dart';
 import 'package:arth/features/scan/scan_pages.dart';
 import 'package:arth/features/settings/reading_settings_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 class ScanReaderScreen extends ConsumerStatefulWidget {
-  const ScanReaderScreen({required this.book, super.key});
+  const ScanReaderScreen({required this.book, super.key, this.initialPage});
 
   final Book book;
+
+  /// Open at this page (1-based) instead of where the reader left off.
+  final int? initialPage;
 
   @override
   ConsumerState<ScanReaderScreen> createState() => _ScanReaderScreenState();
 }
 
-class _ScanReaderScreenState extends ConsumerState<ScanReaderScreen> {
+class _ScanReaderScreenState extends ConsumerState<ScanReaderScreen> with AdBreakOnClose {
   late List<String> _pages;
   late final PageController _pager;
   int _current = 0;
@@ -38,7 +46,7 @@ class _ScanReaderScreenState extends ConsumerState<ScanReaderScreen> {
   void initState() {
     super.initState();
     _pages = ref.read(scanPagesProvider).pagesOf(widget.book);
-    _current = (widget.book.lastPage - 1).clamp(0, _pages.isEmpty ? 0 : _pages.length - 1);
+    _current = ((widget.initialPage ?? widget.book.lastPage) - 1).clamp(0, _pages.isEmpty ? 0 : _pages.length - 1);
     _pager = PageController(initialPage: _current);
   }
 
@@ -86,6 +94,10 @@ class _ScanReaderScreenState extends ConsumerState<ScanReaderScreen> {
             tooltip: t.readingSettings,
             onPressed: () => showReadingSettingsSheet(context),
           ),
+          ReaderMoreMenu(
+            onNote: () => unawaited(makeScanCard(context, ref, widget.book, _current + 1, const CardDraft(kind: CardKind.idea))),
+            onCards: () => context.push(deckRoute((bookId: widget.book.id, bookTitle: widget.book.title))),
+          ),
         ],
       ),
       body: _pages.isEmpty
@@ -96,7 +108,9 @@ class _ScanReaderScreenState extends ConsumerState<ScanReaderScreen> {
               onPageChanged: (i) {
                 setState(() => _current = i);
                 ref.read(readerControllerProvider.notifier).dismiss();
-                unawaited(ref.read(libraryProvider.notifier).touch(widget.book.id, lastPage: i + 1));
+                // A scan is a few photographed pages, not a book to finish:
+                // record progress, but no end-of-book recap.
+                unawaited(ref.read(libraryProvider.notifier).reportProgress(widget.book.id, (i + 1) / _pages.length, lastPage: i + 1));
               },
               itemBuilder: (_, i) => _ScanPage(
                 key: ValueKey(_pages[i]),
@@ -351,11 +365,27 @@ class _ScanPageState extends ConsumerState<_ScanPage> {
                 onShowDetails: _showDetails,
                 onSuggestion: _lookupTyped,
                 onTranslateSentence: _translateSentence,
+                onMakeCard: (d) {
+                  ref.read(readerControllerProvider.notifier).dismiss();
+                  unawaited(makeScanCard(context, ref, widget.book, widget.pageNumber, d));
+                },
               ),
             ),
           ],
         );
       },
     );
+  }
+}
+
+/// Opens the card editor for a draft made on page [page] of a scan.
+Future<void> makeScanCard(BuildContext context, WidgetRef ref, Book book, int page, CardDraft draft) async {
+  final t = ref.read(stringsProvider);
+  final saved = await showCardEditor(
+    context,
+    draft: draft.at(bookId: book.id, bookTitle: book.title, page: page, location: t.pageLabel(page)),
+  );
+  if (saved != null && context.mounted) {
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(t.cardSaved), duration: const Duration(seconds: 1)));
   }
 }

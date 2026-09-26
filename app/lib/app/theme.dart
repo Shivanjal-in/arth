@@ -208,6 +208,14 @@ ThemeData arthTheme(Brightness brightness) {
   );
   return base.copyWith(
     extensions: [c],
+    // Android: pages fade in while rising a few pixels, a quieter arrival
+    // than the default zoom. iOS keeps its own slide and swipe-back.
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: _RisePageTransitionsBuilder(),
+        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+      },
+    ),
     textTheme: GoogleFonts.literataTextTheme(base.textTheme).apply(
       bodyColor: c.ink,
       displayColor: c.ink,
@@ -306,3 +314,32 @@ const List<Color> kCoverInks = [
   Color(0xFF5B4A7A),
   Color(0xFF8A6A1F),
 ];
+
+class _RisePageTransitionsBuilder extends PageTransitionsBuilder {
+  const _RisePageTransitionsBuilder();
+
+  static const Curve _arrive = Cubic(0.05, 0.7, 0.1, 1);
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final incoming = CurvedAnimation(parent: animation, curve: _arrive, reverseCurve: Curves.easeInCubic);
+    // The page underneath dims slightly as the new one arrives over it.
+    final outgoing = CurvedAnimation(parent: secondaryAnimation, curve: Curves.easeOutCubic);
+    return FadeTransition(
+      opacity: Tween<double>(begin: 1, end: 0.92).animate(outgoing),
+      child: FadeTransition(
+        opacity: incoming,
+        child: SlideTransition(
+          position: Tween(begin: const Offset(0, 0.035), end: Offset.zero).animate(incoming),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
