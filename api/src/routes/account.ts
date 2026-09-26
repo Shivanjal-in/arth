@@ -5,6 +5,7 @@ import { ok } from '../lib/envelope.js';
 import { ApiError, messages } from '../lib/errors.js';
 import { signIn, sync, updateProfile, type AccountStore, type ProfilePatch, type SyncRequest, type User } from '../services/accounts.js';
 import { defaultLimits, usageOf, type Limits } from '../services/quota.js';
+import { deviceIdOf, withPhone } from '../auth/device.js';
 import { disabledPusher, type Pusher } from '../push/pusher.js';
 import { notifyUser, testMessage } from '../push/notify.js';
 
@@ -86,9 +87,9 @@ const cardDefaults = { context: null, bookKey: null, bookTitle: null, page: null
 const bookmarkDefaults = { bookKey: null, bookTitle: null, block: null, label: null, excerpt: null, deletedAt: null };
 
 /** The user as the app sees them: profile, tier, and AI usage. */
-const view = (user: User, limits: Limits) => {
+const view = (user: User, limits: Limits, phoneUsed = 0) => {
   const { aiTotal: _t, aiMonth: _m, aiMonthUses: _u, lastReviewNudgeAt: _r, lowAiNoticeFor: _l, ...profile } = user;
-  return { ...profile, usage: usageOf(user, limits) };
+  return { ...profile, usage: withPhone(usageOf(user, limits), user.role === 'admin' ? 0 : phoneUsed) };
 };
 
 export const accountRoutes: FastifyPluginAsync<AccountDeps & { limits?: Limits }> = async (app, { limits = defaultLimits, ...deps }) => {
@@ -97,7 +98,10 @@ export const accountRoutes: FastifyPluginAsync<AccountDeps & { limits?: Limits }
     req.user = await authenticate(req, deps);
   });
 
-  app.get('/me', async (req) => ok(view(req.user!, limits)));
+  app.get('/me', async (req) => {
+    const device = deviceIdOf(req);
+    return ok(view(req.user!, limits, device ? await deps.store.deviceAiUsed(device) : 0));
+  });
 
   app.patch<{ Body: ProfilePatch }>(
     '/me',

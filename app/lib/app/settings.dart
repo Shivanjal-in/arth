@@ -1,12 +1,17 @@
 // Reading settings, persisted in the kv table.
 
 import 'package:arth/app/strings.dart';
+import 'package:arth/data/card_reminders.dart';
 import 'package:arth/data/local_store.dart';
 import 'package:flutter/material.dart';
 
 enum TooltipDetail { compact, detailed }
 
 enum HindiSize { small, medium, large }
+
+/// The typeface of a card's own words (the interface stays Montserrat).
+/// Travels with what's shared: the PDF export, and published recaps.
+enum CardFont { montserrat, quintessential, bricolage }
 
 class Settings {
   const Settings({
@@ -18,6 +23,9 @@ class Settings {
     this.haptics = true,
     this.language = UiLanguage.en,
     this.apiBaseUrl,
+    this.cardReminders = true,
+    this.reminderHours = defaultReminderHours,
+    this.cardFont = CardFont.montserrat,
   });
 
   final ThemeMode themeMode;
@@ -38,6 +46,14 @@ class Settings {
   /// phone without rebuilding with --dart-define.
   final String? apiBaseUrl;
 
+  /// Remind the reader to review new cards (see card_reminders.dart).
+  final bool cardReminders;
+
+  /// Hours after a card is made to remind, ascending.
+  final List<int> reminderHours;
+
+  final CardFont cardFont;
+
   double get hindiScale => switch (hindiSize) {
         HindiSize.small => 0.9,
         HindiSize.medium => 1.0,
@@ -53,6 +69,9 @@ class Settings {
     bool? haptics,
     UiLanguage? language,
     String? Function()? apiBaseUrl,
+    bool? cardReminders,
+    List<int>? reminderHours,
+    CardFont? cardFont,
   }) =>
       Settings(
         themeMode: themeMode ?? this.themeMode,
@@ -63,6 +82,9 @@ class Settings {
         haptics: haptics ?? this.haptics,
         language: language ?? this.language,
         apiBaseUrl: apiBaseUrl == null ? this.apiBaseUrl : apiBaseUrl(),
+        cardReminders: cardReminders ?? this.cardReminders,
+        reminderHours: reminderHours ?? this.reminderHours,
+        cardFont: cardFont ?? this.cardFont,
       );
 
   static Future<Settings> load(LocalStore store) async => Settings(
@@ -76,7 +98,15 @@ class Settings {
         haptics: (await store.get('haptics') ?? 'true') == 'true',
         language: UiLanguage.values.byName(await store.get('language') ?? 'en'),
         apiBaseUrl: await store.get('api_base_url'),
+        cardReminders: (await store.get('card_reminders') ?? 'true') == 'true',
+        reminderHours: _hours(await store.get('reminder_hours')),
+        cardFont: CardFont.values.asNameMap()[await store.get('card_font')] ?? CardFont.montserrat,
       );
+
+  static List<int> _hours(String? stored) {
+    final hours = [for (final h in (stored ?? '').split(',')) ?int.tryParse(h)];
+    return hours.isEmpty ? defaultReminderHours : (hours..sort());
+  }
 
   Future<void> save(LocalStore store) async {
     await store.set('theme', themeMode.name);
@@ -87,5 +117,8 @@ class Settings {
     await store.set('haptics', haptics.toString());
     await store.set('language', language.name);
     await store.set('api_base_url', apiBaseUrl);
+    await store.set('card_reminders', cardReminders.toString());
+    await store.set('reminder_hours', reminderHours.join(','));
+    await store.set('card_font', cardFont.name);
   }
 }

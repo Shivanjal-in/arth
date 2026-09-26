@@ -15,7 +15,7 @@ const verifier: TokenVerifier = {
     return { uid: token.slice(2) };
   },
 };
-const as = (uid: string) => ({ authorization: `Bearer t:${uid}` });
+const as = (uid: string) => ({ authorization: `Bearer t:${uid}`, 'x-device-id': `phone-${uid}` });
 const tok = (s: string) => `fcm-token-${s}-${'x'.repeat(20)}`;
 
 function setup() {

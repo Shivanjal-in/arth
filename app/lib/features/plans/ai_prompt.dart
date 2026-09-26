@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:arth/app/account_providers.dart';
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/theme.dart';
+import 'package:arth/data/api_client.dart';
 import 'package:arth/features/reader/reader_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,7 +15,7 @@ import 'package:go_router/go_router.dart';
 /// Which AI feature is asking, for the sign-in wording.
 enum AiFeature { context, translate, rareWord }
 
-bool isAiBlock(String? code) => code == 'UNAUTHORIZED' || code == 'QUOTA_EXCEEDED';
+bool isAiBlock(String? code) => aiBlockCodes.contains(code);
 
 class AiPrompt extends ConsumerWidget {
   const AiPrompt({required this.code, required this.feature, super.key});
@@ -37,9 +38,11 @@ class AiPrompt extends ConsumerWidget {
             AiFeature.translate => t.aiSignInTranslate,
             AiFeature.rareWord => t.aiSignInRareWord,
           }
-        : resets != null
-            ? t.aiQuotaResets('${resets.day}/${resets.month}')
-            : t.aiQuotaUsed;
+        : code == 'QUOTA_PHONE'
+            ? t.aiQuotaPhone
+            : resets != null
+                ? t.aiQuotaResets('${resets.day}/${resets.month}')
+                : t.aiQuotaUsed;
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(top: 10),

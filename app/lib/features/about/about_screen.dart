@@ -69,7 +69,7 @@ class AboutScreen extends ConsumerWidget {
           const SizedBox(height: 12),
           Text(
             'Word frequencies from wordfreq by Robyn Speer (MIT License). '
-            'PDF rendering by pdfrx / PDFium. Fonts: Literata, Mukta and Noto Sans Devanagari (SIL Open Font License).',
+            'PDF rendering by pdfrx / PDFium. Fonts: Montserrat, Literata, Mukta, Noto Sans Devanagari, Quintessential and Bricolage Grotesque (SIL Open Font License).',
             style: EnglishText.body(c.ink),
           ),
           const SizedBox(height: 36),

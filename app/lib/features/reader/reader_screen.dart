@@ -28,6 +28,8 @@ import 'package:arth/features/cards/card_editor.dart';
 import 'package:arth/features/cards/deck_screen.dart';
 import 'package:arth/features/reader/bookmarks_sheet.dart';
 import 'package:arth/features/reader/details_sheet.dart';
+import 'package:arth/features/reader/flick_physics.dart';
+import 'package:arth/features/reader/go_to_page.dart';
 import 'package:arth/features/reader/highlights/highlight_colors.dart';
 import 'package:arth/features/reader/highlights/highlights_sheet.dart';
 import 'package:arth/features/reader/page_text_cache.dart';
@@ -187,6 +189,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
         continue;
       }
       if (!mounted) return;
+      if (idx.words.isEmpty) continue; // not loaded yet; resolved on a later pass
       final to = math.min(h.endWord, idx.words.length - 1);
       _highlightRects[h.id] = highlightBands([for (var i = h.startWord; i <= to; i++) idx.words[i].rect]);
       changed = true;
@@ -194,46 +197,50 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
     if (changed && mounted) setState(() {});
   }
 
-  /// Map pdfrx's selection onto our word index. pdfrx's character offsets
-  /// come from a different text extraction and don't always line up, so the
-  /// first and last selected tokens are matched by text near the offsets.
-  ({int page, int start, int end})? _wordsForSelection(List<PdfPageTextRange> ranges, PageTextIndex idx, String text) {
+  /// Map pdfrx's selection onto our word index by position: the words under
+  /// the first and last selected characters. pdfrx's character offsets come
+  /// from a different text extraction (drop caps and hyphenation throw them
+  /// off), but both put the same glyph in the same place.
+  ({int page, int start, int end})? _wordsForSelection(List<PdfPageTextRange> ranges, PageTextIndex idx) {
     if (ranges.map((r) => r.pageNumber).toSet().length != 1 || idx.words.isEmpty) return null;
-    final tokens = text.split(' ');
-    final firstKey = normalizeWord(tokens.first);
-    final lastKey = normalizeWord(tokens.last);
-    int? nearest(String key, int charIndex, {int from = 0}) {
-      final at = idx.wordAtChar(charIndex);
-      if (at != null && at.key == key && at.index >= from) return at.index;
-      int? best;
-      var bestDist = 1 << 30;
-      for (final w in idx.words.skip(from)) {
-        if (w.key != key) continue;
-        final d = (w.start - charIndex).abs();
-        if (d < bestDist) {
-          best = w.index;
-          bestDist = d;
-        }
-      }
-      return best;
+    final page = ranges.first.pageNumber;
+    Offset? centreOf(PdfPageTextRange r, int i) {
+      final rects = r.pageText.charRects;
+      if (i < 0 || i >= rects.length) return null;
+      return _controller.calcRectForRectInsidePage(pageNumber: page, rect: rects[i]).center;
     }
 
-    final start = nearest(firstKey, ranges.first.start);
-    if (start == null) return null;
-    final end = nearest(lastKey, ranges.last.end - 1, from: start);
-    if (end == null) return null;
-    return (page: ranges.first.pageNumber, start: start, end: end);
+    // Skip selected whitespace at either end; it has no word under it.
+    final text = ranges.first.pageText.fullText;
+    var from = ranges.first.start;
+    while (from < ranges.first.end - 1 && text[from].trim().isEmpty) {
+      from++;
+    }
+    var to = ranges.last.end - 1;
+    final lastText = ranges.last.pageText.fullText;
+    while (to > ranges.last.start && lastText[to].trim().isEmpty) {
+      to--;
+    }
+    final first = centreOf(ranges.first, from);
+    final last = centreOf(ranges.last, to);
+    if (first == null || last == null) return null;
+    final start = nearestWord(idx, first)?.index;
+    final end = nearestWord(idx, last)?.index;
+    if (start == null || end == null) return null;
+    return (page: page, start: math.min(start, end), end: math.max(start, end));
   }
 
   Future<void> _highlightSelection(SentenceTooltipState s, HighlightColor color) async {
     final words = _selectionWords;
-    if (words == null) return;
+    final cache = _cache;
+    if (words == null || cache == null) return;
+    final idx = await cache.page(words.page);
     await ref.read(highlightsProvider(widget.book.id).notifier).add(
           page: words.page,
           startWord: words.start,
           endWord: words.end,
-          text: s.text,
           color: color,
+          textOf: (a, b) => normalizeSentence(idx.fullText.substring(idx.words[a].start, idx.words[b].end)),
         );
     if (!mounted) return;
     unawaited(_controller.textSelectionDelegate.clearTextSelection());
@@ -320,6 +327,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
     if (d.type != PdfViewerGeneralTapType.tap) return false;
     final cache = _cache;
     if (cache == null) return false;
+    // A tap anywhere lets go of a selection; a tap on a word then opens it.
+    unawaited(_controller.textSelectionDelegate.clearTextSelection());
     unawaited(_handleTap(cache, d.documentPosition));
     return true;
   }
@@ -358,6 +367,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
     final offset = word.index - around.index;
     _portal.show();
     await rc.showWord(
+      book: (id: widget.book.id, title: widget.book.title),
       word: word,
       page: page,
       sentence: sentence,
@@ -403,7 +413,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
     }
     final page = ranges.first.pageNumber;
     final idx = await cache.page(page);
-    _selectionWords = _wordsForSelection(ranges, idx, text);
+    _selectionWords = _wordsForSelection(ranges, idx);
 
     // A single selected word gets the word card (speaker, save), with its
     // sentence. pdfrx's character offsets don't always line up with our
@@ -570,6 +580,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
     } else {
       final sentence = s is WordTooltipState ? s.sentence : (s as SentenceTooltipState).text;
       await rc.showWord(
+        book: (id: widget.book.id, title: widget.book.title),
         word: PageWord(index: 0, start: 0, end: 0, text: word, rect: s.anchor),
         page: s.page,
         sentence: sentence,
@@ -619,13 +630,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
         title: Text(widget.book.title, maxLines: 1, overflow: TextOverflow.ellipsis),
         actions: [
           if (_page != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Center(
-                child: Text(
-                  '$_page / ${_controller.isReady ? _controller.pageCount : '…'}',
-                  style: EnglishText.label(c.inkMuted),
-                ),
+            Center(
+              child: PageCounter(
+                page: _page!,
+                count: _controller.isReady ? _controller.pageCount : null,
+                tooltip: t.goToPage,
+                onGo: (p) => unawaited(_controller.goToPage(pageNumber: p)),
               ),
             ),
           BookmarkButton(
@@ -638,6 +648,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
             onPressed: () => showReadingSettingsSheet(context),
           ),
           ReaderMoreMenu(
+            onWords: () => context.push(Uri(path: '/vocabulary', queryParameters: {'book': '${widget.book.id}', 'title': widget.book.title}).toString()),
             onHighlights: _showHighlights,
             onBookmarks: () => showBookmarksSheet(
               context,
@@ -658,6 +669,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
             initialPageNumber: widget.initialPage ?? widget.book.lastPage,
             params: PdfViewerParams(
               backgroundColor: c.paper,
+              // Native scrolling (pdfrx's default flings stop short), with
+              // hard flicks carried further.
+              scrollPhysics: FlickBoostPhysics(parent: PdfViewerParams.getScrollPhysics(context)),
               textSelectionParams: PdfTextSelectionParams(
                 showContextMenuAutomatically: false,
                 onTextSelectionChange: _onSelectionChanged,

@@ -84,6 +84,10 @@ class SettingsScreen extends ConsumerWidget {
             SettingsHeading(t.hindiSize),
             const HindiSizeControl(),
 
+            SettingsHeading(t.cardFont),
+            const CardFontPicker(),
+            SettingsCaption(t.cardFontHelp),
+
             const SizedBox(height: 26),
             Divider(color: c.rule),
             const SizedBox(height: 6),
@@ -103,6 +107,7 @@ class SettingsScreen extends ConsumerWidget {
               value: s.prefetch,
               onChanged: (v) => n.update((s) => s.copyWith(prefetch: v)),
             ),
+            const CardReminderControls(),
 
             SettingsHeading(t.sectionDictionary),
             Text(
@@ -124,33 +129,9 @@ class SettingsScreen extends ConsumerWidget {
                   color: c.marigold,
                   backgroundColor: c.rule,
                 ),
-              )
-            else
-              Align(
-                alignment: Alignment.centerLeft,
-                child: FilledButton.icon(
-                  icon: const Icon(Icons.sync_rounded, size: 18),
-                  label: Text(
-                    t.updateDictionary,
-                    style: uiLabel(
-                      hindi: t.isHindi,
-                      color: c.onAccent,
-                      scale: s.hindiScale,
-                    ),
-                  ),
-                  onPressed: () async {
-                    final r = await ref
-                        .read(seedProvider.notifier)
-                        .run(delta: count != 0);
-                    ref.invalidate(localEntryCountProvider);
-                    if (context.mounted && r.phase == SeedPhase.failed) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(r.message ?? t.downloadFailed)),
-                      );
-                    }
-                  },
-                ),
               ),
+            // No update button: the app refreshes the dictionary itself once
+            // a day (app.dart), and an unfinished first download resumes.
             if (seed.phase == SeedPhase.failed && seed.message != null)
               SettingsCaption(seed.message!),
 

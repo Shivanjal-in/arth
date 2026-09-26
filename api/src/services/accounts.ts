@@ -84,6 +84,9 @@ export type BookmarkRow = {
   deletedAt: number | null;
 };
 
+/** The outcome of counting a use against a phone. */
+export type DeviceCharge = { ok: true; used: number } | { ok: false; reason: 'exhausted' | 'accounts'; used: number };
+
 export type SyncKind = 'cards' | 'bookmarks';
 export type RowOf<K extends SyncKind> = K extends 'cards' ? CardRow : BookmarkRow;
 
@@ -111,6 +114,16 @@ export interface AccountStore {
   consumeAi(uid: string, month: string, allowance: Allowance): Promise<User | null>;
   /** Gives back a use counted by [consumeAi] in [month]. */
   refundAi(uid: string, month: string): Promise<void>;
+  /**
+   * Counts one Free-plan AI use against a phone, atomically, if it has room
+   * (fewer than [max] uses) and [uid] is one of at most [maxAccounts]
+   * accounts that have used it. Otherwise says why not.
+   */
+  consumeDeviceAi(deviceId: string, uid: string, max: number, maxAccounts: number): Promise<DeviceCharge>;
+  /** Gives back a use counted by [consumeDeviceAi]. */
+  refundDeviceAi(deviceId: string): Promise<void>;
+  /** Free-plan AI uses counted against a phone so far. */
+  deviceAiUsed(deviceId: string): Promise<number>;
   /**
    * Saves [device] for [uid]. A token belongs to one phone, so it's first
    * removed from any other user (a phone that changed accounts).
@@ -229,6 +242,7 @@ export async function sync(store: AccountStore, uid: string, req: SyncRequest, l
 /** In-memory store, for tests. */
 export function memoryAccountStore(): AccountStore & { users: Map<string, User>; devices: Map<string, PushDevice[]> } {
   const users = new Map<string, User>();
+  const phones = new Map<string, { used: number; accounts: string[] }>();
   const devices = new Map<string, PushDevice[]>();
   const seqs = new Map<string, number>();
   const rows = { cards: new Map<string, { owner: string; row: CardRow; seq: number }>(), bookmarks: new Map<string, { owner: string; row: BookmarkRow; seq: number }>() };
@@ -313,6 +327,21 @@ export function memoryAccountStore(): AccountStore & { users: Map<string, User>;
         aiTotal: Math.max(0, u.aiTotal - 1),
         aiMonthUses: u.aiMonth === month ? Math.max(0, u.aiMonthUses - 1) : u.aiMonthUses,
       });
+    },
+    async consumeDeviceAi(deviceId, uid, max, maxAccounts) {
+      const d = phones.get(deviceId) ?? { used: 0, accounts: [] };
+      if (!d.accounts.includes(uid) && d.accounts.length >= maxAccounts) return { ok: false, reason: 'accounts', used: d.used };
+      if (d.used >= max) return { ok: false, reason: 'exhausted', used: d.used };
+      const next = { used: d.used + 1, accounts: d.accounts.includes(uid) ? d.accounts : [...d.accounts, uid] };
+      phones.set(deviceId, next);
+      return { ok: true, used: next.used };
+    },
+    async refundDeviceAi(deviceId) {
+      const d = phones.get(deviceId);
+      if (d && d.used > 0) phones.set(deviceId, { ...d, used: d.used - 1 });
+    },
+    async deviceAiUsed(deviceId) {
+      return phones.get(deviceId)?.used ?? 0;
     },
     async reserveSeqs(uid, n) {
       const first = (seqs.get(uid) ?? 0) + 1;

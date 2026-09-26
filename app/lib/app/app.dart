@@ -5,6 +5,7 @@ import 'package:arth/app/account_providers.dart';
 import 'package:arth/app/dev_hooks.dart';
 import 'package:arth/app/feel.dart';
 import 'package:arth/app/providers.dart';
+import 'package:arth/app/reminders.dart';
 import 'package:arth/app/router.dart';
 import 'package:arth/app/strings.dart';
 import 'package:arth/app/theme.dart';
@@ -28,6 +29,7 @@ class ArthApp extends ConsumerStatefulWidget {
 class _ArthAppState extends ConsumerState<ArthApp> {
   late final GoRouter router = buildRouter(needsSeed: widget.needsSeed);
   StreamSubscription<String>? _pushRoutes;
+  StreamSubscription<String>? _localRoutes;
 
   @override
   void initState() {
@@ -39,6 +41,14 @@ class _ArthAppState extends ConsumerState<ArthApp> {
       final pending = push.pendingRoute;
       push.pendingRoute = null;
       if (pending != null && !widget.needsSeed) WidgetsBinding.instance.addPostFrameCallback((_) => router.go(pending));
+    }
+    // …and so does a tapped reminder, or a push shown while the app was open.
+    final local = ref.read(localNotificationsProvider);
+    _localRoutes = local.routes.stream.listen(router.go);
+    final launch = local.launchRoute;
+    local.launchRoute = null;
+    if (launch != null && launch.isNotEmpty && !widget.needsSeed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => router.go(launch));
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _refreshDictionaryIfStale());
     DevHooks.on('nav', (p) async {
@@ -71,6 +81,7 @@ class _ArthAppState extends ConsumerState<ArthApp> {
   @override
   void dispose() {
     unawaited(_pushRoutes?.cancel());
+    unawaited(_localRoutes?.cancel());
     super.dispose();
   }
 
@@ -99,6 +110,13 @@ class _ArthAppState extends ConsumerState<ArthApp> {
       darkTheme: arthTheme(Brightness.dark),
       themeMode: mode,
       routerConfig: router,
+      // iOS keyboards have no hide key: a tap on anything that isn't a text
+      // field or a control puts the keyboard away.
+      builder: (context, child) => GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        child: child,
+      ),
     );
   }
 }

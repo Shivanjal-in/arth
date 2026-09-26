@@ -4,6 +4,7 @@
 import 'dart:async';
 
 import 'package:arth/app/providers.dart';
+import 'package:arth/app/reminders.dart';
 import 'package:arth/app/strings.dart';
 import 'package:arth/data/account.dart';
 import 'package:arth/data/api_client.dart';
@@ -68,6 +69,7 @@ final pushServiceProvider = Provider<PushService?>((ref) {
   final service = PushService(
     api: () => ref.read(apiClientProvider),
     language: () => ref.read(settingsProvider).language == UiLanguage.hi ? 'hi' : 'en',
+    local: ref.read(localNotificationsProvider),
   );
   // Register after sign-in is restored, never at launch: the API needs the
   // session. And again when the language changes.

@@ -1,6 +1,7 @@
 // Lazily builds a PageTextIndex per page, in document coordinates, and
 // stitches sentences that run across page boundaries.
 
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:arth/core/normalize.dart';
@@ -15,11 +16,19 @@ class PageTextCache {
 
   static const _pageBreak = '';
 
-  Future<PageTextIndex> page(int pageNumber) =>
-      _pages.putIfAbsent(pageNumber, () => _build(pageNumber));
+  Future<PageTextIndex> page(int pageNumber) => _pages.putIfAbsent(pageNumber, () async {
+        final idx = await _build(pageNumber);
+        // An empty page may only mean it wasn't loaded yet: ask again next
+        // time rather than remembering it as blank.
+        if (idx.words.isEmpty) unawaited(_pages.remove(pageNumber));
+        return idx;
+      });
 
   Future<PageTextIndex> _build(int pageNumber) async {
-    final page = controller.pages[pageNumber - 1];
+    // Long PDFs load progressively: until a page is really loaded pdfrx
+    // gives empty text and guessed page sizes, with no error.
+    final page = await controller.pages[pageNumber - 1].waitForLoaded(timeout: const Duration(seconds: 15));
+    if (page == null) return PageTextIndex.build('', const []);
     final text = await page.loadStructuredText();
     final rects = <Rect>[
       for (final r in text.charRects)

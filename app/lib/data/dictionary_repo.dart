@@ -142,7 +142,7 @@ class DictionaryRepo {
       serverSuggestions = r.suggestions;
     } on ApiFailure catch (e) {
       offline = e.isOffline;
-      if (e.code == 'UNAUTHORIZED' || e.code == 'QUOTA_EXCEEDED') blocked = e.code;
+      if (aiBlockCodes.contains(e.code)) blocked = e.code;
     }
 
     return LookupMissing(
@@ -189,7 +189,7 @@ class DictionaryRepo {
       serverSuggestions = r.suggestions;
     } on ApiFailure catch (e) {
       offline = e.isOffline;
-      if (e.code == 'UNAUTHORIZED' || e.code == 'QUOTA_EXCEEDED') blocked = e.code;
+      if (aiBlockCodes.contains(e.code)) blocked = e.code;
     }
     return LookupMissing(
       word: key,

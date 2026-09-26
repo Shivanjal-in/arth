@@ -4,11 +4,16 @@
 // of small page thumbnails; the segmented pill is ink-on-paper rather than the
 // Material default; Hindi size shows a live sample line.
 
+import 'dart:async';
+
 import 'package:arth/app/feel.dart';
 import 'package:arth/app/providers.dart';
+import 'package:arth/app/reminders.dart';
 import 'package:arth/app/settings.dart';
 import 'package:arth/app/strings.dart';
 import 'package:arth/app/theme.dart';
+import 'package:arth/data/card_reminders.dart';
+import 'package:arth/features/cards/card_face.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -464,6 +469,138 @@ class SettingsSwitch extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Review reminders: on/off, and when each of the three comes.
+class CardReminderControls extends ConsumerWidget {
+  const CardReminderControls({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    final s = ref.watch(settingsProvider);
+    final n = ref.read(settingsProvider.notifier);
+    final t = ref.watch(stringsProvider);
+    final hours = s.reminderHours;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SettingsSwitch(
+          title: t.cardReminders,
+          subtitle: t.cardRemindersHelp,
+          value: s.cardReminders,
+          onChanged: (v) async {
+            await n.update((s) => s.copyWith(cardReminders: v));
+            if (!v) return;
+            final allowed = await ref.read(localNotificationsProvider).requestPermission();
+            if (!allowed && context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.remindersBlocked)));
+            }
+          },
+        ),
+        AnimatedSize(
+          duration: Motion.of(context, Motion.quick),
+          curve: Motion.arrive,
+          alignment: Alignment.topCenter,
+          child: !s.cardReminders
+              ? const SizedBox(width: double.infinity)
+              : Padding(
+                  padding: const EdgeInsets.only(left: 4, bottom: 6),
+                  child: Column(
+                    children: [
+                      for (final (i, h) in hours.indexed)
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(t.reminderNumber(i + 1), style: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: s.hindiScale, size: 15)),
+                            ),
+                            PopupMenuButton<int>(
+                              initialValue: h,
+                              tooltip: t.reminderNumber(i + 1),
+                              onSelected: (picked) {
+                                Haptics.choose();
+                                // Kept in order, so the first reminder is always the soonest.
+                                final next = [...hours]..[i] = picked;
+                                unawaited(n.update((s) => s.copyWith(reminderHours: next..sort())));
+                              },
+                              itemBuilder: (_) => [
+                                for (final choice in reminderHourChoices) PopupMenuItem(value: choice, child: Text(t.afterHours(choice))),
+                              ],
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(t.afterHours(h), style: uiLabel(hindi: t.isHindi, color: c.accent, scale: s.hindiScale).copyWith(fontSize: 15)),
+                                    Icon(Icons.expand_more_rounded, color: c.accent, size: 20),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The three card fonts, each shown on a small card in its own type.
+class CardFontPicker extends ConsumerWidget {
+  const CardFontPicker({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    final s = ref.watch(settingsProvider);
+    final n = ref.read(settingsProvider.notifier);
+    return Row(
+      children: [
+        for (final (i, font) in CardFont.values.indexed) ...[
+          if (i > 0) const SizedBox(width: 10),
+          Expanded(
+            child: Pressable(
+              onTap: () {
+                if (font == s.cardFont) return;
+                Haptics.choose();
+                unawaited(n.update((s) => s.copyWith(cardFont: font)));
+              },
+              child: AnimatedContainer(
+                duration: Motion.of(context, Motion.quick),
+                height: 104,
+                padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+                decoration: BoxDecoration(
+                  color: c.card,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: font == s.cardFont ? c.accent : c.rule, width: font == s.cardFont ? 2 : 1),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text('solitude', style: cardStyle('solitude', font, color: c.ink, scale: 1, size: 20, weight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.fade, softWrap: false),
+                      ),
+                    ),
+                    Text(
+                      cardFontName(font),
+                      style: EnglishText.label(font == s.cardFont ? c.accent : c.inkMuted, size: 11.5),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

@@ -72,7 +72,12 @@ class PlansScreen extends ConsumerWidget {
                   Tier.superTier => t.tierSuper,
                 },
                 ink: ink,
-                lines: [(Icons.auto_awesome_outlined, ai), (Icons.menu_book_outlined, t.planOfflineDictionary), (Icons.campaign_outlined, ads)],
+                lines: [
+                  (Icons.auto_awesome_outlined, ai),
+                  (Icons.menu_book_outlined, t.planOfflineDictionary),
+                  if (tier != Tier.free) (Icons.document_scanner_outlined, t.planScanShare),
+                  (Icons.campaign_outlined, ads),
+                ],
                 current: tier == current,
                 onRequest: tier == Tier.free || tier == current || kSupportEmail.isEmpty ? null : () => unawaited(request(tier)),
               ),

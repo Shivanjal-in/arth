@@ -167,6 +167,7 @@ class _CardEditorState extends ConsumerState<_CardEditor> {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SingleChildScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -190,6 +191,13 @@ class _CardEditorState extends ConsumerState<_CardEditor> {
                     icon: Icon(Icons.delete_outline_rounded, color: c.inkMuted),
                     onPressed: _delete,
                   ),
+                // The sheet can fill the screen with the keyboard up, leaving
+                // nothing to tap outside it.
+                IconButton(
+                  tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                  icon: Icon(Icons.close_rounded, color: c.inkMuted),
+                  onPressed: () => Navigator.pop(context),
+                ),
               ],
             ),
             if (_bookTitle.isNotEmpty || _location != null)

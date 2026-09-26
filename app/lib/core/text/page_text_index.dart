@@ -257,3 +257,21 @@ class PageTextIndex {
 /// server-side phrase matcher expects.
 List<String> tokenize(String text) =>
     text.trim().split(_whitespace).where((t) => t.isNotEmpty).toList();
+
+/// The word nearest [point]: on the nearest line first, then the nearest
+/// word along it (for drags past a line's end, and for mapping a glyph's
+/// position onto the index).
+PageWord? nearestWord(PageTextIndex idx, Offset point) {
+  PageWord? best;
+  var bestDist = double.infinity;
+  for (final w in idx.words) {
+    final dx = math.max<double>(0, math.max(w.rect.left - point.dx, point.dx - w.rect.right));
+    final dy = math.max<double>(0, math.max(w.rect.top - point.dy, point.dy - w.rect.bottom));
+    final d = dy * 1000 + dx;
+    if (d < bestDist) {
+      best = w;
+      bestDist = d;
+    }
+  }
+  return best;
+}

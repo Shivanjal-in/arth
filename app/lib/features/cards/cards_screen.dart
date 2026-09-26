@@ -10,6 +10,7 @@ import 'package:arth/features/cards/card_face.dart';
 import 'package:arth/features/cards/deck_screen.dart';
 import 'package:arth/features/library/book_cover.dart';
 import 'package:arth/features/saved/saved_words_list.dart';
+import 'package:arth/features/vocabulary/vocabulary_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -23,7 +24,7 @@ class CardsScreen extends ConsumerWidget {
     final t = ref.watch(stringsProvider);
     final scale = ref.watch(settingsProvider).hindiScale;
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           title: Text(t.cardsTitle, style: uiTitle(hindi: t.isHindi, color: c.ink, scale: scale).copyWith(fontSize: 26)),
@@ -35,10 +36,10 @@ class CardsScreen extends ConsumerWidget {
             indicatorColor: c.accent,
             dividerColor: c.rule,
             indicatorSize: TabBarIndicatorSize.label,
-            tabs: [Tab(text: t.decks), Tab(text: t.words)],
+            tabs: [Tab(text: t.decks), Tab(text: t.words), Tab(text: t.vocabulary)],
           ),
         ),
-        body: const TabBarView(children: [_Decks(), SavedWordsList()]),
+        body: const TabBarView(children: [_Decks(), SavedWordsList(), LifetimeVocabulary()]),
       ),
     );
   }

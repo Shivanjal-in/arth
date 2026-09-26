@@ -10,9 +10,11 @@ import 'package:arth/app/theme.dart';
 import 'package:arth/data/local_store.dart';
 import 'package:arth/features/cards/card_editor.dart';
 import 'package:arth/features/cards/card_face.dart';
+import 'package:arth/features/cards/deck_pdf.dart';
 import 'package:arth/features/community/publish_sheet.dart';
 import 'package:arth/features/library/book_cover.dart';
 import 'package:arth/features/library/library_screen.dart';
+import 'package:arth/features/settings/settings_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -39,6 +41,60 @@ class DeckScreen extends ConsumerStatefulWidget {
 
 class _DeckScreenState extends ConsumerState<DeckScreen> {
   CardKind? _filter;
+
+  /// Two ways to share a recap: a PDF for anyone, or the community.
+  Future<void> _share(BuildContext button, {required String title, required String? bookKey, required List<Flashcard> cards}) async {
+    final t = ref.read(stringsProvider);
+    final box = button.findRenderObject() as RenderBox?;
+    final origin = box == null ? null : box.localToGlobal(Offset.zero) & box.size;
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      useSafeArea: true,
+      builder: (ctx) {
+        final c = ctx.colors;
+        final scale = ref.read(settingsProvider).hindiScale;
+        Widget option(String value, IconData icon, String label, String hint) => ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              leading: Icon(icon, color: c.accent),
+              title: Text(label, style: uiLabel(hindi: t.isHindi, color: c.ink, scale: scale).copyWith(fontSize: 16)),
+              subtitle: Text(hint, style: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: scale, size: 13.5)),
+              onTap: () => Navigator.pop(ctx, value),
+            );
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Pick how the cards look, then share them that way.
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(t.cardFont, style: uiLabel(hindi: t.isHindi, color: c.inkMuted, scale: scale)),
+                      const SizedBox(height: 8),
+                      const CardFontPicker(),
+                    ],
+                  ),
+                ),
+                option('pdf', Icons.picture_as_pdf_outlined, t.exportPdf, t.exportPdfHint),
+                option('community', Icons.public_rounded, t.shareToCommunity, t.shareToCommunityHint),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (!mounted || choice == null) return;
+    Haptics.choose();
+    if (choice == 'pdf') {
+      await exportDeckPdf(context, ref, bookTitle: title, cards: cards, origin: origin);
+    } else {
+      await shareRecap(context, ref, bookTitle: title, bookKey: bookKey, cards: cards);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -84,10 +140,12 @@ class _DeckScreenState extends ConsumerState<DeckScreen> {
             title: Text(t.recap, style: EnglishText.heading(Colors.white, size: 18)),
             actions: [
               if (cards != null && cards.isNotEmpty)
-                IconButton(
-                  tooltip: t.shareToCommunity,
-                  icon: const Icon(Icons.ios_share_rounded),
-                  onPressed: () => shareRecap(context, ref, bookTitle: title, bookKey: book?.contentKey ?? cards.first.bookKey, cards: cards),
+                Builder(
+                  builder: (button) => IconButton(
+                    tooltip: t.share,
+                    icon: const Icon(Icons.ios_share_rounded),
+                    onPressed: () => _share(button, title: title, bookKey: book?.contentKey ?? cards.first.bookKey, cards: cards),
+                  ),
                 ),
             ],
             flexibleSpace: FlexibleSpaceBar(

@@ -42,15 +42,18 @@ class BookmarkButton extends ConsumerWidget {
   }
 }
 
-enum _MenuItem { highlights, bookmarks, note, cards }
+enum _MenuItem { highlights, bookmarks, note, cards, words }
 
 class ReaderMoreMenu extends ConsumerWidget {
-  const ReaderMoreMenu({required this.onNote, required this.onCards, super.key, this.onHighlights, this.onBookmarks});
+  const ReaderMoreMenu({required this.onNote, required this.onCards, super.key, this.onHighlights, this.onBookmarks, this.onWords});
 
   final VoidCallback? onHighlights;
   final VoidCallback? onBookmarks;
   final VoidCallback onNote;
   final VoidCallback onCards;
+
+  /// The words looked up in this book (vocabulary).
+  final VoidCallback? onWords;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -76,10 +79,12 @@ class ReaderMoreMenu extends ConsumerWidget {
         _MenuItem.bookmarks => onBookmarks?.call(),
         _MenuItem.note => onNote(),
         _MenuItem.cards => onCards(),
+        _MenuItem.words => onWords?.call(),
       },
       itemBuilder: (_) => [
         item(_MenuItem.note, Icons.edit_note_rounded, t.addNote),
         item(_MenuItem.cards, Icons.style_outlined, t.cardsForBook),
+        if (onWords != null) item(_MenuItem.words, Icons.spellcheck_rounded, t.wordsFromBook),
         if (onBookmarks != null) item(_MenuItem.bookmarks, Icons.bookmarks_outlined, t.bookmarks),
         if (onHighlights != null) item(_MenuItem.highlights, Icons.border_color_outlined, t.highlights),
       ],

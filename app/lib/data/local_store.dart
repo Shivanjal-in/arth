@@ -356,7 +356,7 @@ class Bookmark {
 class LocalStore {
   LocalStore._(this._db);
 
-  static const _schemaVersion = 5;
+  static const _schemaVersion = 6;
 
   final Database _db;
 
@@ -385,6 +385,16 @@ class LocalStore {
             await _createCardsAndBookmarks(db);
           }
           if (from < 5) await db.execute('ALTER TABLE books ADD COLUMN content_key TEXT');
+          if (from < 6) {
+            await _createVocabulary(db);
+            // Words saved before vocabulary was kept count as met then.
+            final saved = await db.rawQuery("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'saved_words'");
+            if (saved.isNotEmpty) {
+              await db.execute('''
+              INSERT OR IGNORE INTO vocabulary (lemma, book_id, book_title, meaning, first_at, last_at, lookups)
+              SELECT lemma, book_id, book_title, meaning, saved_at, saved_at, 1 FROM saved_words WHERE book_id IS NOT NULL''');
+            }
+          }
           if (from == 4) {
             await db.execute('ALTER TABLE flashcards ADD COLUMN book_key TEXT');
             // A synced bookmark can arrive before its book is on this device:
@@ -451,6 +461,7 @@ class LocalStore {
       )''');
     await db.execute('CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT)');
     await _createHighlights(db);
+    await _createVocabulary(db);
     await _createCardsAndBookmarks(db);
   }
 
@@ -514,6 +525,23 @@ class LocalStore {
       )''');
     await db.execute('CREATE INDEX highlights_book ON highlights(book_id, page)');
   }
+  /// Every word looked up while reading, once per book: when it was first
+  /// and last looked up there, and how often.
+  static Future<void> _createVocabulary(Database db) async {
+    await db.execute('''
+      CREATE TABLE vocabulary (
+        lemma TEXT NOT NULL,
+        book_id INTEGER NOT NULL,
+        book_title TEXT,
+        meaning TEXT NOT NULL DEFAULT '',
+        first_at INTEGER NOT NULL,
+        last_at INTEGER NOT NULL,
+        lookups INTEGER NOT NULL DEFAULT 1,
+        PRIMARY KEY (lemma, book_id)
+      )''');
+    await db.execute('CREATE INDEX vocabulary_first ON vocabulary(lemma, first_at)');
+  }
+
 
   // ---- dictionary ----
 
@@ -600,6 +628,12 @@ class LocalStore {
   }
 
   /// Batched upsert used by the seed loader.
+  /// The rarest entry on the phone (highest freqRank), or null if none.
+  Future<int?> maxEntryRank() async {
+    final rows = await _db.rawQuery('SELECT MAX(freq_rank) AS r FROM entries');
+    return rows.first['r'] as int?;
+  }
+
   Future<void> upsertSeed({
     required List<(String word, int freqRank, String json)> entries,
     required List<(String form, String lemma)> forms,
@@ -979,6 +1013,53 @@ class LocalStore {
     );
   }
 
+  /// Applies a highlight plan (see planHighlight) in one go: deletes, trims, and inserts (the
+  /// first insert is the new highlight, which is returned).
+  Future<Highlight> rearrangeHighlights({
+    required int bookId,
+    required int page,
+    required int? block,
+    required List<int> remove,
+    required List<({int id, int start, int end, String text})> trim,
+    required List<({int start, int end, String text, HighlightColor color})> insert,
+  }) async {
+    final now = DateTime.now();
+    late int firstId;
+    await _db.transaction((txn) async {
+      for (final id in remove) {
+        await txn.delete('highlights', where: 'id = ?', whereArgs: [id]);
+      }
+      for (final t in trim) {
+        await txn.update('highlights', {'start_word': t.start, 'end_word': t.end, 'text': t.text}, where: 'id = ?', whereArgs: [t.id]);
+      }
+      for (final (i, h) in insert.indexed) {
+        final id = await txn.insert('highlights', {
+          'book_id': bookId,
+          'page': page,
+          'block': block,
+          'start_word': h.start,
+          'end_word': h.end,
+          'text': h.text,
+          'color': h.color.name,
+          'created_at': now.millisecondsSinceEpoch,
+        });
+        if (i == 0) firstId = id;
+      }
+    });
+    final first = insert.first;
+    return Highlight(
+      id: firstId,
+      bookId: bookId,
+      page: page,
+      block: block,
+      startWord: first.start,
+      endWord: first.end,
+      text: first.text,
+      color: first.color,
+      createdAt: now,
+    );
+  }
+
   Future<void> recolorHighlight(int id, HighlightColor color) =>
       _db.update('highlights', {'color': color.name}, where: 'id = ?', whereArgs: [id]);
 
@@ -1145,4 +1226,105 @@ class LocalStore {
         {'word': word, 'looked_up_at': DateTime.now().millisecondsSinceEpoch},
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
+
+  // ---- vocabulary ----
+
+  /// A word looked up while reading [bookId]. (Update, then insert: older
+  /// Android SQLite has no upsert.)
+  Future<void> recordWord({required String lemma, required int bookId, required String bookTitle, required String meaning, DateTime? at}) async {
+    final now = (at ?? DateTime.now()).millisecondsSinceEpoch;
+    await _db.transaction((txn) async {
+      final updated = await txn.rawUpdate(
+        """
+        UPDATE vocabulary SET last_at = ?, lookups = lookups + 1, book_title = ?,
+          meaning = CASE WHEN ? = '' THEN meaning ELSE ? END
+        WHERE lemma = ? AND book_id = ?""",
+        [now, bookTitle, meaning, meaning, lemma, bookId],
+      );
+      if (updated == 0) {
+        await txn.insert('vocabulary', {
+          'lemma': lemma,
+          'book_id': bookId,
+          'book_title': bookTitle,
+          'meaning': meaning,
+          'first_at': now,
+          'last_at': now,
+          'lookups': 1,
+        });
+      }
+    });
+  }
+
+  /// Every word met, once each: where and when it was first met, the latest
+  /// meaning, and lookups across all books. Most recently met first.
+  Future<List<VocabWord>> lifetimeVocabulary() async {
+    final rows = await _db.rawQuery('''
+      SELECT v.lemma, v.book_id, v.book_title, v.first_at,
+        (SELECT meaning FROM vocabulary m WHERE m.lemma = v.lemma AND m.meaning != '' ORDER BY m.last_at DESC LIMIT 1) AS meaning,
+        (SELECT SUM(lookups) FROM vocabulary s WHERE s.lemma = v.lemma) AS lookups,
+        (SELECT MAX(last_at) FROM vocabulary l WHERE l.lemma = v.lemma) AS last_at,
+        (SELECT COUNT(*) FROM vocabulary b WHERE b.lemma = v.lemma) AS books
+      FROM vocabulary v
+      WHERE v.first_at = (SELECT MIN(first_at) FROM vocabulary f WHERE f.lemma = v.lemma)
+      GROUP BY v.lemma
+      ORDER BY v.first_at DESC''');
+    return rows.map(VocabWord.fromRow).toList();
+  }
+
+  /// The words looked up in [bookId]; [VocabWord.isNew] when this book is
+  /// where the reader first met the word.
+  Future<List<VocabWord>> bookVocabulary(int bookId) async {
+    final rows = await _db.rawQuery(
+      '''
+      SELECT v.lemma, v.book_id, v.book_title, v.meaning, v.first_at, v.last_at, v.lookups, 1 AS books,
+        (SELECT COUNT(*) FROM vocabulary e WHERE e.lemma = v.lemma AND e.first_at < v.first_at) = 0 AS is_new
+      FROM vocabulary v WHERE v.book_id = ?
+      ORDER BY v.first_at DESC''',
+      [bookId],
+    );
+    return rows.map(VocabWord.fromRow).toList();
+  }
+}
+
+/// A word from the reader's vocabulary.
+class VocabWord {
+  const VocabWord({
+    required this.lemma,
+    required this.meaning,
+    required this.bookId,
+    required this.bookTitle,
+    required this.firstAt,
+    required this.lastAt,
+    required this.lookups,
+    this.books = 1,
+    this.isNew = true,
+  });
+
+  factory VocabWord.fromRow(Map<String, Object?> r) => VocabWord(
+        lemma: r['lemma']! as String,
+        meaning: (r['meaning'] as String?) ?? '',
+        bookId: r['book_id']! as int,
+        bookTitle: (r['book_title'] as String?) ?? '',
+        firstAt: DateTime.fromMillisecondsSinceEpoch(r['first_at']! as int),
+        lastAt: DateTime.fromMillisecondsSinceEpoch(r['last_at']! as int),
+        lookups: r['lookups']! as int,
+        books: (r['books'] as int?) ?? 1,
+        isNew: (r['is_new'] as int? ?? 1) == 1,
+      );
+
+  final String lemma;
+  final String meaning;
+
+  /// For the lifetime list: the book where it was first met.
+  final int bookId;
+  final String bookTitle;
+  final DateTime firstAt;
+  final DateTime lastAt;
+  final int lookups;
+
+  /// How many books it was looked up in.
+  final int books;
+
+  /// First met in this book (not looked up in an earlier one).
+  final bool isNew;
 }

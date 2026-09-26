@@ -90,3 +90,20 @@ bookmarkSchema.index({ owner: 1, seq: 1 });
 
 export const FlashcardModel = model('Flashcard', flashcardSchema);
 export const BookmarkModel = model('Bookmark', bookmarkSchema);
+
+/**
+ * A phone's Free-plan AI uses, whichever accounts made them, and those
+ * accounts: signing in with a new email doesn't reset the allowance.
+ * Keyed by the app's device id (stable across reinstalls).
+ */
+const phoneSchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    aiUsed: { type: Number, default: 0 },
+    accounts: { type: [String], default: [] },
+    updatedAt: { type: Number, required: true },
+  },
+  { versionKey: false, collection: 'phones' },
+);
+
+export const PhoneModel = model('Phone', phoneSchema);

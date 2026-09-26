@@ -43,6 +43,8 @@ export const messages = {
   internal: 'कुछ गड़बड़ हो गई। थोड़ी देर बाद फिर कोशिश करें।',
   signInRequired: 'इसके लिए साइन इन करें।',
   quotaExceeded: 'आपके AI उपयोग खत्म हो गए हैं।',
+  quotaPhoneAccounts: 'इस फ़ोन पर मुफ़्त AI जवाब पहले ही दूसरे खातों से इस्तेमाल हो चुके हैं।',
+  deviceRequired: 'कृपया Arth ऐप का नया संस्करण इस्तेमाल करें।',
   signInExpired: 'साइन इन की अवधि खत्म हो गई। दोबारा साइन इन करें।',
   accountsUnavailable: 'खाते अभी उपलब्ध नहीं हैं।',
   uploadsUnavailable: 'तस्वीर अपलोड अभी उपलब्ध नहीं है।',

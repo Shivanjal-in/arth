@@ -55,6 +55,8 @@ export type AppOptions = {
   /** Published decks, comments, reports. In memory when omitted (tests). */
   community?: CommunityStore;
   limits?: Limits;
+  /** Entries in the on-device dictionary (SEED_LIMIT); 20000 when omitted. */
+  seedLimit?: number;
   config: Pick<
     Config,
     | 'CONTEXT_MODE'
@@ -166,7 +168,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
         });
         await dbRoutes.register(phraseRoutes, { store: opts.store });
       });
-      await v1.register(seedRoutes);
+      await v1.register(seedRoutes, { defaultLimit: opts.seedLimit });
       await v1.register(contextRoutes, {
         deps: { config: opts.config, llm: opts.llm, cache: opts.cache, store: opts.store, log },
         spend,

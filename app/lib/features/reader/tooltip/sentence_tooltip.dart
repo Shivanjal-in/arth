@@ -70,6 +70,19 @@ class SentenceTooltip extends ConsumerWidget {
           maxLines: 3,
           overflow: TextOverflow.ellipsis,
         ),
+        // Highlighting doesn't wait for the translation: it's the first
+        // thing under the sentence.
+        if (onHighlight != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Row(
+              children: [
+                Text(t.highlight, style: label(c.inkMuted)),
+                const SizedBox(width: 12),
+                HighlightColorDots(onPick: onHighlight!, size: 26),
+              ],
+            ),
+          ),
         const SizedBox(height: 8),
         if (isAiBlock(state.errorCode))
           AiPrompt(code: state.errorCode!, feature: AiFeature.translate)
@@ -136,19 +149,13 @@ class SentenceTooltip extends ConsumerWidget {
             show: (state.difficultWords ?? const []).isNotEmpty,
           ),
         ],
-        if (onHighlight != null || onMakeCard != null)
+        if (onMakeCard != null)
           Padding(
             padding: const EdgeInsets.only(top: 12),
             child: Row(
               children: [
-                if (onHighlight != null) ...[
-                  Text(t.highlight, style: label(c.inkMuted)),
-                  const SizedBox(width: 12),
-                  HighlightColorDots(onPick: onHighlight!, size: 22),
-                ],
                 const Spacer(),
-                if (onMakeCard != null)
-                  TextButton.icon(
+                TextButton.icon(
                     // The quote's back is the translation: wait for it.
                     onPressed: state.done ? onMakeCard : null,
                     style: TextButton.styleFrom(foregroundColor: c.accent, visualDensity: VisualDensity.compact),

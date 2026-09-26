@@ -14,27 +14,23 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:arth/data/api_client.dart';
+import 'package:arth/data/local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-const _channel = AndroidNotificationChannel(
-  'arth_default', // the server's android.notification.channelId
-  'Arth',
-  description: 'Review reminders and account updates',
-  importance: Importance.high,
-);
 
 class PushService {
-  PushService({required this.api, required this.language});
+  PushService({required this.api, required this.language, required this.local});
 
   final ApiClient Function() api;
 
   /// The interface language, 'en' or 'hi'.
   final String Function() language;
 
+  /// Posts the banner for a push that arrives while the app is open.
+  final LocalNotifications local;
+
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
-  final _local = FlutterLocalNotificationsPlugin();
   StreamSubscription<String>? _refresh;
   String? _registered;
   String? _registeredLang;
@@ -46,16 +42,7 @@ class PushService {
   String? pendingRoute;
 
   Future<void> init() async {
-    if (Platform.isAndroid) {
-      await _local.initialize(
-        settings: const InitializationSettings(android: AndroidInitializationSettings('ic_stat_arth')),
-        onDidReceiveNotificationResponse: (r) {
-          final route = r.payload;
-          if (route != null && route.isNotEmpty) routes.add(route);
-        },
-      );
-      await _local.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.createNotificationChannel(_channel);
-    } else {
+    if (!Platform.isAndroid) {
       await _messaging.setForegroundNotificationPresentationOptions(alert: true, badge: true, sound: true);
     }
     FirebaseMessaging.onMessage.listen(_showInForeground);
@@ -71,14 +58,12 @@ class PushService {
 
   Future<void> _showInForeground(RemoteMessage m) async {
     final n = m.notification;
-    if (n == null || !Platform.isAndroid) return;
-    await _local.show(
+    if (n == null || !Platform.isAndroid || !local.ready) return;
+    await local.plugin.show(
       id: m.messageId.hashCode,
       title: n.title,
       body: n.body,
-      notificationDetails: NotificationDetails(
-        android: AndroidNotificationDetails(_channel.id, _channel.name, channelDescription: _channel.description, importance: Importance.high, priority: Priority.high, icon: 'ic_stat_arth'),
-      ),
+      notificationDetails: LocalNotifications.details,
       payload: m.data['route'] as String?,
     );
   }

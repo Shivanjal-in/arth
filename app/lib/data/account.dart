@@ -5,13 +5,14 @@ enum Tier { free, pro, superTier }
 
 /// AI uses against the tier's allowance (api/src/services/quota.ts).
 class Usage {
-  const Usage({required this.used, required this.limit, required this.monthly, this.resetsAt});
+  const Usage({required this.used, required this.limit, required this.monthly, this.resetsAt, this.phone = false});
 
   factory Usage.fromJson(Map<String, dynamic> j) => Usage(
         used: (j['used'] as int?) ?? 0,
         limit: j['limit'] as int?,
         monthly: j['period'] == 'month',
         resetsAt: j['resetsAt'] == null ? null : DateTime.fromMillisecondsSinceEpoch(j['resetsAt'] as int),
+        phone: j['phone'] == true,
       );
 
   /// From the `x-ai-*` headers an AI response carries; null if absent.
@@ -29,6 +30,10 @@ class Usage {
   /// Resets each month (pro), rather than a lifetime allowance (free).
   final bool monthly;
   final DateTime? resetsAt;
+
+  /// The Free allowance is limited by this phone (other accounts on it used
+  /// it), not by the account.
+  final bool phone;
 
   int? get left => limit == null ? null : (limit! - used).clamp(0, limit!);
   bool get exhausted => limit != null && used >= limit!;

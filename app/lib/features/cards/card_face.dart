@@ -5,12 +5,14 @@
 // timeline lists.
 
 import 'package:arth/app/providers.dart';
+import 'package:arth/app/settings.dart';
 import 'package:arth/app/strings.dart';
 import 'package:arth/app/theme.dart';
 import 'package:arth/data/local_store.dart';
 import 'package:arth/features/library/book_cover.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// The dye the book of this title is printed on (see book_cover.dart).
 Color deckInk(String title) => coverInk(title);
@@ -130,8 +132,8 @@ class _RuledPaper extends CustomPainter {
   bool shouldRepaint(_RuledPaper old) => old.rule != rule || old.margin != margin || old.ink != ink;
 }
 
-/// Text in whichever script it's written in: Mukta for Hindi, Literata for
-/// English.
+/// Text in whichever script it's written in: Mukta for Hindi, the interface
+/// font (Montserrat) for English.
 TextStyle scriptStyle(String text, {required Color color, required double scale, double size = 16, bool italic = false, FontWeight? weight}) {
   if (isHindiText(text)) {
     final h = HindiText(scale).body(color).copyWith(fontSize: (size + 1) * scale);
@@ -141,9 +143,43 @@ TextStyle scriptStyle(String text, {required Color color, required double scale,
   return weight == null ? e : e.copyWith(fontWeight: weight);
 }
 
+/// A card's own words in the chosen [CardFont]; Hindi stays in Mukta, which
+/// none of the three has letters for.
+TextStyle cardStyle(
+  String text,
+  CardFont font, {
+  required Color color,
+  required double scale,
+  double size = 16,
+  bool italic = false,
+  FontWeight? weight,
+}) {
+  if (isHindiText(text)) return scriptStyle(text, color: color, scale: scale, size: size, italic: italic, weight: weight);
+  return switch (font) {
+    CardFont.montserrat => GoogleFonts.montserrat(
+        fontSize: size * 0.93,
+        fontWeight: weight,
+        fontStyle: italic ? FontStyle.italic : null,
+        color: color,
+        height: 1.45,
+      ),
+    // A calligraphic face: one weight, italic by nature, small on its body.
+    CardFont.quintessential => GoogleFonts.quintessential(fontSize: size * 1.18, color: color, height: 1.35),
+    // No italic cut; its character is in the upright.
+    CardFont.bricolage => GoogleFonts.bricolageGrotesque(fontSize: size * 1.02, fontWeight: weight, color: color, height: 1.4),
+  };
+}
+
+/// A card font's name, as it's shown in the picker.
+String cardFontName(CardFont f) => switch (f) {
+      CardFont.montserrat => 'Montserrat',
+      CardFont.quintessential => 'Quintessential',
+      CardFont.bricolage => 'Bricolage Grotesque',
+    };
+
 /// The face you see first.
 class CardFront extends ConsumerWidget {
-  const CardFront({required this.card, required this.ink, super.key, this.hint});
+  const CardFront({required this.card, required this.ink, super.key, this.hint, this.font});
 
   final Flashcard card;
   final Color ink;
@@ -151,30 +187,34 @@ class CardFront extends ConsumerWidget {
   /// "Tap to flip", when the card can be flipped.
   final String? hint;
 
+  /// A deck's own font (a published recap); the reader's setting otherwise.
+  final CardFont? font;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
     final scale = ref.watch(settingsProvider).hindiScale;
     final t = ref.watch(stringsProvider);
+    final f = font ?? ref.watch(settingsProvider).cardFont;
     final main = switch (card.kind) {
       CardKind.quote => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('“', style: EnglishText.title(c.accent.withValues(alpha: 0.5), size: 64).copyWith(height: 0.8)),
-            Text(card.front, style: EnglishText.italic(c.ink, size: 21).copyWith(height: 1.5)),
+            Text(card.front, style: cardStyle(card.front, f, color: c.ink, scale: scale, size: 21, italic: true).copyWith(height: 1.5)),
           ],
         ),
       CardKind.word => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(card.front, style: EnglishText.title(c.ink, size: 38)),
+            Text(card.front, style: cardStyle(card.front, f, color: c.ink, scale: scale, size: 38, weight: FontWeight.w700).copyWith(height: 1.1)),
             if (card.context != null) ...[
               const SizedBox(height: 18),
               _ContextLine(sentence: card.context!, word: card.front),
             ],
           ],
         ),
-      CardKind.idea => Text(card.front, style: scriptStyle(card.front, color: c.ink, scale: scale, size: 24, weight: FontWeight.w500).copyWith(height: 1.35)),
+      CardKind.idea => Text(card.front, style: cardStyle(card.front, f, color: c.ink, scale: scale, size: 24, weight: FontWeight.w500).copyWith(height: 1.35)),
     };
     return IndexCard(
       ink: ink,
@@ -202,16 +242,20 @@ class CardFront extends ConsumerWidget {
 
 /// The answer face.
 class CardBack extends ConsumerWidget {
-  const CardBack({required this.card, required this.ink, super.key});
+  const CardBack({required this.card, required this.ink, super.key, this.font});
 
   final Flashcard card;
   final Color ink;
+
+  /// A deck's own font (a published recap); the reader's setting otherwise.
+  final CardFont? font;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
     final scale = ref.watch(settingsProvider).hindiScale;
     final t = ref.watch(stringsProvider);
+    final f = font ?? ref.watch(settingsProvider).cardFont;
     return IndexCard(
       ink: ink,
       child: Column(
@@ -238,12 +282,12 @@ class CardBack extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (card.back.isNotEmpty)
-                        Text(card.back, style: scriptStyle(card.back, color: c.ink, scale: scale, size: 22, weight: FontWeight.w500).copyWith(height: 1.5))
+                        Text(card.back, style: cardStyle(card.back, f, color: c.ink, scale: scale, size: 22, weight: FontWeight.w500).copyWith(height: 1.5))
                       else if (card.note.isEmpty)
                         Text(t.emptyBack, style: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: scale)),
                       if (card.note.isNotEmpty) ...[
                         const SizedBox(height: 20),
-                        NoteBlock(note: card.note),
+                        NoteBlock(note: card.note, font: f),
                       ],
                       if (card.context != null && card.kind != CardKind.quote) ...[
                         const SizedBox(height: 20),
@@ -266,10 +310,11 @@ class CardBack extends ConsumerWidget {
 /// The reader's own words: set off with a marigold rule, like a note in the
 /// margin.
 class NoteBlock extends ConsumerWidget {
-  const NoteBlock({required this.note, super.key, this.maxLines});
+  const NoteBlock({required this.note, super.key, this.maxLines, this.font});
 
   final String note;
   final int? maxLines;
+  final CardFont? font;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -280,7 +325,7 @@ class NoteBlock extends ConsumerWidget {
       decoration: BoxDecoration(border: Border(left: BorderSide(color: c.marigold, width: 3))),
       child: Text(
         note,
-        style: scriptStyle(note, color: c.ink, scale: scale, size: 15, italic: true),
+        style: cardStyle(note, font ?? ref.watch(settingsProvider).cardFont, color: c.ink, scale: scale, size: 15, italic: true),
         maxLines: maxLines,
         overflow: maxLines == null ? null : TextOverflow.ellipsis,
       ),
@@ -316,20 +361,24 @@ class _ContextLine extends StatelessWidget {
 
 /// A card in a list: both sides at a glance.
 class CardTile extends ConsumerWidget {
-  const CardTile({required this.card, super.key, this.onTap, this.showLocation = false});
+  const CardTile({required this.card, super.key, this.onTap, this.showLocation = false, this.font});
 
   final Flashcard card;
   final VoidCallback? onTap;
   final bool showLocation;
 
+  /// A deck's own font (a published recap); the reader's setting otherwise.
+  final CardFont? font;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
     final scale = ref.watch(settingsProvider).hindiScale;
+    final f = font ?? ref.watch(settingsProvider).cardFont;
     final front = switch (card.kind) {
-      CardKind.quote => Text('“${card.front}”', style: EnglishText.italic(c.ink, size: 16), maxLines: 4, overflow: TextOverflow.ellipsis),
-      CardKind.word => Text(card.front, style: EnglishText.word(c.ink, size: 20)),
-      CardKind.idea => Text(card.front, style: scriptStyle(card.front, color: c.ink, scale: scale, weight: FontWeight.w600), maxLines: 3, overflow: TextOverflow.ellipsis),
+      CardKind.quote => Text('“${card.front}”', style: cardStyle(card.front, f, color: c.ink, scale: scale, italic: true), maxLines: 4, overflow: TextOverflow.ellipsis),
+      CardKind.word => Text(card.front, style: cardStyle(card.front, f, color: c.ink, scale: scale, size: 20, weight: FontWeight.w600)),
+      CardKind.idea => Text(card.front, style: cardStyle(card.front, f, color: c.ink, scale: scale, weight: FontWeight.w600), maxLines: 3, overflow: TextOverflow.ellipsis),
     };
     return Material(
       color: c.card,
@@ -351,11 +400,11 @@ class CardTile extends ConsumerWidget {
               front,
               if (card.back.isNotEmpty) ...[
                 const SizedBox(height: 6),
-                Text(card.back, style: scriptStyle(card.back, color: c.inkMuted, scale: scale, size: 15), maxLines: 3, overflow: TextOverflow.ellipsis),
+                Text(card.back, style: cardStyle(card.back, f, color: c.inkMuted, scale: scale, size: 15), maxLines: 3, overflow: TextOverflow.ellipsis),
               ],
               if (card.note.isNotEmpty) ...[
                 const SizedBox(height: 10),
-                NoteBlock(note: card.note, maxLines: 3),
+                NoteBlock(note: card.note, maxLines: 3, font: f),
               ],
             ],
           ),

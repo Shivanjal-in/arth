@@ -35,6 +35,9 @@ enum AppStrings {
       );
   String get notStarted => _('Not started', 'अभी शुरू नहीं किया');
   String page(int n, int total) => _('Page $n of $total', 'पृष्ठ $n / $total');
+  String get goToPage => _('Go to page', 'पृष्ठ पर जाएँ');
+  String get go => _('Go', 'जाएँ');
+  String pageRange(int total) => _('1 to $total', '1 से $total तक');
   String pageLabel(int n) => _('Page $n', 'पृष्ठ $n');
   String get removeBook => _('Remove this book?', 'किताब हटाएँ?');
   String get no => _('No', 'नहीं');
@@ -159,6 +162,41 @@ enum AppStrings {
   String get hindiSize => _('Hindi text size', 'हिंदी का आकार');
   String get tts => _('Pronunciation (TTS)', 'उच्चारण सुनें (TTS)');
   String get haptics => _('Vibration on touch', 'छूने पर हल्का कंपन');
+  String get cardFont => _('Card font', 'कार्ड का फ़ॉन्ट');
+  String get cardFontHelp => _(
+        'How your cards look, here and when you share them: the PDF and the community use it too.',
+        'आपके कार्ड कैसे दिखें — यहाँ भी, और साझा करते समय PDF और समुदाय में भी।',
+      );
+  String get cardReminders => _('Card review reminders', 'कार्ड दोहराने की याद');
+  String get cardRemindersHelp => _(
+        'After you make a card, a reminder to look at it again. Never between 10 pm and 9 am.',
+        'कार्ड बनाने के बाद उसे फिर देखने की याद। रात 10 से सुबह 9 बजे के बीच कभी नहीं।',
+      );
+  String reminderNumber(int n) => _(
+        switch (n) { 1 => 'First reminder', 2 => 'Second reminder', _ => 'Third reminder' },
+        switch (n) { 1 => 'पहली याद', 2 => 'दूसरी याद', _ => 'तीसरी याद' },
+      );
+  String afterHours(int h) => h % 168 == 0
+      ? _(h == 168 ? 'After 1 week' : 'After ${h ~/ 168} weeks', '${h ~/ 168} हफ़्ते बाद')
+      : h % 24 == 0 && h >= 48
+          ? _('After ${h ~/ 24} days', '${h ~/ 24} दिन बाद')
+          : h == 24
+              ? _('After 1 day', '1 दिन बाद')
+              : _('After $h hours', '$h घंटे बाद');
+  String get remindersBlocked => _(
+        'Notifications are off for Arth. Turn them on in your phone’s settings to get reminders.',
+        'Arth की सूचनाएँ बंद हैं। याद पाने के लिए फ़ोन की सेटिंग में इन्हें चालू करें।',
+      );
+  String get reminderTitle => _('Time to look at your cards', 'कार्ड दोहराने का समय');
+  String reminderBody(int cards, String? book, int otherBooks) {
+    final what = cardCount(cards);
+    if (book == null) return _('$what are ready for a quick review.', '$what एक झलक के लिए तैयार हैं।');
+    if (otherBooks == 0) return _('$what from $book are ready for a quick review.', '$book के $what एक झलक के लिए तैयार हैं।');
+    return _(
+      '$what from $book and ${otherBooks == 1 ? '1 more book' : '$otherBooks more books'} are ready for a quick review.',
+      '$book और $otherBooks और किताबों के $what एक झलक के लिए तैयार हैं।',
+    );
+  }
   String get prefetch => _('Prefetch meanings while reading', 'पढ़ते समय अर्थ पहले से लाएँ');
   String get prefetchHelp => _(
         'Resolves hard words on the next page in the background. Uses data.',
@@ -178,7 +216,6 @@ enum AppStrings {
     }
     return b.toString();
   }
-  String get updateDictionary => _('Update dictionary', 'शब्दकोश अपडेट करें');
   String get serverHelp => _(
         'Leave empty to use the build default',
         'खाली छोड़ें तो बिल्ड का डिफ़ॉल्ट इस्तेमाल होगा',
@@ -299,6 +336,35 @@ enum AppStrings {
   String get bookmarksEmpty => _('No bookmarks yet. Tap the ribbon at the top to mark a place.', 'अभी कोई बुकमार्क नहीं। ऊपर रिबन दबाकर जगह चिह्नित करें।');
   String get more => _('More', 'और');
   String get continueReading => _('Continue reading', 'पढ़ना जारी रखें');
+  // ---- vocabulary ----
+  String get vocabulary => _('Vocabulary', 'शब्द भंडार');
+  String get wordsFromBook => _('Words from this book', 'इस किताब के शब्द');
+  String lifetimeWords(int words, int books) => _(
+        '${words == 1 ? '1 word' : '$words words'} from ${books == 1 ? '1 book' : '$books books'}',
+        '$books किताबों से $words शब्द',
+      );
+  String bookWordsSummary(int all, int fresh) => _(
+        'You looked up ${all == 1 ? '1 word' : '$all words'} in this book; ${fresh == all ? (all == 1 ? 'it was' : 'all were') : '$fresh'} new to you.',
+        'इस किताब में आपने $all शब्द देखे; इनमें से $fresh आपके लिए नए थे।',
+      );
+  String newToYou(int n) => _('New to you  $n', 'नए  $n');
+  String allWords(int n) => _('All  $n', 'सभी  $n');
+  String get metBefore => _('Met in an earlier book', 'पहले किसी किताब में मिला');
+  String firstMetIn(String book) => _('First met in $book', 'पहली बार: $book');
+  String lookedUpTimes(int n) => _(n == 1 ? 'looked up once' : 'looked up $n times', '$n बार देखा');
+  String inBooks(int n) => _('in $n books', '$n किताबों में');
+  String get sortAz => _('A–Z', 'अ–ज़');
+  String get searchWords => _('Search your words', 'अपने शब्द खोजें');
+  String get vocabularyEmpty => _(
+        'Words you tap while reading gather here, with the book you met them in.',
+        'पढ़ते समय जिन शब्दों पर आप टैप करते हैं, वे उस किताब के नाम के साथ यहाँ जमा होते हैं।',
+      );
+  String get bookVocabularyEmpty => _(
+        'No words looked up in this book yet. Tap any word while reading to see its meaning; it will be kept here.',
+        'इस किताब में अभी कोई शब्द नहीं देखा। पढ़ते समय किसी शब्द पर टैप करें; वह यहाँ रखा जाएगा।',
+      );
+  String get seeAllWords => _('All your words', 'आपके सारे शब्द');
+
   String get cardsForBook => _('Cards for this book', 'इस किताब के कार्ड');
 
   // ---- account ----
@@ -362,6 +428,10 @@ enum AppStrings {
   String get aiSignInTranslate => _('Sign in to translate sentences. Your first 100 AI answers are free.', 'वाक्यों का अनुवाद देखने के लिए साइन इन करें। पहले 100 AI जवाब मुफ़्त हैं।');
   String get aiSignInRareWord => _('This word isn’t in the offline dictionary. Sign in to look it up with AI.', 'यह शब्द ऑफ़लाइन शब्दकोश में नहीं है। AI से देखने के लिए साइन इन करें।');
   String get aiQuotaUsed => _('You’ve used all your AI answers. The offline dictionary still works.', 'आपके सारे AI जवाब इस्तेमाल हो चुके हैं। ऑफ़लाइन शब्दकोश चलता रहेगा।');
+  String get aiQuotaPhone => _(
+        'This phone has already used its free AI answers, on this or another account. A plan brings them back; the offline dictionary still works.',
+        'इस फ़ोन के मुफ़्त AI जवाब इस या किसी दूसरे खाते से इस्तेमाल हो चुके हैं। प्लान लेकर फिर पाएँ; ऑफ़लाइन शब्दकोश चलता रहेगा।',
+      );
   String aiQuotaResets(String date) => _('You’ve used this month’s AI answers. More on $date; the offline dictionary still works.', 'इस महीने के AI जवाब खत्म हो गए। $date से फिर मिलेंगे; ऑफ़लाइन शब्दकोश चलता रहेगा।');
   String get seePlans => _('See plans', 'प्लान देखें');
   String get plans => _('Plans', 'प्लान');
@@ -413,6 +483,19 @@ enum AppStrings {
   String get heldForReview => _('Held for review after reports. Only you can see it until an admin decides.', 'रिपोर्ट के बाद समीक्षा के लिए रोका गया। एडमिन के फ़ैसले तक सिर्फ़ आप इसे देख सकते हैं।');
   String get shareToCommunity => _('Share to community', 'समुदाय में साझा करें');
   String get shareTitle => _('Share your recap', 'अपना सार साझा करें');
+  String get share => _('Share', 'साझा करें');
+  String get exportPdf => _('Export as PDF', 'PDF बनाएँ');
+  String get exportPdfHint => _(
+        'Every card, to send to anyone or print. No account needed.',
+        'सारे कार्ड, किसी को भेजने या छापने के लिए। खाते की ज़रूरत नहीं।',
+      );
+  String get shareToCommunityHint => _(
+        'Publish your cards for other Arth readers.',
+        'अपने कार्ड Arth के दूसरे पाठकों के लिए प्रकाशित करें।',
+      );
+  String get preparingPdf => _('Making the PDF…', 'PDF बन रहा है…');
+  String get pdfFailed => _('Couldn’t make the PDF. Try again.', 'PDF नहीं बन पाया। फिर कोशिश करें।');
+  String pdfSubject(String book) => _('My cards from $book', '$book से मेरे कार्ड');
   String get shareIntro => _('Other readers will see the cards you choose, with your name and photo.', 'दूसरे पाठक आपके चुने कार्ड आपके नाम और फ़ोटो के साथ देखेंगे।');
   String get recapTitleHint => _('A title (optional), e.g. “What stayed with me”', 'शीर्षक (वैकल्पिक), जैसे “जो मन में रह गया”');
   String get blurbHint => _('A line about the book or your cards (optional)', 'किताब या कार्ड के बारे में एक पंक्ति (वैकल्पिक)');
@@ -422,6 +505,12 @@ enum AppStrings {
   String get publish => _('Publish', 'प्रकाशित करें');
   String get published => _('Published to the community', 'समुदाय में प्रकाशित हुआ');
   String get publishNeedsPlan => _('Sharing recaps is part of Pro and Super. Anyone can browse, save and comment.', 'सार साझा करना Pro और Super में है। ब्राउज़, सहेजना और टिप्पणी सभी कर सकते हैं।');
+  String get scanTitlePaid => _('Scan printed pages', 'छपे पन्ने स्कैन करें');
+  String get scanNeedsPlan => _(
+        'Photographing a page and reading it word by word is part of Pro and Super. Scans you already have stay readable.',
+        'पन्ने की फ़ोटो लेकर उसे शब्द-दर-शब्द पढ़ना Pro और Super में है। पहले से स्कैन किए पन्ने पढ़े जा सकते हैं।',
+      );
+  String get planScanShare => _('Scan printed pages, share recaps', 'छपे पन्ने स्कैन करें, सार साझा करें');
   String get signInToShare => _('Sign in to share your recap.', 'सार साझा करने के लिए साइन इन करें।');
   String get bannedNotice => _('Your account can’t post in the community right now.', 'आपका खाता अभी समुदाय में लिख नहीं सकता।');
   String get justNow => _('just now', 'अभी');

@@ -1,5 +1,6 @@
 // App-wide Riverpod providers. Everything below the UI is reachable from here.
 
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:arth/app/account_providers.dart';
@@ -8,9 +9,12 @@ import 'package:arth/app/strings.dart';
 import 'package:arth/app/tts.dart';
 import 'package:arth/data/api_client.dart';
 import 'package:arth/data/dictionary_repo.dart';
+import 'package:arth/data/highlight_plan.dart';
 import 'package:arth/data/local_store.dart';
 import 'package:arth/data/ocr_service.dart';
 import 'package:arth/data/seed_loader.dart';
+import 'package:crypto/crypto.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Opened once in main() before runApp so screens never see a loading store.
@@ -47,7 +51,16 @@ final deviceIdProvider = Provider<String>((_) => throw UnimplementedError());
 
 /// Reads (or mints) the device id from the kv table. Random v4 UUID; no
 /// package needed.
+/// This phone's id for the API (rate limits, and the Free plan's per-phone
+/// AI allowance). From the platform's reinstall-proof id (Android's
+/// ANDROID_ID, an iOS Keychain item), hashed so the raw id never leaves the
+/// phone; a random id kept in the database where that isn't available.
 Future<String> loadDeviceId(LocalStore store) async {
+  try {
+    final stable = await const MethodChannel('arth/device').invokeMethod<String>('stableId');
+    if (stable != null && stable.isNotEmpty) return deviceIdFrom(stable);
+  } on PlatformException catch (_) {
+  } on MissingPluginException catch (_) {}
   final existing = await store.get('device_id');
   if (existing != null && existing.isNotEmpty) return existing;
   final r = Random.secure();
@@ -58,6 +71,12 @@ Future<String> loadDeviceId(LocalStore store) async {
   final id = '${h.substring(0, 8)}-${h.substring(8, 12)}-${h.substring(12, 16)}-${h.substring(16, 20)}-${h.substring(20)}';
   await store.set('device_id', id);
   return id;
+}
+
+/// A platform id as a UUID-shaped SHA-256 digest (salted for this app).
+String deviceIdFrom(String platformId) {
+  final h = sha256.convert(utf8.encode('arth-device:$platformId')).toString();
+  return '${h.substring(0, 8)}-${h.substring(8, 12)}-${h.substring(12, 16)}-${h.substring(16, 20)}-${h.substring(20, 32)}';
 }
 
 final apiClientProvider = Provider<ApiClient>((ref) {
@@ -264,23 +283,34 @@ class HighlightsNotifier extends FamilyAsyncNotifier<List<Highlight>, int> {
   @override
   Future<List<Highlight>> build(int arg) => ref.watch(localStoreProvider).highlights(arg);
 
+  /// Highlights words [startWord]..[endWord] without stacking on what's
+  /// there (see planHighlight). [textOf] gives the text of any word range in
+  /// the same block, for merged and trimmed highlights. [replacing] is an
+  /// existing highlight being recoloured.
   Future<Highlight> add({
     required int page,
     required int startWord,
     required int endWord,
-    required String text,
     required HighlightColor color,
+    required String Function(int start, int end) textOf,
     int? block,
+    int? replacing,
   }) async {
-    final h = await ref.read(localStoreProvider).addHighlight(
-          bookId: arg,
-          page: page,
-          block: block,
-          startWord: startWord,
-          endWord: endWord,
-          text: text,
-          color: color,
-        );
+    final store = ref.read(localStoreProvider);
+    final all = await store.highlights(arg);
+    final here = [for (final h in all) if (h.page == page && h.block == block && h.id != replacing) h];
+    final plan = planHighlight(here, startWord, endWord, color);
+    final h = await store.rearrangeHighlights(
+      bookId: arg,
+      page: page,
+      block: block,
+      remove: [...plan.remove, ?replacing],
+      trim: [for (final t in plan.trim) (id: t.id, start: t.range.start, end: t.range.end, text: textOf(t.range.start, t.range.end))],
+      insert: [
+        (start: plan.add.start, end: plan.add.end, text: textOf(plan.add.start, plan.add.end), color: color),
+        for (final p in plan.split) (start: p.range.start, end: p.range.end, text: textOf(p.range.start, p.range.end), color: p.color),
+      ],
+    );
     ref.invalidateSelf();
     return h;
   }

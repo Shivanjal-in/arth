@@ -15,6 +15,7 @@ import 'package:arth/core/formats/reflow_book.dart';
 import 'package:arth/data/local_store.dart';
 import 'package:arth/features/cards/deck_screen.dart';
 import 'package:arth/features/library/book_cover.dart';
+import 'package:arth/features/plans/paid_gate.dart';
 import 'package:arth/features/scan/scan_pages.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -89,6 +90,8 @@ class LibraryScreen extends ConsumerWidget {
   }
 
   Future<void> _scan(BuildContext context, WidgetRef ref, ScanSource source) async {
+    final t0 = ref.read(stringsProvider);
+    if (!await ensurePaid(context, ref, title: t0.scanTitlePaid, why: t0.scanNeedsPlan)) return;
     final picked = await pickScanImage(source);
     if (picked == null || !context.mounted) return;
     final t = ref.read(stringsProvider);
@@ -122,6 +125,7 @@ class LibraryScreen extends ConsumerWidget {
             ListTile(
               leading: Icon(Icons.photo_camera_outlined, color: c.accent),
               title: Text(t.takePhoto, style: style),
+              trailing: const PaidTag(),
               onTap: () {
                 Navigator.pop(ctx);
                 unawaited(_scan(context, ref, ScanSource.camera));
@@ -130,6 +134,7 @@ class LibraryScreen extends ConsumerWidget {
             ListTile(
               leading: Icon(Icons.photo_library_outlined, color: c.accent),
               title: Text(t.chooseFromGallery, style: style),
+              trailing: const PaidTag(),
               onTap: () {
                 Navigator.pop(ctx);
                 unawaited(_scan(context, ref, ScanSource.gallery));

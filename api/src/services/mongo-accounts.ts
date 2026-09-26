@@ -1,4 +1,4 @@
-import { BookmarkModel, FlashcardModel, UserModel } from '../db/models/account.js';
+import { BookmarkModel, FlashcardModel, PhoneModel, UserModel } from '../db/models/account.js';
 import type { AccountStore, BookmarkRow, CardRow, SyncKind, User } from './accounts.js';
 
 const models = { cards: FlashcardModel, bookmarks: BookmarkModel } as const;
@@ -86,6 +86,32 @@ export const mongoAccountStore: AccountStore = {
   async refundAi(uid, month) {
     await UserModel.updateOne({ _id: uid, aiTotal: { $gt: 0 } }, { $inc: { aiTotal: -1 } });
     await UserModel.updateOne({ _id: uid, aiMonth: month, aiMonthUses: { $gt: 0 } }, { $inc: { aiMonthUses: -1 } });
+  },
+  async consumeDeviceAi(deviceId, uid, max, maxAccounts) {
+    const now = Date.now();
+    await PhoneModel.updateOne({ _id: deviceId }, { $setOnInsert: { aiUsed: 0, accounts: [], updatedAt: now } }, { upsert: true });
+    // One atomic step: room left, and this account is known or there's a
+    // free slot for it. Parallel taps can't overshoot either limit.
+    const doc = await PhoneModel.findOneAndUpdate(
+      {
+        _id: deviceId,
+        aiUsed: { $lt: max },
+        $or: [{ accounts: uid }, { $expr: { $lt: [{ $size: '$accounts' }, maxAccounts] } }],
+      },
+      { $inc: { aiUsed: 1 }, $addToSet: { accounts: uid }, $set: { updatedAt: now } },
+      { new: true },
+    ).lean();
+    if (doc) return { ok: true, used: doc.aiUsed };
+    const cur = await PhoneModel.findById(deviceId).lean();
+    const used = cur?.aiUsed ?? 0;
+    const known = cur?.accounts.includes(uid) ?? false;
+    return { ok: false, reason: !known && (cur?.accounts.length ?? 0) >= maxAccounts ? 'accounts' : 'exhausted', used };
+  },
+  async refundDeviceAi(deviceId) {
+    await PhoneModel.updateOne({ _id: deviceId, aiUsed: { $gt: 0 } }, { $inc: { aiUsed: -1 } });
+  },
+  async deviceAiUsed(deviceId) {
+    return (await PhoneModel.findById(deviceId, { aiUsed: 1 }).lean())?.aiUsed ?? 0;
   },
   async addPushDevice(uid, device) {
     await UserModel.updateMany({ _id: { $ne: uid } }, { $pull: { pushDevices: { token: device.token } } });

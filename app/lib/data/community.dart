@@ -1,6 +1,7 @@
 // The community as the API describes it (api/src/routes/community.ts,
 // admin.ts): published recaps of books, their comments, and admin views.
 
+import 'package:arth/app/settings.dart';
 import 'package:arth/data/account.dart';
 import 'package:arth/data/local_store.dart';
 
@@ -73,6 +74,7 @@ class PublishedDeckSummary {
     required this.createdAt,
     required this.author,
     required this.liked,
+    this.font = CardFont.montserrat,
   });
 
   factory PublishedDeckSummary.fromJson(Map<String, dynamic> j) => PublishedDeckSummary(
@@ -88,6 +90,7 @@ class PublishedDeckSummary {
         createdAt: _ms(j['createdAt']),
         author: Author.fromJson(j['author'] as Map<String, dynamic>),
         liked: (j['liked'] as bool?) ?? false,
+        font: CardFont.values.asNameMap()[j['font']] ?? CardFont.montserrat,
       );
 
   final String id;
@@ -102,6 +105,9 @@ class PublishedDeckSummary {
   final DateTime createdAt;
   final Author author;
   final bool liked;
+
+  /// The font its author chose for the cards.
+  final CardFont font;
 }
 
 class CommunityComment {

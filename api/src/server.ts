@@ -20,6 +20,7 @@ const app = buildApp({
   cache: withMemory(mongoCache),
   llm: new OpenAIProvider(config.OPENAI_API_KEY),
   config,
+  seedLimit: config.SEED_LIMIT,
   rateLimits: { lookups: config.RATE_LIMIT_LOOKUPS, llm: config.RATE_LIMIT_LLM, prefetch: config.RATE_LIMIT_PREFETCH },
   accounts: {
     store: mongoAccountStore,
@@ -30,7 +31,7 @@ const app = buildApp({
   // Without a Firebase project nobody can sign in, so AI stays open.
   enforceQuota: config.FIREBASE_PROJECT_ID !== '',
   community: mongoCommunityStore,
-  limits: { free: config.AI_FREE_LIMIT, proMonthly: config.AI_PRO_MONTHLY },
+  limits: { free: config.AI_FREE_LIMIT, proMonthly: config.AI_PRO_MONTHLY, freeAccountsPerDevice: config.AI_FREE_ACCOUNTS_PER_DEVICE },
 });
 
 try {

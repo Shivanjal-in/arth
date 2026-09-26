@@ -23,6 +23,7 @@ Future<void> showHighlightsSheet(
       builder: (_) => DraggableScrollableSheet(
         expand: false,
         initialChildSize: 0.6,
+        maxChildSize: 0.92,
         builder: (ctx, scroll) => _HighlightsList(
           bookId: bookId,
           scroll: scroll,

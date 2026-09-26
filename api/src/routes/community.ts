@@ -17,6 +17,8 @@ import {
   type CommunityStore,
   type Deck,
   type DeckCard,
+  type DeckFont,
+  DECK_FONTS,
 } from '../services/community.js';
 import { notifyUser } from '../push/notify.js';
 import { disabledPusher } from '../push/pusher.js';
@@ -44,6 +46,7 @@ const summary = (d: Deck, author: Author, liked: boolean) => ({
   title: d.title,
   bookTitle: d.bookTitle,
   blurb: d.blurb,
+  font: d.font ?? 'montserrat',
   cardCount: d.cardCount,
   preview: d.cards.slice(0, 3).map((c) => ({ kind: c.kind, front: c.front })),
   likes: d.likes,
@@ -78,7 +81,7 @@ const cardSchema = {
   },
 } as const;
 
-type PublishBody = { title?: string; bookTitle: string; bookKey?: string | null; blurb?: string; cards: Partial<DeckCard>[] };
+type PublishBody = { title?: string; bookTitle: string; bookKey?: string | null; blurb?: string; font?: DeckFont; cards: Partial<DeckCard>[] };
 
 const normalizeCards = (cards: Partial<DeckCard>[]): DeckCard[] =>
   cards.map((c) => ({ kind: c.kind!, front: c.front!, back: c.back ?? '', note: c.note ?? '', location: c.location ?? null }));
@@ -157,6 +160,7 @@ export const communityRoutes: FastifyPluginAsync<CommunityDeps> = async (app, de
             bookTitle: { type: 'string', minLength: 1, maxLength: 300 },
             bookKey: { type: ['string', 'null'], maxLength: 128 },
             blurb: text(600),
+            font: { enum: [...DECK_FONTS] },
             cards: { type: 'array', minItems: 1, maxItems: 300, items: cardSchema },
           },
         },
@@ -170,6 +174,7 @@ export const communityRoutes: FastifyPluginAsync<CommunityDeps> = async (app, de
         bookTitle: b.bookTitle,
         bookKey: b.bookKey ?? null,
         blurb: b.blurb ?? '',
+        ...(b.font ? { font: b.font } : {}),
         cards: normalizeCards(b.cards),
       });
       return ok({ id: deck.id });
@@ -184,7 +189,7 @@ export const communityRoutes: FastifyPluginAsync<CommunityDeps> = async (app, de
         body: {
           type: 'object',
           additionalProperties: false,
-          properties: { title: text(120), blurb: text(600), cards: { type: 'array', minItems: 1, maxItems: 300, items: cardSchema } },
+          properties: { title: text(120), blurb: text(600), font: { enum: [...DECK_FONTS] }, cards: { type: 'array', minItems: 1, maxItems: 300, items: cardSchema } },
         },
       },
     },
@@ -194,6 +199,7 @@ export const communityRoutes: FastifyPluginAsync<CommunityDeps> = async (app, de
       await editDeck(store, me, req.params.id, {
         ...(b.title !== undefined ? { title: b.title } : {}),
         ...(b.blurb !== undefined ? { blurb: b.blurb } : {}),
+        ...(b.font !== undefined ? { font: b.font } : {}),
         ...(b.cards !== undefined ? { cards: normalizeCards(b.cards) } : {}),
       });
       return ok({ id: req.params.id });

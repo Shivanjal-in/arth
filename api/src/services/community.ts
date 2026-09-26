@@ -24,6 +24,10 @@ export type DeckCard = {
   location: string | null;
 };
 
+/** The typeface the author chose for their cards; readers see it too. */
+export const DECK_FONTS = ['montserrat', 'quintessential', 'bricolage'] as const;
+export type DeckFont = (typeof DECK_FONTS)[number];
+
 export type Deck = {
   id: string;
   owner: string;
@@ -33,6 +37,8 @@ export type Deck = {
   /** Content fingerprint of the author's copy; a saved deck attaches to the same book. */
   bookKey: string | null;
   blurb: string;
+  /** Absent on decks published before fonts: Montserrat. */
+  font?: DeckFont;
   cards: DeckCard[];
   /** cards.length, stored: lists fetch only a preview of the cards. */
   cardCount: number;
@@ -110,7 +116,7 @@ function assertActive(user: User) {
   if (user.banned) throw new ApiError('FORBIDDEN', 'आप अभी समुदाय में लिख नहीं सकते।');
 }
 
-export type PublishInput = { title: string; bookTitle: string; bookKey: string | null; blurb: string; cards: DeckCard[] };
+export type PublishInput = { title: string; bookTitle: string; bookKey: string | null; blurb: string; font?: DeckFont; cards: DeckCard[] };
 
 export async function publishDeck(store: CommunityStore, user: User, input: PublishInput, now = Date.now()): Promise<Deck> {
   if (!canPublish(user)) throw new ApiError('FORBIDDEN', 'डेक साझा करने के लिए Pro या Super प्लान चाहिए।', { reason: 'tier' });
@@ -121,6 +127,7 @@ export async function publishDeck(store: CommunityStore, user: User, input: Publ
     bookTitle: input.bookTitle.trim(),
     bookKey: input.bookKey,
     blurb: input.blurb.trim(),
+    font: input.font ?? 'montserrat',
     cards: input.cards.slice(0, MAX_CARDS),
     cardCount: Math.min(input.cards.length, MAX_CARDS),
     likes: 0,
@@ -153,6 +160,7 @@ export async function editDeck(store: CommunityStore, user: User, id: string, in
   const set: Partial<Deck> = { updatedAt: now };
   if (input.title !== undefined) set.title = input.title.trim();
   if (input.blurb !== undefined) set.blurb = input.blurb.trim();
+  if (input.font !== undefined) set.font = input.font;
   if (input.cards !== undefined) {
     set.cards = input.cards.slice(0, MAX_CARDS);
     set.cardCount = set.cards.length;

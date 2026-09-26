@@ -349,7 +349,7 @@ class _PublishedDeckScreenState extends ConsumerState<PublishedDeckScreen> {
             sliver: SliverList.separated(
               itemCount: d.cards.length,
               separatorBuilder: (_, _) => const SizedBox(height: 10),
-              itemBuilder: (_, i) => CardTile(card: d.cards[i].asFlashcard(i), showLocation: true),
+              itemBuilder: (_, i) => CardTile(card: d.cards[i].asFlashcard(i), showLocation: true, font: d.summary.font),
             ),
           ),
           SliverToBoxAdapter(

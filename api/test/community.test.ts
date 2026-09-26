@@ -108,6 +108,27 @@ describe('publishing', () => {
   });
 });
 
+describe('card font', () => {
+  test('a recap keeps the font its author chose; older ones read as Montserrat', async () => {
+    const { app } = await setup();
+    const plain = await publish(app);
+    assert.equal((await app.inject({ method: 'GET', url: `/v1/community/decks/${plain}` })).json().data.font, 'montserrat');
+
+    const res = await app.inject({ method: 'POST', url: '/v1/community/decks', headers: as('pro'), payload: { ...deckBody, font: 'quintessential' } });
+    const id = res.json().data.id as string;
+    assert.equal((await app.inject({ method: 'GET', url: `/v1/community/decks/${id}` })).json().data.font, 'quintessential');
+    const listed = (await app.inject({ method: 'GET', url: '/v1/community/decks' })).json().data.decks;
+    assert.equal(listed.find((d: { id: string }) => d.id === id).font, 'quintessential');
+
+    await app.inject({ method: 'PATCH', url: `/v1/community/decks/${id}`, headers: as('pro'), payload: { font: 'bricolage' } });
+    assert.equal((await app.inject({ method: 'GET', url: `/v1/community/decks/${id}` })).json().data.font, 'bricolage');
+
+    const bad = await app.inject({ method: 'POST', url: '/v1/community/decks', headers: as('pro'), payload: { ...deckBody, font: 'comic-sans' } });
+    assert.equal(bad.statusCode, 400);
+    await app.close();
+  });
+});
+
 describe('reactions and comments', () => {
   test('like toggles; a save counts once per reader', async () => {
     const { app } = await setup();

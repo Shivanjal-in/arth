@@ -8,11 +8,11 @@ import 'package:arth/app/account_providers.dart';
 import 'package:arth/app/feel.dart';
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/theme.dart';
-import 'package:arth/data/account.dart';
 import 'package:arth/data/api_client.dart';
 import 'package:arth/data/community.dart';
 import 'package:arth/data/local_store.dart';
 import 'package:arth/features/cards/card_face.dart';
+import 'package:arth/features/plans/paid_gate.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -25,43 +25,7 @@ Future<void> shareRecap(BuildContext context, WidgetRef ref, {required String bo
     messenger?.showSnackBar(SnackBar(content: Text(t.signInToShare), persist: false, action: SnackBarAction(label: t.signIn, onPressed: () => context.push('/signin'))));
     return;
   }
-  final account = ref.read(accountProvider).valueOrNull;
-  final paid = account != null && (account.tier != Tier.free || account.isAdmin);
-  if (!paid) {
-    final c = context.colors;
-    await showModalBottomSheet<void>(
-      context: context,
-      useSafeArea: true,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.workspace_premium_outlined, color: c.marigold, size: 32),
-              const SizedBox(height: 12),
-              Text(t.shareToCommunity, style: uiHeading(hindi: t.isHindi, color: c.ink)),
-              const SizedBox(height: 8),
-              Text(t.publishNeedsPlan, style: uiBody(hindi: t.isHindi, color: c.inkMuted)),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    unawaited(context.push('/plans'));
-                  },
-                  child: Text(t.seePlans),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    return;
-  }
+  if (!await ensurePaid(context, ref, title: t.shareToCommunity, why: t.publishNeedsPlan)) return;
   if (!context.mounted) return;
   final id = await showModalBottomSheet<String>(
     context: context,
@@ -112,6 +76,7 @@ class _PublishSheetState extends ConsumerState<_PublishSheet> {
             bookKey: widget.bookKey,
             title: _title.text.trim(),
             blurb: _blurb.text.trim(),
+            font: ref.read(settingsProvider).cardFont.name,
             cards: [for (final c in widget.cards) if (_chosen.contains(c.id)) DeckCard.of(c)],
           );
       Haptics.commit();
@@ -141,11 +106,21 @@ class _PublishSheetState extends ConsumerState<_PublishSheet> {
             Expanded(
               child: ListView(
                 controller: scroll,
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
                 children: [
                   Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: c.rule, borderRadius: BorderRadius.circular(2)))),
                   const SizedBox(height: 14),
-                  Text(t.shareTitle, style: uiHeading(hindi: t.isHindi, color: c.ink, scale: scale)),
+                  Row(
+                    children: [
+                      Expanded(child: Text(t.shareTitle, style: uiHeading(hindi: t.isHindi, color: c.ink, scale: scale))),
+                      IconButton(
+                        tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                        icon: Icon(Icons.close_rounded, color: c.inkMuted),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 4),
                   Text(widget.bookTitle, style: EnglishText.italic(c.inkMuted, size: 15)),
                   const SizedBox(height: 8),

@@ -24,6 +24,7 @@ Future<void> showBookmarksSheet(BuildContext context, {required int bookId, requ
       builder: (_) => DraggableScrollableSheet(
         expand: false,
         initialChildSize: 0.55,
+        maxChildSize: 0.92,
         builder: (ctx, scroll) => _BookmarksList(
           bookId: bookId,
           scroll: scroll,

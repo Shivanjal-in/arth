@@ -32,6 +32,7 @@ import 'package:arth/features/cards/deck_screen.dart';
 import 'package:arth/features/epub/epub_paragraph.dart';
 import 'package:arth/features/reader/bookmarks_sheet.dart';
 import 'package:arth/features/reader/details_sheet.dart';
+import 'package:arth/features/reader/flick_physics.dart';
 import 'package:arth/features/reader/highlights/highlight_colors.dart';
 import 'package:arth/features/reader/highlights/highlights_sheet.dart';
 import 'package:arth/features/reader/reader_controller.dart';
@@ -390,6 +391,7 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
     });
     _portal.show();
     await ref.read(readerControllerProvider.notifier).showWord(
+          book: (id: widget.book.id, title: widget.book.title),
           word: word,
           page: at.chapter + 1,
           sentence: sentence,
@@ -428,6 +430,7 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
       HighlightBarState() => s.text,
     };
     await ref.read(readerControllerProvider.notifier).showWord(
+          book: (id: widget.book.id, title: widget.book.title),
           word: PageWord(index: 0, start: 0, end: 0, text: word, rect: s.anchor),
           page: s.page,
           sentence: sentence,
@@ -483,22 +486,6 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
 
   HighlightsNotifier get _highlighter => ref.read(highlightsProvider(widget.book.id).notifier);
 
-  /// The word nearest [point] in the block, for dragging past line ends.
-  static PageWord? _nearestWord(PageTextIndex idx, Offset point) {
-    PageWord? best;
-    var bestDist = double.infinity;
-    for (final w in idx.words) {
-      final dx = math.max<double>(0, math.max(w.rect.left - point.dx, point.dx - w.rect.right));
-      final dy = math.max<double>(0, math.max(w.rect.top - point.dy, point.dy - w.rect.bottom));
-      final d = dy * 1000 + dx; // the right line first, then the nearest word on it
-      if (d < bestDist) {
-        best = w;
-        bestDist = d;
-      }
-    }
-    return best;
-  }
-
   static Rect _rectOf(PageTextIndex idx, int start, int end) {
     var r = idx.words[start].rect;
     for (var i = start + 1; i <= end; i++) {
@@ -532,7 +519,7 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
   void _onPressMove(_BlockRef at, RenderParagraphBlock render, Offset local) {
     final sel = _selection;
     if (_editing != null || sel == null || sel.at != at) return;
-    final word = _nearestWord(render.index, local);
+    final word = nearestWord(render.index, local);
     if (word == null) return;
     final start = math.min(_selectionAnchor, word.index);
     final end = math.max(_selectionAnchor, word.index);
@@ -562,16 +549,16 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
   Future<void> _pickColor(HighlightBarState s, HighlightColor color) async {
     final existing = s.existing;
     final sel = _selection;
-    if (existing != null) {
-      await _highlighter.recolor(existing.id, color);
-    } else if (sel != null) {
+    final render = _activeRender;
+    if (render != null && (existing != null || sel != null)) {
       await _highlighter.add(
-        page: sel.at.chapter + 1,
-        block: sel.at.block,
-        startWord: sel.start,
-        endWord: sel.end,
-        text: s.text,
+        page: existing?.page ?? sel!.at.chapter + 1,
+        block: existing?.block ?? sel!.at.block,
+        startWord: existing?.startWord ?? sel!.start,
+        endWord: existing?.endWord ?? sel!.end,
         color: color,
+        textOf: (a, b) => _textOf(render.index, a, b),
+        replacing: existing?.id,
       );
     }
     if (mounted) _dismiss();
@@ -590,14 +577,15 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
 
   Future<void> _highlightSentence(SentenceTooltipState s, HighlightColor color) async {
     final range = _sentenceRange;
-    if (range == null) return;
+    final render = _activeRender;
+    if (range == null || render == null) return;
     await _highlighter.add(
       page: range.at.chapter + 1,
       block: range.at.block,
       startWord: range.start,
       endWord: range.end,
-      text: s.text,
       color: color,
+      textOf: (a, b) => _textOf(render.index, a, b),
     );
     if (mounted) _dismiss();
   }
@@ -632,6 +620,7 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
       builder: (ctx) => DraggableScrollableSheet(
         expand: false,
         initialChildSize: 0.6,
+        maxChildSize: 0.92,
         builder: (_, scroll) => ListView.builder(
           controller: scroll,
           padding: const EdgeInsets.fromLTRB(8, 12, 8, 24),
@@ -700,6 +689,7 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
             onPressed: () => showReadingSettingsSheet(context),
           ),
           ReaderMoreMenu(
+            onWords: () => context.push(Uri(path: '/vocabulary', queryParameters: {'book': '${widget.book.id}', 'title': widget.book.title}).toString()),
             onHighlights: epub == null ? null : _showHighlights,
             onBookmarks: epub == null
                 ? null
@@ -791,10 +781,10 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
 typedef _BlockStyle = ({TextStyle base, EdgeInsets padding, TextAlign align});
 
 _BlockStyle _styleFor(EpubBlock b, {required bool first, required ArthColors c}) {
-  final body = EnglishText.body(c.ink, size: 17.5).copyWith(height: 1.55);
+  final body = BookText.body(c.ink);
   return switch (b.kind) {
     BlockKind.heading => (
-        base: EnglishText.heading(c.ink, size: switch (b.level) { 1 => 26, 2 => 22, 3 => 19.5, _ => 18 }),
+        base: BookText.heading(c.ink, size: switch (b.level) { 1 => 26, 2 => 22, 3 => 19.5, _ => 18 }),
         padding: EdgeInsets.only(top: first ? 8 : 28, bottom: 12),
         align: b.level <= 2 ? TextAlign.center : TextAlign.start,
       ),
@@ -961,6 +951,7 @@ class _ChapterViewState extends ConsumerState<_ChapterView> {
           onTap: widget.onTapOutside,
           child: ListView.builder(
             controller: _scroll,
+            physics: const FlickBoostPhysics(),
             padding: _pagePadding,
             itemCount: blocks.length,
             itemBuilder: (_, i) {

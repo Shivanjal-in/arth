@@ -28,6 +28,10 @@ const EnvSchema = z.object({
   /** Background prefetch (X-Prefetch: 1) has its own bucket so it never starves taps. */
   RATE_LIMIT_PREFETCH: z.coerce.number().int().default(40),
 
+  // --- on-device dictionary ---
+  /** How many of the most frequent entries phones download (GET /v1/seed). */
+  SEED_LIMIT: z.coerce.number().int().positive().max(100_000).default(20_000),
+
   // --- accounts ---
   /** Firebase project whose ID tokens we accept. Unset: account routes answer 503. */
   FIREBASE_PROJECT_ID: z.string().default(''),
@@ -38,6 +42,8 @@ const EnvSchema = z.object({
 
   // --- AI allowances (enforced only when accounts are on) ---
   AI_FREE_LIMIT: z.coerce.number().int().positive().default(100),
+  /** Free accounts that may share one phone's allowance (a new email doesn't reset it). */
+  AI_FREE_ACCOUNTS_PER_DEVICE: z.coerce.number().int().positive().default(3),
   AI_PRO_MONTHLY: z.coerce.number().int().positive().default(1000),
 });
 

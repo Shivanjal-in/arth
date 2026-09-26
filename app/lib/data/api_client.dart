@@ -18,6 +18,10 @@ const String kApiBaseUrl = String.fromEnvironment(
 );
 
 /// Typed failure from the API or the network.
+/// Codes meaning AI answers aren't available to this reader: signed out, the
+/// allowance spent, or this phone's Free allowance spent (by any account).
+const aiBlockCodes = {'UNAUTHORIZED', 'QUOTA_EXCEEDED', 'QUOTA_PHONE'};
+
 class ApiFailure implements Exception {
   const ApiFailure(this.code, this.message, {this.suggestions = const []});
 
@@ -208,10 +212,18 @@ class ApiClient {
 
   Future<PublishedDeck> communityDeck(String id) => _call(() => _dio.get('/community/decks/$id'), PublishedDeck.fromJson);
 
-  Future<String> publishDeck({required String bookTitle, required List<DeckCard> cards, String title = '', String blurb = '', String? bookKey}) => _call(
+  Future<String> publishDeck({
+    required String bookTitle,
+    required List<DeckCard> cards,
+    String title = '',
+    String blurb = '',
+    String? bookKey,
+    String? font,
+  }) =>
+      _call(
         () => _dio.post(
           '/community/decks',
-          data: {'title': title, 'bookTitle': bookTitle, 'bookKey': bookKey, 'blurb': blurb, 'cards': [for (final c in cards) c.toJson()]},
+          data: {'title': title, 'bookTitle': bookTitle, 'bookKey': bookKey, 'blurb': blurb, 'font': ?font, 'cards': [for (final c in cards) c.toJson()]},
         ),
         (d) => d['id'] as String,
       );
@@ -352,11 +364,11 @@ class ApiClient {
   }
 
   /// Raw NDJSON lines from /seed. The seed loader parses them.
-  Future<Stream<String>> seedLines({DateTime? since}) async {
+  Future<Stream<String>> seedLines({DateTime? since, int? afterRank}) async {
     try {
       final res = await _dio.get<ResponseBody>(
         '/seed',
-        queryParameters: {if (since != null) 'since': since.toIso8601String()},
+        queryParameters: {if (since != null) 'since': since.toIso8601String(), 'afterRank': ?afterRank},
         options: Options(
           responseType: ResponseType.stream,
           receiveTimeout: const Duration(minutes: 10),
@@ -383,8 +395,12 @@ class ApiClient {
   static ApiFailure _fromErrorBody(Map<String, dynamic> body) {
     final err = body['error'];
     if (err is Map<String, dynamic>) {
+      final code = (err['code'] as String?) ?? 'INTERNAL';
+      // The phone, not the account, is out: its own message (a new account
+      // on a spent phone hasn't "used" anything).
+      final phone = code == 'QUOTA_EXCEEDED' && (err['reason'] == 'phone' || err['reason'] == 'phone_accounts');
       return ApiFailure(
-        (err['code'] as String?) ?? 'INTERNAL',
+        phone ? 'QUOTA_PHONE' : code,
         (err['message'] as String?) ?? 'कुछ गड़बड़ हो गई।',
         suggestions: ((err['suggestions'] as List<dynamic>?) ?? const [])
             .cast<String>(),

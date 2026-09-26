@@ -275,7 +275,7 @@ class PublishedDeckTile extends ConsumerWidget {
                     Expanded(
                       child: Text(
                         p.kind == CardKind.quote ? '“${p.front}”' : p.front,
-                        style: scriptStyle(p.front, color: c.ink, scale: scale, size: 14.5, italic: p.kind == CardKind.quote),
+                        style: cardStyle(p.front, deck.font, color: c.ink, scale: scale, size: 14.5, italic: p.kind == CardKind.quote),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),

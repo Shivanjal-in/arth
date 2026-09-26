@@ -13,8 +13,13 @@
  */
 import type { Tier, User } from './accounts.js';
 
-export type Limits = { free: number; proMonthly: number };
-export const defaultLimits: Limits = { free: 100, proMonthly: 1000 };
+/**
+ * [free] is also the most one phone gets on the Free plan, whichever
+ * accounts use it, and [freeAccountsPerDevice] how many Free accounts may
+ * share a phone's allowance: signing in with a fresh email doesn't reset it.
+ */
+export type Limits = { free: number; proMonthly: number; freeAccountsPerDevice?: number };
+export const defaultLimits: Limits = { free: 100, proMonthly: 1000, freeAccountsPerDevice: 3 };
 
 /** How a tier is limited: a lifetime cap, a monthly cap, or none. */
 export type Allowance = { period: 'lifetime'; max: number } | { period: 'month'; max: number } | { period: 'none' };
@@ -47,6 +52,8 @@ export type Usage = {
   period: Allowance['period'];
   /** Ms timestamp for a monthly allowance; null otherwise. */
   resetsAt: number | null;
+  /** Set when the phone's Free allowance, not the account's, is the limit. */
+  phone?: true;
 };
 
 export function usageOf(user: User, limits: Limits = defaultLimits, now = Date.now()): Usage {

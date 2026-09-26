@@ -172,6 +172,7 @@ class ReaderController extends AutoDisposeNotifier<ReaderTooltip?> {
     required List<String> tokens,
     required int index,
     required List<Rect> Function(int start, int count) rectsForWindow,
+    ({int id, String title})? book,
   }) async {
     final gen = ++_generation;
     unawaited(_translation?.cancel());
@@ -198,6 +199,17 @@ class ReaderController extends AutoDisposeNotifier<ReaderTooltip?> {
     }
     if (outcome is LookupFound) {
       unawaited(ref.read(localStoreProvider).addRecentLookup(outcome.lemma));
+      // Vocabulary: this word was met in this book.
+      if (book != null) {
+        unawaited(
+          ref.read(localStoreProvider).recordWord(
+                lemma: outcome.lemma,
+                bookId: book.id,
+                bookTitle: book.title,
+                meaning: outcome.entry.senses.firstOrNull?.meaning ?? '',
+              ),
+        );
+      }
       // Step 4: context, in parallel with showing the entry. Single-sense
       // entries have nothing to disambiguate.
       if (outcome.entry.senses.length > 1) {
@@ -239,14 +251,14 @@ class ReaderController extends AutoDisposeNotifier<ReaderTooltip?> {
   /// this reader right now; null when they are.
   String? _blockedCode() => switch (ref.read(aiAccessProvider)) {
         AiAccess.signedOut => 'UNAUTHORIZED',
-        AiAccess.exhausted => 'QUOTA_EXCEEDED',
+        AiAccess.exhausted => (ref.read(usageProvider)?.phone ?? false) ? 'QUOTA_PHONE' : 'QUOTA_EXCEEDED',
         AiAccess.open || AiAccess.allowed => null,
       };
 
   /// The server says the allowance ran out (another device used it, say):
   /// refetch the account so every screen shows the real count.
   void _onAiFailure(ApiFailure e) {
-    if (e.code == 'QUOTA_EXCEEDED') ref.invalidate(accountProvider);
+    if (e.code == 'QUOTA_EXCEEDED' || e.code == 'QUOTA_PHONE') ref.invalidate(accountProvider);
   }
 
   /// A run of words was selected (or an existing highlight long-pressed).

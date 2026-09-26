@@ -15,6 +15,7 @@ import 'package:arth/data/local_store.dart';
 import 'package:arth/features/ads/interstitials.dart';
 import 'package:arth/features/cards/card_editor.dart';
 import 'package:arth/features/cards/deck_screen.dart';
+import 'package:arth/features/plans/paid_gate.dart';
 import 'package:arth/features/reader/details_sheet.dart';
 import 'package:arth/features/reader/reader_controller.dart';
 import 'package:arth/features/reader/reader_menu.dart';
@@ -57,6 +58,8 @@ class _ScanReaderScreenState extends ConsumerState<ScanReaderScreen> with AdBrea
   }
 
   Future<void> _addPage(ScanSource source) async {
+    final t = ref.read(stringsProvider);
+    if (!await ensurePaid(context, ref, title: t.scanTitlePaid, why: t.scanNeedsPlan)) return;
     final picked = await pickScanImage(source);
     if (picked == null || !mounted) return;
     await ref.read(scanPagesProvider).addPage(widget.book, picked);
@@ -95,6 +98,7 @@ class _ScanReaderScreenState extends ConsumerState<ScanReaderScreen> with AdBrea
             onPressed: () => showReadingSettingsSheet(context),
           ),
           ReaderMoreMenu(
+            onWords: () => context.push(Uri(path: '/vocabulary', queryParameters: {'book': '${widget.book.id}', 'title': widget.book.title}).toString()),
             onNote: () => unawaited(makeScanCard(context, ref, widget.book, _current + 1, const CardDraft(kind: CardKind.idea))),
             onCards: () => context.push(deckRoute((bookId: widget.book.id, bookTitle: widget.book.title))),
           ),
@@ -238,6 +242,7 @@ class _ScanPageState extends ConsumerState<_ScanPage> {
     final offset = word.index - around.index;
     _portal.show();
     await ref.read(readerControllerProvider.notifier).showWord(
+          book: (id: widget.book.id, title: widget.book.title),
           word: PageWord(index: word.index, start: word.start, end: word.end, text: word.text, rect: _toLocal(word.rect, scale)),
           page: widget.pageNumber,
           sentence: sentence,
@@ -263,6 +268,7 @@ class _ScanPageState extends ConsumerState<_ScanPage> {
     }
     final sentence = s is WordTooltipState ? s.sentence : (s as SentenceTooltipState).text;
     await ref.read(readerControllerProvider.notifier).showWord(
+          book: (id: widget.book.id, title: widget.book.title),
           word: PageWord(index: 0, start: 0, end: 0, text: word, rect: s.anchor),
           page: s.page,
           sentence: sentence,

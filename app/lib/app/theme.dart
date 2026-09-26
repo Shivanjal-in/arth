@@ -135,52 +135,29 @@ class HindiText {
   TextStyle small(Color color) => _base(13, color: color);
 }
 
-/// English (book/dictionary) text styles.
+/// English interface text: Montserrat, everywhere but a book's own pages.
+/// Montserrat sets larger than the serif these sizes were chosen for, so
+/// sizes are scaled by [_k] to keep the same visual weight in the layouts.
 class EnglishText {
-  static TextStyle word(Color color, {double size = 22}) => GoogleFonts.literata(
-        fontSize: size,
-        fontWeight: FontWeight.w500,
-        color: color,
-        height: 1.25,
-      );
+  static const _k = 0.93;
 
-  static TextStyle body(Color color, {double size = 15}) => GoogleFonts.literata(
-        fontSize: size,
-        color: color,
-        height: 1.45,
-      );
+  static TextStyle _m(double size, Color color, {FontWeight weight = FontWeight.w400, FontStyle? style, double height = 1.4, double spacing = 0}) =>
+      GoogleFonts.montserrat(fontSize: size * _k, fontWeight: weight, fontStyle: style, color: color, height: height, letterSpacing: spacing);
 
-  static TextStyle italic(Color color, {double size = 14.5}) => GoogleFonts.literata(
-        fontSize: size,
-        fontStyle: FontStyle.italic,
-        color: color,
-        height: 1.45,
-      );
+  static TextStyle word(Color color, {double size = 22}) => _m(size, color, weight: FontWeight.w600, height: 1.25);
+
+  static TextStyle body(Color color, {double size = 15}) => _m(size, color, height: 1.5);
+
+  static TextStyle italic(Color color, {double size = 14.5}) => _m(size, color, style: FontStyle.italic, height: 1.5);
 
   /// Small labels: sentence case, a touch of tracking, never all-caps.
-  static TextStyle label(Color color, {double size = 13}) => GoogleFonts.literata(
-        fontSize: size,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.2,
-        color: color,
-        height: 1.3,
-      );
+  static TextStyle label(Color color, {double size = 13}) => _m(size, color, weight: FontWeight.w600, height: 1.3, spacing: 0.1);
 
   /// Section headings and screen titles.
-  static TextStyle heading(Color color, {double size = 20}) => GoogleFonts.literata(
-        fontSize: size,
-        fontWeight: FontWeight.w600,
-        color: color,
-        height: 1.2,
-      );
+  static TextStyle heading(Color color, {double size = 20}) => _m(size, color, weight: FontWeight.w600, height: 1.25);
 
-  /// Screen titles: the biggest serif on the page.
-  static TextStyle title(Color color, {double size = 32}) => GoogleFonts.literata(
-        fontSize: size,
-        fontWeight: FontWeight.w500,
-        color: color,
-        height: 1.1,
-      );
+  /// Screen titles: the biggest type on the page.
+  static TextStyle title(Color color, {double size = 32}) => _m(size, color, weight: FontWeight.w700, height: 1.1, spacing: -0.3);
 
   /// Kept for the IPA line and page counters.
   static TextStyle caps(Color color, {double size = 11}) => label(color, size: size);
@@ -189,6 +166,15 @@ class EnglishText {
         fontSize: 14,
         color: color,
       );
+}
+
+/// A book's own text (the EPUB reader's pages): a reading serif, not the
+/// interface font.
+class BookText {
+  static TextStyle body(Color color, {double size = 17.5}) => GoogleFonts.literata(fontSize: size, color: color, height: 1.55);
+
+  static TextStyle heading(Color color, {double size = 22}) =>
+      GoogleFonts.literata(fontSize: size, fontWeight: FontWeight.w600, color: color, height: 1.2);
 }
 
 /// The design is a single committed look per brightness.
@@ -216,7 +202,7 @@ ThemeData arthTheme(Brightness brightness) {
         TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
       },
     ),
-    textTheme: GoogleFonts.literataTextTheme(base.textTheme).apply(
+    textTheme: GoogleFonts.montserratTextTheme(base.textTheme).apply(
       bodyColor: c.ink,
       displayColor: c.ink,
     ),
@@ -287,7 +273,7 @@ extension ArthThemeContext on BuildContext {
   ArthColors get colors => Theme.of(this).extension<ArthColors>()!;
 }
 
-/// Small label style: sentence-case serif in English, Mukta in Hindi.
+/// Small label style: Montserrat in English, Mukta in Hindi.
 TextStyle uiLabel({required bool hindi, required Color color, double scale = 1}) =>
     hindi ? HindiText(scale).label(color) : EnglishText.label(color);
 

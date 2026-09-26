@@ -21,6 +21,7 @@ import 'package:arth/features/reader/reader_screen.dart';
 import 'package:arth/features/scan/scan_reader_screen.dart';
 import 'package:arth/features/seed/seed_screen.dart';
 import 'package:arth/features/settings/settings_screen.dart';
+import 'package:arth/features/vocabulary/vocabulary_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -53,6 +54,13 @@ GoRouter buildRouter({required bool needsSeed}) => GoRouter(
         GoRoute(
           path: '/scan/:id',
           builder: (_, s) => _ScanRoute(id: int.parse(s.pathParameters['id']!), at: _placeOf(s)),
+        ),
+        GoRoute(
+          path: '/vocabulary',
+          builder: (_, s) => VocabularyScreen(
+            bookId: int.tryParse(s.uri.queryParameters['book'] ?? ''),
+            bookTitle: s.uri.queryParameters['title'],
+          ),
         ),
         GoRoute(path: '/deck', builder: (_, s) => DeckScreen(deck: deckRefFrom(s.uri.queryParameters))),
         GoRoute(

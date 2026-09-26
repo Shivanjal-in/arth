@@ -11,6 +11,7 @@ const deckSchema = new Schema(
     bookTitle: { type: String, required: true },
     bookKey: { type: String, default: null },
     blurb: { type: String, default: '' },
+    font: { type: String, enum: ['montserrat', 'quintessential', 'bricolage'], default: 'montserrat' },
     cards: [
       {
         _id: false,
