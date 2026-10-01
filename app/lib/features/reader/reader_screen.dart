@@ -2,7 +2,8 @@
 //
 // Tap a word → WordTooltip (local entry now, /context pinned when it lands).
 // Long-press/drag (pdfrx's own selection) → SentenceTooltip (streamed
-// translation), whose colour row saves the selection as a highlight. The
+// translation), whose colour row saves the selection as a highlight. With
+// AI lookup off, that same hold only opens the colour bar. The
 // tooltip hangs off a LayerLink target that we place in the viewer overlay at
 // the anchor's current on-screen rect, so it tracks scroll and zoom; the
 // follower lives in an OverlayPortal above everything.
@@ -88,7 +89,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
 
   /// Prefetch (Section 7): sentences already sent for /context this session.
   final Set<String> _prefetched = {};
-  static const _prefetchRankThreshold = 8000;
   static const _prefetchMaxPerPage = 6;
   static const _prefetchMaxPerMinute = 12;
   final List<DateTime> _prefetchSent = [];
@@ -230,7 +230,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
     return (page: page, start: math.min(start, end), end: math.max(start, end));
   }
 
-  Future<void> _highlightSelection(SentenceTooltipState s, HighlightColor color) async {
+  Future<void> _saveSelectionHighlight(HighlightColor color) async {
     final words = _selectionWords;
     final cache = _cache;
     if (words == null || cache == null) return;
@@ -246,6 +246,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
     unawaited(_controller.textSelectionDelegate.clearTextSelection());
     ref.read(readerControllerProvider.notifier).dismiss();
   }
+
+  Future<void> _highlightSelection(SentenceTooltipState s, HighlightColor color) => _saveSelectionHighlight(color);
+
+  Future<void> _highlightFromBar(HighlightBarState s, HighlightColor color) => _saveSelectionHighlight(color);
 
   Future<void> _showHighlights() async {
     final t = ref.read(stringsProvider);
@@ -386,7 +390,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
     final rc = ref.read(readerControllerProvider.notifier);
     if (!sel.hasSelectedText) {
       _selectionHaptic = false;
-      if (ref.read(readerControllerProvider) is SentenceTooltipState) rc.dismiss();
+      final open = ref.read(readerControllerProvider);
+      if (open is SentenceTooltipState || open is HighlightBarState) rc.dismiss();
       return;
     }
     if (!_selectionHaptic) {
@@ -414,6 +419,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
     final page = ranges.first.pageNumber;
     final idx = await cache.page(page);
     _selectionWords = _wordsForSelection(ranges, idx);
+
+    // Holding text to highlight it must not spend an AI call. The colour
+    // bar still offers translate, for when they actually want it.
+    if (!ref.read(settingsProvider).aiLookup) {
+      _portal.show();
+      ref.read(readerControllerProvider.notifier).showHighlightBar(
+            anchor: anchor!,
+            page: page,
+            text: text,
+          );
+      return;
+    }
 
     // A single selected word gets the word card (speaker, save), with its
     // sentence. pdfrx's character offsets don't always line up with our
@@ -497,7 +514,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
   /// next, so the tooltip's "इस वाक्य में" is a cache hit when tapped.
   /// Fire-and-forget: no retries, never blocks rendering, errors ignored.
   Future<void> _prefetch(int page) async {
-    if (!ref.read(settingsProvider).prefetch) return;
+    final settings = ref.read(settingsProvider);
+    if (!settings.prefetch || !settings.aiLookup) return;
     // Prefetch is free, but only for readers who could tap for these answers.
     final access = ref.read(aiAccessProvider);
     if (access != AiAccess.open && access != AiAccess.allowed) return;
@@ -523,7 +541,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
         // Capitalised mid-sentence → almost certainly a name; not worth a call.
         if (_looksLikeName(w.text) && !sentenceStarts.contains(w.index)) continue;
         final rank = await store.rankOf(key);
-        if (rank != null && rank <= _prefetchRankThreshold) continue;
+        if (rank != null && rank <= kAiOnRequestRank) continue;
         if (gen != _prefetchGeneration || !_prefetchAllowed()) return;
         final sentence = await cache.sentenceFor(p, idx, w);
         final id = '$key|$sentence';
@@ -736,6 +754,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
               onSuggestion: _lookupTyped,
               onTranslateSentence: _translateSentence,
               highlightActions: HighlightActions(
+                onColor: _highlightFromBar,
+                onTranslate: _translateSelection,
                 onSentenceColor: _selectionWords == null ? null : _highlightSelection,
               ),
               onMakeCard: (d) => unawaited(_makeCard(d)),
@@ -750,5 +770,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
     _selectionWords = null; // the card's sentence isn't a placed selection
     _portal.show();
     ref.read(readerControllerProvider.notifier).showSentence(text: s.sentence, anchor: s.anchor, page: s.page);
+  }
+
+  void _translateSelection(HighlightBarState s) {
+    _portal.show();
+    ref.read(readerControllerProvider.notifier).showSentence(text: s.text, anchor: s.anchor, page: s.page);
   }
 }

@@ -34,6 +34,7 @@ class WordTooltipState extends ReaderTooltip {
     this.contextLoading = false,
     this.contextError,
     this.contextErrorCode,
+    this.contextOffered = false,
     this.highlight,
   });
 
@@ -52,6 +53,9 @@ class WordTooltipState extends ReaderTooltip {
   /// `QUOTA_EXCEEDED` turn the in-context block into a prompt.
   final String? contextErrorCode;
 
+  /// A common word: the AI sense-pick waits for the reader to ask for it.
+  final bool contextOffered;
+
   /// Word rects to highlight (the phrase, when one matched).
   final List<Rect>? highlight;
 
@@ -63,6 +67,7 @@ class WordTooltipState extends ReaderTooltip {
     bool? contextLoading,
     String? contextError,
     String? contextErrorCode,
+    bool? contextOffered,
     List<Rect>? highlight,
     Rect? anchor,
   }) =>
@@ -77,6 +82,7 @@ class WordTooltipState extends ReaderTooltip {
         contextLoading: contextLoading ?? this.contextLoading,
         contextError: contextError ?? this.contextError,
         contextErrorCode: contextErrorCode ?? this.contextErrorCode,
+        contextOffered: contextOffered ?? this.contextOffered,
         highlight: highlight ?? this.highlight,
       );
 }
@@ -140,6 +146,10 @@ class HighlightBarState extends ReaderTooltip {
   /// The highlight being edited, or null for a new selection.
   final Highlight? existing;
 }
+
+/// Words ranked at or above this (1 = most common) show their dictionary entry
+/// on a tap; the AI sense-pick is one more tap away.
+const int kAiOnRequestRank = 8000;
 
 final AutoDisposeNotifierProvider<ReaderController, ReaderTooltip?> readerControllerProvider =
     NotifierProvider.autoDispose<ReaderController, ReaderTooltip?>(ReaderController.new);
@@ -213,6 +223,15 @@ class ReaderController extends AutoDisposeNotifier<ReaderTooltip?> {
       // Step 4: context, in parallel with showing the entry. Single-sense
       // entries have nothing to disambiguate.
       if (outcome.entry.senses.length > 1) {
+        // Common words are answered from the dictionary; asking the AI which
+        // sense fits is the reader's call (it counts against their allowance).
+        // With AI lookup off, every word waits for that tap.
+        final rank = await ref.read(localStoreProvider).rankOf(outcome.lemma);
+        if (gen != _generation) return;
+        if (!ref.read(settingsProvider).aiLookup || (rank != null && rank <= kAiOnRequestRank)) {
+          state = s.copyWith(contextOffered: true);
+          return;
+        }
         // Signed out or out of allowance: say so rather than ask the server.
         final blocked = _blockedCode();
         if (blocked != null) {
@@ -226,6 +245,20 @@ class ReaderController extends AutoDisposeNotifier<ReaderTooltip?> {
       }
     }
     state = s;
+  }
+
+  /// The reader asked which sense fits this sentence (common words only
+  /// offer it; rarer ones resolve on their own).
+  void explainInContext() {
+    final s = state;
+    if (s is! WordTooltipState || s.outcome is! LookupFound) return;
+    final blocked = _blockedCode();
+    if (blocked != null) {
+      state = s.copyWith(contextOffered: false, contextErrorCode: blocked);
+      return;
+    }
+    state = s.copyWith(contextOffered: false, contextLoading: true);
+    unawaited(_resolveContext(_generation, (s.outcome! as LookupFound).lemma, s.sentence));
   }
 
   Future<void> _resolveContext(int gen, String lemma, String sentence) async {

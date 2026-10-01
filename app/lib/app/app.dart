@@ -37,18 +37,18 @@ class _ArthAppState extends ConsumerState<ArthApp> {
     // A tapped notification opens its screen (the app may have been closed).
     final push = ref.read(pushServiceProvider);
     if (push != null) {
-      _pushRoutes = push.routes.stream.listen(router.go);
+      _pushRoutes = push.routes.stream.listen((r) => openFromNotification(router, r));
       final pending = push.pendingRoute;
       push.pendingRoute = null;
-      if (pending != null && !widget.needsSeed) WidgetsBinding.instance.addPostFrameCallback((_) => router.go(pending));
+      if (pending != null && !widget.needsSeed) WidgetsBinding.instance.addPostFrameCallback((_) => openFromNotification(router, pending));
     }
     // …and so does a tapped reminder, or a push shown while the app was open.
     final local = ref.read(localNotificationsProvider);
-    _localRoutes = local.routes.stream.listen(router.go);
+    _localRoutes = local.routes.stream.listen((r) => openFromNotification(router, r));
     final launch = local.launchRoute;
     local.launchRoute = null;
     if (launch != null && launch.isNotEmpty && !widget.needsSeed) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => router.go(launch));
+      WidgetsBinding.instance.addPostFrameCallback((_) => openFromNotification(router, launch));
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _refreshDictionaryIfStale());
     DevHooks.on('nav', (p) async {

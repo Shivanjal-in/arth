@@ -32,12 +32,14 @@ function setup(llm: FakeLLM) {
   return { app, store };
 }
 
-const context = (uid: string | null, sentence: string, headers: Record<string, string> = {}) => ({
+const contextBase = (uid: string | null, sentence: string, headers: Record<string, string> = {}) => ({
   method: 'POST' as const,
   url: '/v1/context',
   headers: uid ? as(uid, headers) : headers,
   payload: { word: 'single', sentence },
 });
+
+const context = contextBase;
 
 describe('AI allowance', () => {
   test('AI routes need sign-in; the offline-dictionary lookup does not', async () => {
@@ -56,13 +58,15 @@ describe('AI allowance', () => {
     assert.equal(r1.headers['x-ai-used'], '1');
     assert.equal(r1.headers['x-ai-limit'], '2');
     assert.equal(r1.headers['x-ai-period'], 'lifetime');
-    // A cache hit is still an AI answer the reader asked for.
-    assert.equal((await app.inject(context('ana', `${PP} 1`))).headers['x-ai-used'], '2');
-    const over = await app.inject(context('ana', `${PP} 2`));
+    // An answer the server already had cost no model call: it is not counted.
+    assert.equal((await app.inject(context('ana', `${PP} 1`))).headers['x-ai-used'], '1');
+    assert.equal(llm.requests.length, 1);
+    assert.equal((await app.inject(context('ana', `${PP} 2`))).headers['x-ai-used'], '2');
+    const over = await app.inject(context('ana', `${PP} 3`));
     assert.equal(over.statusCode, 402);
     assert.equal(over.json().error.code, 'QUOTA_EXCEEDED');
     assert.deepEqual(over.json().error.usage, { used: 2, limit: 2, period: 'lifetime', resetsAt: null });
-    assert.equal(llm.requests.length, 1, 'no model call once the allowance is spent');
+    assert.equal(llm.requests.length, 2, 'no model call once the allowance is spent');
 
     const me = (await app.inject({ method: 'GET', url: '/v1/me', headers: as('ana') })).json().data;
     assert.deepEqual(me.usage, { used: 2, limit: 2, period: 'lifetime', resetsAt: null });
@@ -150,10 +154,12 @@ describe('AI allowance', () => {
 
 describe('one phone, many accounts', () => {
   const on = (phone: string) => ({ 'x-device-id': phone });
+  let n = 0;
+  const context = (uid: string | null, _sentence: string, headers: Record<string, string> = {}) => contextBase(uid, `${PP} ${n++}`, headers);
   function phoneSetup(limits = { free: 2, proMonthly: 3, freeAccountsPerDevice: 3 }) {
     const store = memoryAccountStore();
-    // One model answer; the same sentence again is a cache hit, which still counts.
-    const app = buildApp({ ...appOptions(new FakeLLM({ context_result: [answer(1)] })), accounts: { store, verifier, cloudinary: null }, enforceQuota: true, limits });
+    // Plenty of model answers: each call below uses its own sentence, since a cached repeat is free.
+    const app = buildApp({ ...appOptions(new FakeLLM({ context_result: Array.from({ length: 12 }, (_, k) => answer(k)) })), accounts: { store, verifier, cloudinary: null }, enforceQuota: true, limits });
     return { app, store };
   }
 

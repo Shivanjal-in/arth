@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:arth/app/feel.dart';
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/theme.dart';
@@ -32,6 +34,7 @@ GoRouter buildRouter({required bool needsSeed}) => GoRouter(
       routes: [
         GoRoute(path: '/seed', builder: (_, _) => const SeedScreen()),
         GoRoute(path: '/about', builder: (_, _) => const AboutScreen()),
+        GoRoute(path: '/archive', builder: (_, _) => const ArchiveScreen()),
         GoRoute(path: '/signin', builder: (_, _) => const SignInScreen()),
         GoRoute(path: '/profile', builder: (_, _) => const ProfileScreen()),
         GoRoute(path: '/plans', builder: (_, _) => const PlansScreen()),
@@ -257,4 +260,28 @@ class _ScanRoute extends ConsumerWidget {
     }
     return ScanReaderScreen(book: book, initialPage: at?.page);
   }
+}
+
+/// The tab a screen belongs under, for opening it from a notification with
+/// something to go back to. Null for the tabs themselves.
+String? tabUnder(String location) {
+  final path = Uri.parse(location).path;
+  const tabs = {'/', '/dictionary', '/cards', '/community', '/settings'};
+  if (tabs.contains(path)) return null;
+  if (path.startsWith('/deck') || path.startsWith('/word')) return '/cards';
+  if (path.startsWith('/community')) return '/community';
+  if (path == '/plans' || path == '/profile' || path == '/admin' || path == '/about') return '/settings';
+  return '/';
+}
+
+/// Opens a notification's screen on top of its tab: back, ✕ and Finish then
+/// lead somewhere, instead of the screen being the only one there is.
+void openFromNotification(GoRouter router, String location) {
+  final tab = tabUnder(location);
+  if (tab == null) {
+    router.go(location);
+    return;
+  }
+  router.go(tab);
+  unawaited(router.push(location));
 }

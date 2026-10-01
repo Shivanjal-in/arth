@@ -51,6 +51,27 @@ class _DictionaryScreenState extends ConsumerState<DictionaryScreen> {
     });
   }
 
+  Future<void> _forgetRecent(String word) async {
+    final t = ref.read(stringsProvider);
+    final c = context.colors;
+    final scale = ref.read(settingsProvider).hindiScale;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: c.card,
+        title: Text(t.removeRecent, style: uiHeading(hindi: t.isHindi, color: c.ink, scale: scale)),
+        content: Text(word, style: EnglishText.body(c.ink)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.no)),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.delete)),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await ref.read(localStoreProvider).removeRecentLookup(word);
+    ref.invalidate(recentLookupsProvider);
+  }
+
   Future<void> _open(String word) async {
     setState(() => _busy = true);
     final outcome = await ref.read(dictionaryRepoProvider).lookupWord(word);
@@ -135,7 +156,7 @@ class _DictionaryScreenState extends ConsumerState<DictionaryScreen> {
             if (_text.text.isEmpty) ...[
               if (recent.isNotEmpty) ...[
                 SectionLabel(t.recent),
-                for (final w in recent) _WordRow(word: w, onTap: () => _open(w)),
+                for (final w in recent) _WordRow(word: w, onTap: () => _open(w), onLongPress: () => _forgetRecent(w)),
               ],
               if (wotd != null) ...[
                 SectionLabel(t.wordOfTheDay),
@@ -181,16 +202,18 @@ class _DictionaryScreenState extends ConsumerState<DictionaryScreen> {
 }
 
 class _WordRow extends StatelessWidget {
-  const _WordRow({required this.word, required this.onTap});
+  const _WordRow({required this.word, required this.onTap, this.onLongPress});
 
   final String word;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     return InkWell(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.rule))),

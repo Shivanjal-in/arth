@@ -45,8 +45,9 @@ export const contextRoutes: FastifyPluginAsync<{ deps: ContextDeps; spend: LlmSp
         request.log.error({ err }, 'context failed');
         throw new ApiError('UPSTREAM_FAILED', messages.upstreamFailed, {}, { cause: err });
       }
-      // A single-sense word is answered from the dictionary, no AI: free.
-      if (!outcome || outcome.cache === 'bypass') await use?.refund();
+      // A single-sense word is answered from the dictionary, and a cached
+      // answer cost no model call: neither counts against the reader.
+      if (!outcome || outcome.cache !== 'miss') await use?.refund();
       if (!outcome) throw new ApiError('NOT_FOUND', messages.wordNotFound, { suggestions: [] });
       if (outcome.cache === 'hit') cacheStats.hits++;
       else if (outcome.cache === 'miss') cacheStats.misses++;

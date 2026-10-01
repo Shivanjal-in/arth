@@ -136,6 +136,23 @@ class LibraryNotifier extends AsyncNotifier<List<Book>> {
     ref.invalidateSelf();
   }
 
+  Future<void> setCategory(int id, {String? group, String? category}) async {
+    await ref.read(localStoreProvider).setCategory(id, group: group, category: category);
+    ref.invalidateSelf();
+  }
+
+  /// By hand, so no recap sheet: that belongs to reaching the end.
+  Future<void> setFinished(int id, {required bool finished}) async {
+    await ref.read(localStoreProvider).setFinished(id, finished: finished);
+    ref.invalidateSelf();
+  }
+
+  /// Moves a book off the shelf, or back onto it. The file is kept.
+  Future<void> setArchived(int id, {required bool archived}) async {
+    await ref.read(localStoreProvider).setArchived(id, archived: archived);
+    ref.invalidateSelf();
+  }
+
   Future<void> touch(int id, {int? lastPage, int? pageCount, double? progress}) async {
     await ref.read(localStoreProvider).touchBook(id, lastPage: lastPage, pageCount: pageCount, progress: progress);
     ref.invalidateSelf();

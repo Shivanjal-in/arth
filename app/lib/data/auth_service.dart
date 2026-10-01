@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:arth/app/firebase_setup.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 /// Why sign-in stopped, for the UI to word.
@@ -65,6 +66,9 @@ class AuthService {
     try {
       account = await google.authenticate();
     } on GoogleSignInException catch (e) {
+      // Android reports a misconfigured build (e.g. a signing key Firebase
+      // doesn't know) as "canceled" too, so keep the detail.
+      debugPrint('Google sign-in: ${e.code} ${e.description}');
       throw AuthFailure(e.code == GoogleSignInExceptionCode.canceled ? AuthError.cancelled : AuthError.unknown, e.description);
     }
     final idToken = account.authentication.idToken;

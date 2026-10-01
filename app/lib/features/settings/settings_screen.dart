@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:arth/app/account_providers.dart';
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/theme.dart';
 import 'package:arth/data/seed_loader.dart';
 import 'package:arth/features/account/account_card.dart';
+import 'package:arth/features/account/ai_lookup_gate.dart';
 import 'package:arth/features/settings/settings_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -99,6 +102,12 @@ class SettingsScreen extends ConsumerWidget {
               title: t.haptics,
               value: s.haptics,
               onChanged: (v) => n.update((s) => s.copyWith(haptics: v)),
+            ),
+            SettingsSwitch(
+              title: t.aiLookup,
+              subtitle: t.aiLookupHelp,
+              value: s.aiLookup,
+              onChanged: (v) => unawaited(setAiLookup(context, ref, on: v)),
             ),
             SettingsSwitch(
               title: t.prefetch,

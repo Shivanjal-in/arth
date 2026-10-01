@@ -102,11 +102,14 @@ class BlockPrintPainter extends CustomPainter {
 /// A cover: dyed cloth, the title's motif, a spine, and a printed label
 /// with the initial (or a camera, for a scan).
 class BookCover extends StatelessWidget {
-  const BookCover({required this.title, required this.width, super.key, this.scan = false, this.elevation = 1});
+  const BookCover({required this.title, required this.width, super.key, this.scan = false, this.elevation = 1, this.read = false});
 
   final String title;
   final double width;
   final bool scan;
+
+  /// A marigold corner with a tick: the reader has finished it.
+  final bool read;
 
   /// 0: flat (inside a card); 1: resting on the page.
   final double elevation;
@@ -130,15 +133,25 @@ class BookCover extends StatelessWidget {
         boxShadow: elevation == 0
             ? null
             : [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.22 * elevation), blurRadius: 8 * elevation, offset: Offset(2 * elevation, 4 * elevation)),
-                BoxShadow(color: Colors.black.withValues(alpha: 0.10 * elevation), blurRadius: 1.5, offset: const Offset(0, 1)),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.22 * elevation),
+                  blurRadius: 8 * elevation,
+                  offset: Offset(2 * elevation, 4 * elevation),
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.10 * elevation),
+                  blurRadius: 1.5,
+                  offset: const Offset(0, 1),
+                ),
               ],
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          CustomPaint(painter: BlockPrintPainter(motif: scan ? BlockMotif.jaal : motifOf(title), color: print, cell: width * 0.34)),
+          CustomPaint(
+            painter: BlockPrintPainter(motif: scan ? BlockMotif.jaal : motifOf(title), color: print, cell: width * 0.34),
+          ),
           // Spine: a darker band with a highlight where the cover bends.
           Positioned(
             left: 0,
@@ -173,10 +186,43 @@ class BookCover extends StatelessWidget {
               ),
             ),
           ),
+          if (read)
+            Positioned(
+              top: 0,
+              right: 0,
+              width: width * 0.46,
+              height: width * 0.46,
+              child: CustomPaint(
+                painter: _CornerPainter(c.marigold),
+                child: Align(
+                  alignment: const Alignment(0.55, -0.55),
+                  child: Icon(Icons.check_rounded, size: width * 0.2, color: c.ink),
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
+}
+
+class _CornerPainter extends CustomPainter {
+  _CornerPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width, size.height)
+      ..close();
+    canvas.drawPath(path, Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(_CornerPainter old) => old.color != color;
 }
 
 /// The book's motif as a faint texture over a band of its dye (the recap
@@ -190,6 +236,10 @@ class BlockPrintTexture extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => CustomPaint(
-        painter: BlockPrintPainter(motif: motifOf(title), color: Colors.white.withValues(alpha: opacity), cell: cell),
-      );
+    painter: BlockPrintPainter(
+      motif: motifOf(title),
+      color: Colors.white.withValues(alpha: opacity),
+      cell: cell,
+    ),
+  );
 }

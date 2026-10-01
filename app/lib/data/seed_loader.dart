@@ -9,6 +9,7 @@ import 'dart:convert';
 
 import 'package:arth/data/api_client.dart';
 import 'package:arth/data/local_store.dart';
+import 'package:flutter/foundation.dart';
 
 enum SeedPhase { idle, downloading, done, failed }
 
@@ -48,6 +49,7 @@ class SeedLoader {
 
   static const _kAsOf = 'seed_as_of';
   static const _batchSize = 400;
+  static const _attempts = 3;
 
   final ApiClient _api;
   final LocalStore _store;
@@ -69,34 +71,46 @@ class SeedLoader {
   }) async {
     var progress = const SeedProgress(phase: SeedPhase.downloading);
     onProgress(progress);
-    final since = delta ? await lastSeededAt() : null;
-    try {
-      final meta = await _consume(await _api.seedLines(since: since), progress, (p) => onProgress(progress = p));
-      final asOf = meta.asOf;
-      if (asOf != null) await _store.set(_kAsOf, asOf);
-
-      // Catch up with a larger slice. Entries arrive rarest-last, so an
-      // interrupted catch-up resumes from where it stopped next time.
-      final have = await _store.maxEntryRank();
-      final serverMax = meta.maxRank;
-      if (have != null && serverMax != null && serverMax > have) {
-        await _consume(await _api.seedLines(afterRank: have), progress, (p) => onProgress(progress = p));
+    // The stream can drop part-way (mobile data, a cold server). Rows are
+    // upserted, so a fresh attempt only repeats work; try a few times before
+    // giving up to the retry button.
+    for (var attempt = 1;; attempt++) {
+      try {
+        await _once(delta: delta, onProgress: (p) => onProgress(progress = p));
+        progress = progress.copyWith(phase: SeedPhase.done);
+        onProgress(progress);
+        return progress;
+      } on Object catch (e, st) {
+        debugPrint('Seed attempt $attempt failed: $e\n$st');
+        if (attempt < _attempts) {
+          await Future<void>.delayed(Duration(seconds: 2 * attempt));
+          progress = const SeedProgress(phase: SeedPhase.downloading);
+          onProgress(progress);
+          continue;
+        }
+        progress = progress.copyWith(
+          phase: SeedPhase.failed,
+          message: e is ApiFailure ? e.message : 'शब्दकोश डाउनलोड नहीं हो पाया।',
+        );
+        onProgress(progress);
+        return progress;
       }
+    }
+  }
 
-      progress = progress.copyWith(phase: SeedPhase.done);
-      onProgress(progress);
-      return progress;
-    } on ApiFailure catch (e) {
-      progress = progress.copyWith(phase: SeedPhase.failed, message: e.message);
-      onProgress(progress);
-      return progress;
-    } on Exception catch (_) {
-      progress = progress.copyWith(
-        phase: SeedPhase.failed,
-        message: 'शब्दकोश डाउनलोड नहीं हो पाया।',
-      );
-      onProgress(progress);
-      return progress;
+  Future<void> _once({required bool delta, required void Function(SeedProgress) onProgress}) async {
+    var progress = const SeedProgress(phase: SeedPhase.downloading);
+    final since = delta ? await lastSeededAt() : null;
+    final meta = await _consume(await _api.seedLines(since: since), progress, (p) => onProgress(progress = p));
+    final asOf = meta.asOf;
+    if (asOf != null) await _store.set(_kAsOf, asOf);
+
+    // Catch up with a larger slice. Entries arrive rarest-last, so an
+    // interrupted catch-up resumes from where it stopped next time.
+    final have = await _store.maxEntryRank();
+    final serverMax = meta.maxRank;
+    if (have != null && serverMax != null && serverMax > have) {
+      await _consume(await _api.seedLines(afterRank: have), progress, (p) => onProgress(progress = p));
     }
   }
 

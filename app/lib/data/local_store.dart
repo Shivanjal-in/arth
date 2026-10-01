@@ -33,6 +33,9 @@ class Book {
     this.progress,
     this.finishedAt,
     this.contentKey,
+    this.archived = false,
+    this.categoryGroup,
+    this.category,
   });
 
   factory Book.fromRow(Map<String, Object?> r) => Book(
@@ -49,6 +52,9 @@ class Book {
         progress: (r['progress'] as num?)?.toDouble(),
         finishedAt: r['finished_at'] == null ? null : DateTime.fromMillisecondsSinceEpoch(r['finished_at']! as int),
         contentKey: r['content_key'] as String?,
+        archived: (r['archived'] as int?) == 1,
+        categoryGroup: r['category_group'] as String?,
+        category: r['category'] as String?,
       );
 
   final int id;
@@ -75,6 +81,14 @@ class Book {
   /// Fingerprint of the file's content (see book_key.dart): how synced cards
   /// and bookmarks find this book on another device. Null for scans.
   final String? contentKey;
+
+  /// Off the home shelf, listed on the archive screen. The file stays.
+  final bool archived;
+
+  /// `fiction` or `nonfiction`, with [category] a shelf id. Both null until
+  /// the reader picks one.
+  final String? categoryGroup;
+  final String? category;
 
   /// [progress], else estimated from the page (books opened before the
   /// progress column existed).
@@ -356,7 +370,7 @@ class Bookmark {
 class LocalStore {
   LocalStore._(this._db);
 
-  static const _schemaVersion = 6;
+  static const _schemaVersion = 8;
 
   final Database _db;
 
@@ -407,6 +421,11 @@ class LocalStore {
               SELECT id, book_id, page, block, label, excerpt, created_at, updated_at, deleted_at, dirty FROM bookmarks_v4''');
             await db.execute('DROP TABLE bookmarks_v4');
           }
+          if (from < 7) await db.execute('ALTER TABLE books ADD COLUMN archived INTEGER NOT NULL DEFAULT 0');
+          if (from < 8) {
+            await db.execute('ALTER TABLE books ADD COLUMN category_group TEXT');
+            await db.execute('ALTER TABLE books ADD COLUMN category TEXT');
+          }
         },
       ),
     );
@@ -443,7 +462,10 @@ class LocalStore {
         last_opened_at INTEGER,
         progress REAL,
         finished_at INTEGER,
-        content_key TEXT
+        content_key TEXT,
+        archived INTEGER NOT NULL DEFAULT 0,
+        category_group TEXT,
+        category TEXT
       )''');
     await db.execute('''
       CREATE TABLE saved_words (
@@ -719,6 +741,20 @@ class LocalStore {
   /// detached: a deck is worth keeping after the file is gone, and both
   /// reattach by content key if the book comes back. Detaching is local:
   /// other devices still have the book.
+  Future<void> setCategory(int id, {String? group, String? category}) => _db.update(
+        'books',
+        {'category_group': group, 'category': category},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+
+  Future<void> setArchived(int id, {required bool archived}) => _db.update(
+        'books',
+        {'archived': archived ? 1 : 0},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+
   Future<void> removeBook(int id) async {
     await _db.delete('highlights', where: 'book_id = ?', whereArgs: [id]);
     await _db.update('bookmarks', {'book_id': null}, where: 'book_id = ?', whereArgs: [id]);
@@ -757,6 +793,14 @@ class LocalStore {
       );
 
   /// Marks the book finished if it isn't already; true when this call did.
+  /// Marks a book read (now) or unread by hand. Its reading place is kept.
+  Future<void> setFinished(int id, {required bool finished}) => _db.update(
+        'books',
+        {'finished_at': finished ? DateTime.now().millisecondsSinceEpoch : null},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+
   Future<bool> markFinished(int id) async {
     final n = await _db.update(
       'books',
@@ -1227,6 +1271,8 @@ class LocalStore {
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
 
+  Future<void> removeRecentLookup(String word) => _db.delete('recent_lookups', where: 'word = ?', whereArgs: [word]);
+
   // ---- vocabulary ----
 
   /// A word looked up while reading [bookId]. (Update, then insert: older
@@ -1284,6 +1330,14 @@ class LocalStore {
     );
     return rows.map(VocabWord.fromRow).toList();
   }
+
+  /// Drops a word from vocabulary. With [bookId], only that book's meeting
+  /// of it; without, every book.
+  Future<void> removeVocabulary(String lemma, {int? bookId}) => _db.delete(
+        'vocabulary',
+        where: bookId == null ? 'lemma = ?' : 'lemma = ? AND book_id = ?',
+        whereArgs: bookId == null ? [lemma] : [lemma, bookId],
+      );
 }
 
 /// A word from the reader's vocabulary.

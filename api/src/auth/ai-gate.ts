@@ -69,6 +69,8 @@ export function aiGate(deps: AccountDeps, limits: Limits): AiGate {
       async refund() {
         if (refunded) return;
         refunded = true;
+        // The header went out counting this use; keep the app's "N left" true.
+        if (!reply.raw.headersSent && usage.limit !== null) reply.header('x-ai-used', String(Math.max(0, usage.used - 1)));
         await deps.store.refundAi(user.uid, month);
         if (perPhone) await deps.store.refundDeviceAi(device!);
       },

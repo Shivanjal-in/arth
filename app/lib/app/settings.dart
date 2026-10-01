@@ -19,6 +19,7 @@ class Settings {
     this.tooltipDetail = TooltipDetail.compact,
     this.hindiSize = HindiSize.medium,
     this.ttsEnabled = true,
+    this.aiLookup = true,
     this.prefetch = true,
     this.haptics = true,
     this.language = UiLanguage.en,
@@ -31,6 +32,10 @@ class Settings {
   final TooltipDetail tooltipDetail;
   final HindiSize hindiSize;
   final bool ttsEnabled;
+
+  /// Ask the model while reading: a selected sentence is translated, and a
+  /// rare word's sense is picked on tap. Off, a selection only highlights.
+  final bool aiLookup;
 
   /// Resolve hard words on the current and next page in the background.
   final bool prefetch;
@@ -61,6 +66,7 @@ class Settings {
     TooltipDetail? tooltipDetail,
     HindiSize? hindiSize,
     bool? ttsEnabled,
+    bool? aiLookup,
     bool? prefetch,
     bool? haptics,
     UiLanguage? language,
@@ -73,6 +79,7 @@ class Settings {
         tooltipDetail: tooltipDetail ?? this.tooltipDetail,
         hindiSize: hindiSize ?? this.hindiSize,
         ttsEnabled: ttsEnabled ?? this.ttsEnabled,
+        aiLookup: aiLookup ?? this.aiLookup,
         prefetch: prefetch ?? this.prefetch,
         haptics: haptics ?? this.haptics,
         language: language ?? this.language,
@@ -88,6 +95,7 @@ class Settings {
         ),
         hindiSize: HindiSize.values.byName(await store.get('hindi_size') ?? 'medium'),
         ttsEnabled: (await store.get('tts') ?? 'true') == 'true',
+        aiLookup: (await store.get('ai_lookup') ?? 'true') == 'true',
         prefetch: (await store.get('prefetch') ?? 'true') == 'true',
         haptics: (await store.get('haptics') ?? 'true') == 'true',
         language: UiLanguage.values.byName(await store.get('language') ?? 'en'),
@@ -106,6 +114,7 @@ class Settings {
     await store.set('tooltip_detail', tooltipDetail.name);
     await store.set('hindi_size', hindiSize.name);
     await store.set('tts', ttsEnabled.toString());
+    await store.set('ai_lookup', aiLookup.toString());
     await store.set('prefetch', prefetch.toString());
     await store.set('haptics', haptics.toString());
     await store.set('language', language.name);

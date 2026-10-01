@@ -42,6 +42,25 @@ enum AppStrings {
   String get removeBook => _('Remove this book?', 'किताब हटाएँ?');
   String get no => _('No', 'नहीं');
   String get remove => _('Remove', 'हटाएँ');
+  String get category => _('Category', 'श्रेणी');
+  String get fiction => _('Fiction', 'कथा');
+  String get nonfiction => _('Nonfiction', 'गैर-कथा');
+  String get noCategory => _('No category', 'कोई श्रेणी नहीं');
+  String get allCategories => _('All', 'सभी');
+  String get archive => _('Archive', 'संग्रह');
+  String get moveToArchive => _('Move to archive', 'संग्रह में भेजें');
+  String get movedToArchive => _('Moved to archive', 'संग्रह में भेज दिया');
+  String get putBack => _('Put back on the shelf', 'शेल्फ पर वापस लाएँ');
+  String get archiveEmptyTitle => _('Nothing in the archive', 'संग्रह खाली है');
+  String get archiveEmptyBody => _(
+        'Books you move here leave the shelf. Open one, or put it back.',
+        'जो किताबें आप यहाँ भेजेंगे, वे शेल्फ से हट जाएँगी। खोलें, या वापस लाएँ।',
+      );
+  String get shelfClearTitle => _('The shelf is clear', 'शेल्फ खाली है');
+  String get shelfClearBody => _(
+        'Your books are in the archive. Open it from the top.',
+        'आपकी किताबें संग्रह में हैं। ऊपर से खोलें।',
+      );
   String get importFailed => _('Could not import that file.', 'यह फ़ाइल जोड़ी नहीं जा सकी।');
   String get unsupportedFile => _(
         'Arth reads PDF, EPUB, TXT, Word (.docx), ODT, FB2, RTF and HTML files.',
@@ -82,8 +101,8 @@ enum AppStrings {
         'अभी कोई हाइलाइट नहीं। किसी शब्द को दबाकर रखें और खींचें।',
       );
   String get highlightsEmptyPdf => _(
-        'No highlights yet. Select some text, then pick a colour in the translation card.',
-        'अभी कोई हाइलाइट नहीं। कुछ टेक्स्ट चुनें, फिर अनुवाद कार्ड में रंग चुनें।',
+        'No highlights yet. Select some text, then pick a colour.',
+        'अभी कोई हाइलाइट नहीं। कुछ टेक्स्ट चुनें, फिर रंग चुनें।',
       );
 
   // ---- epub ----
@@ -102,6 +121,7 @@ enum AppStrings {
       );
 
   // ---- tooltip / entry ----
+  String get explainInSentence => _('Which meaning fits here?', 'यहाँ कौन-सा अर्थ बैठता है?');
   String get inThisSentence => _('In this sentence', 'इस वाक्य में');
   String get translation => _('Translation', 'अनुवाद');
   String get simpleMeaning => _('In plain words', 'भावार्थ');
@@ -124,6 +144,7 @@ enum AppStrings {
   String get dictionaryTitle => _('Dictionary', 'शब्दकोश');
   String get searchHint => _('Any English word', 'कोई अंग्रेज़ी शब्द');
   String get recent => _('Recent', 'हाल के');
+  String get removeRecent => _('Remove from recent', 'हाल की खोज से हटाएँ');
   String get wordOfTheDay => _('Word of the day', 'आज का शब्द');
   String get notOnDevice => _(
         'Not on this phone — press search to look it up online',
@@ -316,6 +337,17 @@ enum AppStrings {
   String get bookRemoved => _('Book removed from library', 'किताब लाइब्रेरी से हटा दी गई');
   String readPercent(int p) => _('$p% read', '$p% पढ़ा');
   String get finishedReading => _('Finished', 'पूरी पढ़ी');
+  String get markAsRead => _('Mark as read', 'पढ़ी हुई मानें');
+  String get markAsUnread => _('Mark as unread', 'बिना पढ़ी मानें');
+  String get readFilter => _('Read', 'पढ़ी हुई');
+  String get unreadFilter => _('Unread', 'बाकी');
+  String readOn(DateTime d) {
+    const en = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const hi = ['जन', 'फ़र', 'मार्च', 'अप्रै', 'मई', 'जून', 'जुला', 'अग', 'सित', 'अक्टू', 'नव', 'दिस'];
+    final month = (isHindi ? hi : en)[d.month - 1];
+    final year = d.year == DateTime.now().year ? '' : ' ${d.year}';
+    return _('Read · ${d.day} $month$year', 'पढ़ी · ${d.day} $month$year');
+  }
   String finishedTitle(String book) => _('You finished $book!', 'आपने $book पूरी पढ़ ली!');
   String finishedBody(int cards) => cards == 0
       ? _('Write down a few ideas while it’s fresh — they’ll be your recap of this book.', 'अभी याद ताज़ा है — कुछ विचार लिख लें, यही इस किताब का सार बनेंगे।')
@@ -330,6 +362,15 @@ enum AppStrings {
   String get bookmarkAdded => _('Bookmarked', 'बुकमार्क किया गया');
   String get bookmarksEmpty => _('No bookmarks yet. Tap the ribbon at the top to mark a place.', 'अभी कोई बुकमार्क नहीं। ऊपर रिबन दबाकर जगह चिह्नित करें।');
   String get more => _('More', 'और');
+  String get aiLookup => _('AI lookup', 'AI अर्थ');
+  String get aiLookupHelp => _(
+        'For every book. On, selecting text asks for a translation. Off, it only highlights.',
+        'हर किताब में। चालू होने पर टेक्स्ट चुनने से अनुवाद माँगा जाता है। बंद होने पर सिर्फ़ हाइलाइट।',
+      );
+  String get aiLookupSignIn => _(
+        'Sign in to turn on AI lookup. Your first 100 AI answers are free.',
+        'AI अर्थ चालू करने के लिए साइन इन करें। पहले 100 AI जवाब मुफ़्त हैं।',
+      );
   String get continueReading => _('Continue reading', 'पढ़ना जारी रखें');
   // ---- vocabulary ----
   String get vocabulary => _('Vocabulary', 'शब्द भंडार');
@@ -350,6 +391,7 @@ enum AppStrings {
   String inBooks(int n) => _('in $n books', '$n किताबों में');
   String get sortAz => _('A–Z', 'अ–ज़');
   String get searchWords => _('Search your words', 'अपने शब्द खोजें');
+  String get removeFromVocabulary => _('Remove from vocabulary', 'शब्द भंडार से हटाएँ');
   String get vocabularyEmpty => _(
         'Words you tap while reading gather here, with the book you met them in.',
         'पढ़ते समय जिन शब्दों पर आप टैप करते हैं, वे उस किताब के नाम के साथ यहाँ जमा होते हैं।',
@@ -377,7 +419,7 @@ enum AppStrings {
   String resendIn(int s) => _('Resend in ${s}s', '$s सेकंड में दोबारा भेजें');
   String get signInPrivacy => _('Your books stay on your phone. Only your cards, bookmarks and profile are stored with your account.', 'आपकी किताबें आपके फ़ोन पर ही रहती हैं। खाते में सिर्फ़ आपके कार्ड, बुकमार्क और प्रोफ़ाइल रखे जाते हैं।');
   String authError(String code) => switch (code) {
-        'cancelled' => '',
+        'cancelled' => _('Sign-in didn’t finish. Make sure a Google account is added on this phone, then try again.', 'साइन इन पूरा नहीं हुआ। देखें कि इस फ़ोन में Google खाता जुड़ा है, फिर कोशिश करें।'),
         'network' => offline,
         'invalidPhone' => _('That phone number doesn’t look right.', 'यह फ़ोन नंबर सही नहीं लग रहा।'),
         'invalidCode' => _('That code isn’t right. Check the SMS and try again.', 'कोड सही नहीं है। SMS देखकर फिर कोशिश करें।'),

@@ -188,6 +188,7 @@ class _BookVocabularyState extends ConsumerState<_BookVocabulary> {
                 word: w,
                 meta: [if (!w.isNew) t.metBefore, t.lookedUpTimes(w.lookups)],
                 trailing: ago(w.firstAt, t),
+                bookId: widget.bookId,
               ),
           ],
         );
@@ -197,11 +198,14 @@ class _BookVocabularyState extends ConsumerState<_BookVocabulary> {
 }
 
 class _WordRow extends ConsumerWidget {
-  const _WordRow({required this.word, required this.meta, required this.trailing});
+  const _WordRow({required this.word, required this.meta, required this.trailing, this.bookId});
 
   final VocabWord word;
   final List<String> meta;
   final String trailing;
+
+  /// Set on a book's list, so holding removes only that meeting.
+  final int? bookId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -209,6 +213,7 @@ class _WordRow extends ConsumerWidget {
     final scale = ref.watch(settingsProvider).hindiScale;
     return InkWell(
       onTap: () => context.push('/word/${Uri.encodeComponent(word.lemma)}'),
+      onLongPress: () => _forget(context, ref),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.rule))),
@@ -230,6 +235,29 @@ class _WordRow extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _forget(BuildContext context, WidgetRef ref) async {
+    final t = ref.read(stringsProvider);
+    final c = context.colors;
+    final scale = ref.read(settingsProvider).hindiScale;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: c.card,
+        title: Text(t.removeFromVocabulary, style: uiHeading(hindi: t.isHindi, color: c.ink, scale: scale)),
+        content: Text(word.lemma, style: EnglishText.body(c.ink)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.no)),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.delete)),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    await ref.read(localStoreProvider).removeVocabulary(word.lemma, bookId: bookId);
+    ref
+      ..invalidate(lifetimeVocabularyProvider)
+      ..invalidate(bookVocabularyProvider);
   }
 }
 

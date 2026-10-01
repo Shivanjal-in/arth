@@ -109,6 +109,16 @@ class WordTooltip extends ConsumerWidget {
               ),
             if (isAiBlock(state.contextErrorCode))
               AiPrompt(code: state.contextErrorCode!, feature: AiFeature.context)
+            else if (state.contextOffered)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: ref.read(readerControllerProvider.notifier).explainInContext,
+                  style: TextButton.styleFrom(foregroundColor: c.accent, padding: const EdgeInsets.symmetric(horizontal: 4)),
+                  icon: const Icon(Icons.auto_awesome_outlined, size: 18),
+                  label: Text(t.explainInSentence, style: uiLabel(hindi: t.isHindi, color: c.accent, scale: settings.hindiScale)),
+                ),
+              )
             else
               InContextBlock(
                 result: state.context,

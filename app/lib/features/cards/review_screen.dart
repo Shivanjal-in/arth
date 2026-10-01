@@ -18,6 +18,7 @@ import 'package:arth/features/cards/card_face.dart';
 import 'package:arth/features/cards/review_schedule.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 enum ReviewMode { replay, practice }
 
@@ -145,6 +146,16 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> with TickerProvider
     unawaited(_load());
   }
 
+  /// Back to where practice started; opened on its own (a reminder), to
+  /// the Cards tab rather than nowhere.
+  void _leave() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/cards');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -157,7 +168,7 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> with TickerProvider
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.maybePop(context)),
+        leading: IconButton(icon: const Icon(Icons.close_rounded), onPressed: _leave),
         title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
         bottom: cards == null || cards.isEmpty
             ? null
@@ -195,7 +206,7 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> with TickerProvider
                       practice: widget.mode == ReviewMode.practice,
                       onAgain: _restart,
                       onFinish: () {
-                        unawaited(Navigator.maybePop(context));
+                        _leave();
                         ref.read(interstitialsProvider).onBreak(AdBreak.finishedReview);
                       },
                     )
