@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Generate the Arth app icon for Android and iOS from one drawing.
+"""Generate the Arth app icon for Android, iOS and the Play Store from one drawing.
 
-Design: cream ground, a large serif Devanagari "अ" (for अर्थ, "meaning") in the
-brick red of the reader UI, a thin underline like the tab indicator in the design.
+Design (the app's neo-brutalist look): a marigold ground, a cream card with a
+thick ink outline and a hard maroon shadow, and a big red Devanagari "अ" (for
+अर्थ, "meaning") with an ink outline, over a highlighter bar like the one that
+marks a word in the reader.
 
-Run from app/:  python3 tool/make_icon.py     (needs Pillow; macOS system fonts)
+Run from app/:  python3 tool/make_icon.py     (needs Pillow)
 """
 
 from __future__ import annotations
@@ -15,49 +17,63 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 APP = Path(__file__).resolve().parents[1]
-CREAM = (243, 237, 227)
-BRICK = (155, 58, 49)
-FONT = "/System/Library/Fonts/Supplemental/ITFDevanagari.ttc"  # index 1 = Bold
+MARIGOLD = (245, 183, 38)
+CARD = (247, 247, 242)
+INK = (16, 32, 29)
+RED = (179, 40, 28)
+SHADOW = (103, 25, 18)
+FONT = APP / "assets/google_fonts/Mukta-SemiBold.ttf"
 
 
-def draw_icon(size: int, *, glyph_scale: float = 0.60, background: bool = True, radius: float = 0.0) -> Image.Image:
-    """glyph_scale: glyph height as a fraction of the canvas. radius: corner radius as a fraction."""
+def draw_icon(size: int, *, card: float = 0.595, background: bool = True, radius: float = 0.0) -> Image.Image:
+    """card: the card's side as a fraction of the canvas (the shadow adds ~7.5%).
+    radius: corner radius of the ground as a fraction (the legacy launcher shape)."""
     s = 4  # supersample for crisp edges
     w = size * s
     img = Image.new("RGBA", (w, w), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     if background:
         if radius > 0:
-            d.rounded_rectangle((0, 0, w - 1, w - 1), radius=int(w * radius), fill=CREAM)
+            d.rounded_rectangle((0, 0, w - 1, w - 1), radius=int(w * radius), fill=MARIGOLD)
         else:
-            d.rectangle((0, 0, w, w), fill=CREAM)
+            d.rectangle((0, 0, w, w), fill=MARIGOLD)
 
-    # Fit the glyph's ink box to glyph_scale of the canvas, then centre it optically
-    # (a touch above centre so the underline sits in the lower third).
-    target = w * glyph_scale
-    font = ImageFont.truetype(FONT, int(target), index=1)
+    c = w * card  # card side
+    off = c * 0.075  # shadow offset
+    border = max(2, round(c * 0.045))
+    x0 = (w - (c + off)) / 2
+    y0 = (w - (c + off)) / 2
+    # Hard shadow, then the outlined card.
+    d.rectangle((x0 + off, y0 + off, x0 + off + c, y0 + off + c), fill=SHADOW)
+    d.rectangle((x0, y0, x0 + c, y0 + c), fill=INK)
+    d.rectangle((x0 + border, y0 + border, x0 + c - border, y0 + c - border), fill=CARD)
+
+    # The glyph: fit its ink box to a share of the card, centred a little high.
+    target = c * 0.60
+    font = ImageFont.truetype(str(FONT), int(target))
     left, top, right, bottom = font.getbbox("अ")
-    ink_h = bottom - top
-    font = ImageFont.truetype(FONT, int(target * target / ink_h), index=1)
+    font = ImageFont.truetype(str(FONT), int(target * target / (bottom - top)))
     left, top, right, bottom = font.getbbox("अ")
-    ink_w, ink_h = right - left, bottom - top
-    x = (w - ink_w) / 2 - left
-    y = (w - ink_h) / 2 - top - w * 0.04
-    d.text((x, y), "अ", font=font, fill=BRICK)
+    gw, gh = right - left, bottom - top
+    stroke = max(1, round(c * 0.018))
+    gx = x0 + (c - gw) / 2 - left
+    gy = y0 + (c - gh) / 2 - top - c * 0.045
 
-    # Underline: same weight as the design's tab indicator, ~40% of the glyph width.
-    ul_w = ink_w * 0.42
-    ul_h = w * 0.018
-    ul_y = y + top + ink_h + w * 0.075
-    d.rounded_rectangle(((w - ul_w) / 2, ul_y, (w + ul_w) / 2, ul_y + ul_h), radius=ul_h / 2, fill=BRICK)
+    # Highlighter bar behind the letter's lower half, with its own outline.
+    bar_h = c * 0.12
+    bar_y = gy + top + gh - bar_h * 0.15
+    bx0, bx1 = x0 + c * 0.17, x0 + c * 0.83
+    d.rectangle((bx0 - stroke, bar_y - stroke, bx1 + stroke, bar_y + bar_h + stroke), fill=INK)
+    d.rectangle((bx0, bar_y, bx1, bar_y + bar_h), fill=MARIGOLD)
 
+    d.text((gx, gy), "अ", font=font, fill=RED, stroke_width=stroke, stroke_fill=INK)
     return img.resize((size, size), Image.LANCZOS)
 
 
 def save(img: Image.Image, path: Path, *, opaque: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if opaque:
-        bg = Image.new("RGB", img.size, CREAM)
+        bg = Image.new("RGB", img.size, MARIGOLD)
         bg.paste(img, mask=img.split()[3])
         bg.save(path, "PNG", optimize=True)
     else:
@@ -86,7 +102,7 @@ def android() -> None:
     # Adaptive icon (API 26+): 108dp canvas, content inside the central 66dp safe zone.
     for name, mult in densities.items():
         px = round(108 * mult)
-        save(draw_icon(px, glyph_scale=0.40, background=False), res / f"mipmap-{name}/ic_launcher_foreground.png")
+        save(draw_icon(px, card=0.42, background=False), res / f"mipmap-{name}/ic_launcher_foreground.png")
     (res / "mipmap-anydpi-v26").mkdir(exist_ok=True)
     (res / "mipmap-anydpi-v26/ic_launcher.xml").write_text(
         '<?xml version="1.0" encoding="utf-8"?>\n'
@@ -97,10 +113,17 @@ def android() -> None:
     )
     (res / "values/ic_launcher_background.xml").write_text(
         '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
-        f'    <color name="ic_launcher_background">#{CREAM[0]:02X}{CREAM[1]:02X}{CREAM[2]:02X}</color>\n'
+        f'    <color name="ic_launcher_background">#{MARIGOLD[0]:02X}{MARIGOLD[1]:02X}{MARIGOLD[2]:02X}</color>\n'
         "</resources>\n"
     )
     print(f"Android: legacy + adaptive icons → {res.relative_to(APP)}")
+
+
+def playstore() -> None:
+    """The 512x512 Play Console 'App icon' (32-bit PNG, full square: Play rounds it)."""
+    out = APP / "tool/playstore-icon-512.png"
+    draw_icon(512).save(out, "PNG", optimize=True)
+    print(f"Play Store icon → {out.relative_to(APP)}")
 
 
 def preview() -> None:
@@ -116,4 +139,5 @@ def preview() -> None:
 if __name__ == "__main__":
     ios()
     android()
+    playstore()
     preview()

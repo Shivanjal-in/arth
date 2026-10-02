@@ -196,7 +196,6 @@ class InContextBlock extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
       decoration: BoxDecoration(
         color: c.marigold.withValues(alpha: 0.13),
-        borderRadius: BorderRadius.circular(10),
         border: Border(left: BorderSide(color: c.marigold, width: 3)),
       ),
       child: Column(

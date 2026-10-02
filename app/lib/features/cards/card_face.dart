@@ -4,6 +4,7 @@
 // the review screen flips between; CardTile is the compact form the recap
 // timeline lists.
 
+import 'package:arth/app/feel.dart';
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/settings.dart';
 import 'package:arth/app/strings.dart';
@@ -68,7 +69,7 @@ class CardMeta extends ConsumerWidget {
   }
 }
 
-/// The paper: card colour, ruled lines, margin, ink edge, soft shadow.
+/// The paper: card colour, ruled lines, margin, ink edge, hard shadow.
 class IndexCard extends StatelessWidget {
   const IndexCard({required this.ink, required this.child, super.key, this.padding = const EdgeInsets.fromLTRB(28, 22, 22, 22), this.elevated = true});
 
@@ -80,45 +81,20 @@ class IndexCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    // At night a card is lit from within: a wash of the book's colour at the
-    // top fading into the card, an edge in that colour, a deeper shadow and a
-    // faint glow — rather than a navy hole in a navy page.
+    // At night the card takes a wash of the book's colour; its edge stays ink
+    // (or the book's colour), its shadow hard.
     final dark = Theme.of(context).brightness == Brightness.dark;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: dark ? null : c.card,
-        gradient: dark
-            ? LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                stops: const [0, 0.35, 1],
-                colors: [Color.lerp(c.card, ink, 0.16)!, Color.lerp(c.card, ink, 0.04)!, c.card],
-              )
-            : null,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: dark ? Color.lerp(c.rule, ink, 0.40)! : c.rule),
-        boxShadow: elevated
-            ? dark
-                ? [
-                    BoxShadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 28, offset: const Offset(0, 12)),
-                    BoxShadow(color: ink.withValues(alpha: 0.14), blurRadius: 22, spreadRadius: -4),
-                  ]
-                : [
-                    BoxShadow(color: Colors.black.withValues(alpha: 0.10), blurRadius: 24, offset: const Offset(0, 10)),
-                    BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 1)),
-                  ]
-            : null,
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: CustomPaint(
-          painter: _RuledPaper(
-            rule: dark ? Color.lerp(c.rule, ink, 0.30)!.withValues(alpha: 0.75) : c.rule,
-            margin: c.accent,
-            ink: ink,
-          ),
-          child: Padding(padding: padding, child: child),
+    return HardShadow(
+      depth: elevated ? 5 : 0,
+      color: dark ? Color.lerp(c.card, ink, 0.10) : c.card,
+      border: dark ? Color.lerp(c.ink, ink, 0.5) : c.ink,
+      child: CustomPaint(
+        painter: _RuledPaper(
+          rule: dark ? Color.lerp(c.rule, ink, 0.30)!.withValues(alpha: 0.75) : c.rule,
+          margin: c.accent,
+          ink: ink,
         ),
+        child: Padding(padding: padding, child: child),
       ),
     );
   }
@@ -401,17 +377,10 @@ class CardTile extends ConsumerWidget {
       CardKind.word => Text(card.front, style: cardStyle(card.front, f, color: c.ink, scale: scale, size: 20, weight: FontWeight.w600)),
       CardKind.idea => Text(card.front, style: cardStyle(card.front, f, color: c.ink, scale: scale, weight: FontWeight.w600), maxLines: 3, overflow: TextOverflow.ellipsis),
     };
-    return Material(
-      color: c.card,
-      borderRadius: BorderRadius.circular(14),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: c.rule),
-          ),
+    return Pressable.card(
+      depth: 4,
+      onTap: onTap,
+      child: Container(
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -430,7 +399,6 @@ class CardTile extends ConsumerWidget {
             ],
           ),
         ),
-      ),
     );
   }
 }

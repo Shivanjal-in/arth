@@ -352,8 +352,7 @@ class _ScanPageState extends ConsumerState<_ScanPage> {
                 bottom: 16,
                 child: Material(
                   color: c.card,
-                  borderRadius: BorderRadius.circular(12),
-                  elevation: 4,
+                  shape: RoundedRectangleBorder(side: BorderSide(color: c.ink, width: 2)),
                   child: Padding(
                     padding: const EdgeInsets.all(14),
                     child: Text(t.ocrEmpty, style: uiBody(hindi: t.isHindi, color: c.ink)),

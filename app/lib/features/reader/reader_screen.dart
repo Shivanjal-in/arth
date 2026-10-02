@@ -13,6 +13,7 @@
 
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:arth/app/account_providers.dart';
 import 'package:arth/app/dev_hooks.dart';
@@ -28,6 +29,7 @@ import 'package:arth/features/ads/interstitials.dart';
 import 'package:arth/features/cards/card_editor.dart';
 import 'package:arth/features/cards/deck_screen.dart';
 import 'package:arth/features/reader/bookmarks_sheet.dart';
+import 'package:arth/features/reader/curl/book_pager.dart';
 import 'package:arth/features/reader/details_sheet.dart';
 import 'package:arth/features/reader/flick_physics.dart';
 import 'package:arth/features/reader/go_to_page.dart';
@@ -35,6 +37,7 @@ import 'package:arth/features/reader/highlights/highlight_colors.dart';
 import 'package:arth/features/reader/highlights/highlights_sheet.dart';
 import 'package:arth/features/reader/page_text_cache.dart';
 import 'package:arth/features/reader/reader_controller.dart';
+import 'package:arth/features/reader/reader_guide.dart';
 import 'package:arth/features/reader/reader_menu.dart';
 import 'package:arth/features/reader/tooltip/tooltip_layer.dart';
 import 'package:arth/features/settings/reading_settings_sheet.dart';
@@ -66,6 +69,7 @@ class ReaderScreen extends ConsumerStatefulWidget {
 
 class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose {
   final _controller = PdfViewerController();
+  final _pager = BookPagerController();
   final _link = LayerLink();
   final _portal = OverlayPortalController();
   final GlobalKey _viewerKey = GlobalKey();
@@ -99,6 +103,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
   void initState() {
     super.initState();
     _controller.addListener(_onViewerChanged);
+    // Flipping book mode re-lays the pages out (pdfrx doesn't notice by itself).
+    ref.listenManual(settingsProvider.select((s) => s.bookPages), (_, _) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_controller.isReady) return;
+        _controller.invalidate();
+        if (_bookMode) unawaited(_applyBookView(_page ?? 1));
+      });
+    });
     _registerDevHooks();
   }
 
@@ -258,7 +270,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
       bookId: widget.book.id,
       emptyText: t.highlightsEmptyPdf,
       locationOf: (h) => t.page(h.page, _controller.isReady ? _controller.pageCount : h.page),
-      onJump: (h) => unawaited(_controller.goToPage(pageNumber: h.page)),
+      onJump: (h) => unawaited(_goToPage(h.page)),
     );
   }
 
@@ -325,6 +337,231 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
     return box?.localToGlobal(Offset.zero) ?? Offset.zero;
   }
 
+  // ---- book mode ----
+
+  /// Pages in a row, each far enough from the next that neighbours never show
+  /// beside the one being read.
+  static PdfPageLayout _bookLayout(List<PdfPage> pages, PdfViewerParams params) {
+    final height = pages.fold<double>(0, (m, p) => math.max(m, p.height));
+    final gap = pages.fold<double>(0, (m, p) => math.max(m, p.width));
+    final layouts = <Rect>[];
+    var x = 0.0;
+    for (final page in pages) {
+      layouts.add(Rect.fromLTWH(x, (height - page.height) / 2, page.width, page.height));
+      x += page.width + gap;
+    }
+    return PdfPageLayout(pageLayouts: layouts, documentSize: Size(math.max(0, x - gap), height));
+  }
+
+  static double? _fitPage(PdfDocument document, PdfViewerController controller, double fitZoom, double coverZoom) => fitZoom;
+
+  /// pdfrx reports ready a beat before its pages are laid out.
+  PdfPageLayout? get _layoutOrNull {
+    if (!_controller.isReady) return null;
+    try {
+      return _controller.layout;
+    // pdfrx's null-check TypeError is how it says "not laid out yet".
+    // ignore: avoid_catching_errors
+    } on TypeError {
+      return null;
+    }
+  }
+
+  /// Pages are read one at a time and turned with a curl.
+  bool get _bookMode => ref.read(settingsProvider).bookPages;
+
+  /// A tap in the margin beside the text turns the page.
+  bool _turnFromEdge(Offset docPos) {
+    if (!_bookMode || _layoutOrNull == null) return false;
+    final box = _viewerKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return false;
+    final x = MatrixUtils.transformPoint(_controller.value, docPos).dx;
+    final w = box.size.width;
+    if (x > w * 0.14 && x < w * 0.86) return false;
+    unawaited(_pager.turn(forward: x >= w / 2));
+    return true;
+  }
+
+  // ---- book view ----
+  //
+  // In book mode the page's white sheet is dropped (a colour filter maps white
+  // to the paper and black to the ink) and each page is zoomed to its text, so
+  // the words fill the screen like a reflowed book. The same placement is used
+  // for the curl's pictures of the neighbouring pages.
+
+  /// Per page: where its text sits, in page points (null: no text).
+  final Map<int, Rect?> _textBoxes = {};
+  ({double width, double centerX})? _bookRef;
+  bool _bookViewSet = false;
+
+  /// White → paper, black → ink, in both themes.
+  ColorFilter _paperFilter(ArthColors c) {
+    List<double> row(int channel, Color paper, Color ink) {
+      final p = [paper.r, paper.g, paper.b][channel] * 255;
+      final i = [ink.r, ink.g, ink.b][channel] * 255;
+      final out = List<double>.filled(5, 0);
+      out[channel] = (p - i) / 255;
+      out[4] = i;
+      return out;
+    }
+
+    return ColorFilter.matrix([
+      ...row(0, c.paper, c.ink),
+      ...row(1, c.paper, c.ink),
+      ...row(2, c.paper, c.ink),
+      0, 0, 0, 1, 0, //
+    ]);
+  }
+
+  /// The block of text on [page], in page points; null on a page without text.
+  Future<Rect?> _textBoxOf(int page) async {
+    if (_textBoxes.containsKey(page)) return _textBoxes[page];
+    final layout = _layoutOrNull;
+    if (layout == null) return null;
+    final loaded = await _controller.pages[page - 1].waitForLoaded(timeout: const Duration(seconds: 10));
+    if (loaded == null) return null;
+    final text = await loaded.loadStructuredText();
+    final origin = layout.pageLayouts[page - 1].topLeft;
+    final lefts = <double>[];
+    final rights = <double>[];
+    var top = double.infinity;
+    var bottom = -double.infinity;
+    for (final r in text.charRects) {
+      if (r.isEmpty) continue;
+      final d = _controller.calcRectForRectInsidePage(pageNumber: page, rect: r).shift(-origin);
+      if (d.isEmpty) continue;
+      lefts.add(d.left);
+      rights.add(d.right);
+      top = math.min(top, d.top);
+      bottom = math.max(bottom, d.bottom);
+    }
+    Rect? box;
+    if (lefts.length >= 20) {
+      lefts.sort();
+      rights.sort();
+      // Leave out the odd stray mark in a margin.
+      box = Rect.fromLTRB(lefts[(lefts.length * 0.01).floor()], top, rights[(rights.length * 0.99).ceil() - 1], bottom);
+    }
+    return _textBoxes[page] = box;
+  }
+
+  /// How wide a column of text usually is in this book, and where it sits:
+  /// the median over a spread of pages, so zoom is the same on every page.
+  Future<({double width, double centerX})?> _bookRefOf() async {
+    final known = _bookRef;
+    if (known != null) return known;
+    final n = _controller.pageCount;
+    final sample = {for (var i = 0; i < 9; i++) 1 + (n - 1) * i ~/ 8};
+    final boxes = <Rect>[];
+    for (final page in sample) {
+      final box = await _textBoxOf(page);
+      if (box != null) boxes.add(box);
+    }
+    if (boxes.isEmpty) return null;
+    double median(List<double> v) => (v..sort())[v.length ~/ 2];
+    return _bookRef = (width: median([for (final b in boxes) b.width]), centerX: median([for (final b in boxes) b.center.dx]));
+  }
+
+  /// The zoom, and the point of the page (in page points) at the middle of the
+  /// view, that put [page]'s text across a [view]-sized screen.
+  Future<({double zoom, Offset center})> _bookViewOf(int page, Size view) async {
+    final pdfPage = _controller.document.pages[page - 1];
+    final box = await _textBoxOf(page);
+    final ref = await _bookRefOf();
+    if (box == null || ref == null) {
+      final zoom = math.min(view.width / pdfPage.width, view.height / pdfPage.height);
+      return (zoom: zoom, center: Offset(pdfPage.width / 2, pdfPage.height / 2));
+    }
+    const side = 20.0; // logical px kept clear either side of the text
+    const top = 16.0;
+    final byColumn = (view.width - 2 * side) / ref.width;
+    final byThisPage = math.min((view.width - 2 * side) / box.width, (view.height - top - 12) / box.height);
+    final zoom = math.min(byColumn, byThisPage);
+    final half = view.width / (2 * zoom);
+    final low = box.right + side / zoom - half;
+    final high = box.left - side / zoom + half;
+    final cx = low <= high ? ref.centerX.clamp(low, high) : box.center.dx;
+    return (zoom: zoom, center: Offset(cx, box.top - top / zoom + view.height / (2 * zoom)));
+  }
+
+  /// Put [page]'s text across the screen.
+  Future<void> _applyBookView(int page, {int attempt = 0}) async {
+    final layout = _layoutOrNull;
+    final box = _viewerKey.currentContext?.findRenderObject() as RenderBox?;
+    if (layout == null || box == null || !box.hasSize) {
+      // pdfrx isn't laid out yet: try again shortly, and show the page as it
+      // is rather than stay hidden if it never is.
+      if (attempt < 20) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        if (mounted) await _applyBookView(page, attempt: attempt + 1);
+      } else if (mounted && !_bookViewSet) {
+        setState(() => _bookViewSet = true);
+      }
+      return;
+    }
+    if (page < 1 || page > _controller.pageCount) return;
+    try {
+      final v = await _bookViewOf(page, box.size);
+      if (!mounted) return;
+      final at = layout.pageLayouts[page - 1].topLeft + v.center;
+      await _controller.goTo(_controller.calcMatrixFor(at, zoom: v.zoom, viewSize: box.size), duration: Duration.zero);
+    } finally {
+      // Never leave the reader hidden, whatever went wrong placing the text.
+      if (mounted && !_bookViewSet) setState(() => _bookViewSet = true);
+    }
+  }
+
+  /// Go to [page]: in book mode by placing its text, else as pdfrx does.
+  Future<void> _goToPage(int page) => _bookMode ? _applyBookView(page) : _controller.goToPage(pageNumber: page);
+
+  /// A picture of [page] as the book view shows it, for the page curl: the
+  /// text where the live view would put it, on the paper.
+  Future<ui.Image?> _snapshotPage(int page, Size pixels) async {
+    final layout = _layoutOrNull;
+    if (layout == null || page < 1 || page > _controller.pageCount) return null;
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final c = context.colors;
+    final view = Size(pixels.width / dpr, pixels.height / dpr);
+    final v = await _bookViewOf(page, view);
+    final pdfPage = _controller.document.pages[page - 1];
+    final px = v.zoom * dpr;
+    final topLeft = Offset(v.center.dx - view.width / (2 * v.zoom), v.center.dy - view.height / (2 * v.zoom));
+    final visible = Rect.fromLTWH(topLeft.dx, topLeft.dy, view.width / v.zoom, view.height / v.zoom).intersect(Rect.fromLTWH(0, 0, pdfPage.width, pdfPage.height));
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder)..drawColor(c.paper, BlendMode.src);
+    if (!visible.isEmpty) {
+      final rendered = await pdfPage.render(
+        x: (visible.left * px).floor(),
+        y: (visible.top * px).floor(),
+        width: (visible.width * px).ceil(),
+        height: (visible.height * px).ceil(),
+        fullWidth: pdfPage.width * px,
+        fullHeight: pdfPage.height * px,
+        backgroundColor: 0xFFFFFFFF,
+      );
+      if (rendered != null) {
+        final raw = await rendered.createImage();
+        rendered.dispose();
+        canvas.drawImageRect(
+          raw,
+          Rect.fromLTWH(0, 0, raw.width.toDouble(), raw.height.toDouble()),
+          Rect.fromLTWH((visible.left - topLeft.dx) * px, (visible.top - topLeft.dy) * px, visible.width * px, visible.height * px),
+          Paint()
+            ..filterQuality = FilterQuality.medium
+            ..colorFilter = _paperFilter(c),
+        );
+        raw.dispose();
+      }
+    }
+    return recorder.endRecording().toImage(pixels.width.toInt(), pixels.height.toInt());
+  }
+
+  Future<void> _showTurnedPage(int page) async {
+    ref.read(readerControllerProvider.notifier).dismiss();
+    unawaited(_controller.textSelectionDelegate.clearTextSelection());
+    await _applyBookView(page);
+  }
+
   // ---- taps ----
 
   bool _onTap(BuildContext context, PdfViewerController controller, PdfViewerGeneralTapHandlerDetails d) {
@@ -341,7 +578,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
     final page = cache.pageAt(docPos);
     final rc = ref.read(readerControllerProvider.notifier);
     if (page == null) {
-      rc.dismiss();
+      if (!_turnFromEdge(docPos)) rc.dismiss();
       return;
     }
     final idx = await cache.page(page);
@@ -357,7 +594,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
     }
     final word = idx.wordAt(docPos, margin: 3);
     if (word == null || word.key.isEmpty) {
-      rc.dismiss();
+      if (!_turnFromEdge(docPos)) rc.dismiss();
       return;
     }
     unawaited(_controller.textSelectionDelegate.clearTextSelection());
@@ -642,6 +879,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
       unawaited(_resolveHighlightRects(highlights, _page ?? 1));
     }
     final brightness = Theme.of(context).brightness;
+    final bookMode = ref.watch(settingsProvider.select((s) => s.bookPages));
 
     return Scaffold(
       appBar: AppBar(
@@ -653,7 +891,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
                 page: _page!,
                 count: _controller.isReady ? _controller.pageCount : null,
                 tooltip: t.goToPage,
-                onGo: (p) => unawaited(_controller.goToPage(pageNumber: p)),
+                onGo: (p) => unawaited(_goToPage(p)),
               ),
             ),
           BookmarkButton(
@@ -671,75 +909,105 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
             onBookmarks: () => showBookmarksSheet(
               context,
               bookId: widget.book.id,
-              onJump: (b) => unawaited(_controller.goToPage(pageNumber: b.page)),
+              onJump: (b) => unawaited(_goToPage(b.page)),
             ),
             onNote: () => unawaited(_makeCard(const CardDraft(kind: CardKind.idea))),
             onCards: () => context.push(deckRoute((bookId: widget.book.id, bookTitle: widget.book.title))),
           ),
         ],
       ),
-      body: Stack(
+      body: ReaderGuide(
+        child: Stack(
         children: [
-          PdfViewer.file(
-            widget.filePath,
-            key: _viewerKey,
-            controller: _controller,
-            initialPageNumber: widget.initialPage ?? widget.book.lastPage,
-            params: PdfViewerParams(
-              backgroundColor: c.paper,
-              // Native scrolling (pdfrx's default flings stop short), with
-              // hard flicks carried further.
-              scrollPhysics: FlickBoostPhysics(parent: PdfViewerParams.getScrollPhysics(context)),
-              textSelectionParams: PdfTextSelectionParams(
-                showContextMenuAutomatically: false,
-                onTextSelectionChange: _onSelectionChanged,
-              ),
-              // Our tooltip replaces the OS copy/paste menu entirely.
-              buildContextMenu: (_, _) => null,
-              errorBannerBuilder: (ctx, error, stack, ref) => Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(32),
-                  child: Text(
-                    t.pdfOpenFailed,
-                    style: uiBody(hindi: t.isHindi, color: c.inkMuted),
-                    textAlign: TextAlign.center,
+          BookPager(
+            controller: _pager,
+            enabled: bookMode && _page != null && _layoutOrNull != null,
+            position: _page ?? 1,
+            hasNext: (_page ?? 1) < (_controller.isReady ? _controller.pageCount : 1),
+            hasPrevious: (_page ?? 1) > 1,
+            paper: c.paper,
+            snapshot: ({required next, required size}) => _snapshotPage((_page ?? 1) + (next ? 1 : -1), size),
+            onTurn: ({required next}) => _showTurnedPage((_page ?? 1) + (next ? 1 : -1)),
+            canStart: () => !_controller.textSelectionDelegate.hasSelectedText,
+            child: _BookFilter(
+              enabled: bookMode,
+              filter: _paperFilter(c),
+              ready: _bookViewSet,
+              child: PdfViewer.file(
+                widget.filePath,
+                key: _viewerKey,
+                controller: _controller,
+                initialPageNumber: widget.initialPage ?? widget.book.lastPage,
+                params: PdfViewerParams(
+                  // Book mode: a page's text fills the view and the pager turns it,
+                  // so the viewer neither pans nor zooms by itself. White pages
+                  // go through the paper filter, which turns the white to paper.
+                  backgroundColor: bookMode ? Colors.white : c.paper,
+                  boundaryMargin: bookMode ? const EdgeInsets.all(100000) : null,
+                  onViewSizeChanged: (_, _, _) {
+                    if (_bookMode && _page != null) WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_applyBookView(_page!)));
+                  },
+                  margin: bookMode ? 0 : 8,
+                  layoutPages: bookMode ? _bookLayout : null,
+                  sizeDelegateProvider: bookMode ? const PdfViewerSizeDelegateProviderLegacy(calculateInitialZoom: _fitPage) : null,
+                  pageDropShadow: bookMode ? null : const BoxShadow(color: Colors.black54, blurRadius: 4, spreadRadius: 2, offset: Offset(2, 2)),
+                  panEnabled: !bookMode,
+                  scaleEnabled: !bookMode,
+                  // Native scrolling (pdfrx's default flings stop short), with
+                  // hard flicks carried further.
+                  scrollPhysics: bookMode ? null : FlickBoostPhysics(parent: PdfViewerParams.getScrollPhysics(context)),
+                  textSelectionParams: PdfTextSelectionParams(
+                    showContextMenuAutomatically: false,
+                    onTextSelectionChange: _onSelectionChanged,
                   ),
-                ),
-              ),
-              onGeneralTap: _onTap,
-              onViewerReady: (doc, controller) {
-                _cache = PageTextCache(controller);
-                unawaited(_resolveHighlightRects(_highlightsSeen, controller.pageNumber ?? 1));
-                unawaited(_checkForTextLayer(doc.pages.length));
-                unawaited(
-                  ref.read(libraryProvider.notifier).touch(widget.book.id, pageCount: doc.pages.length),
-                );
-                setState(() => _page = controller.pageNumber);
-                unawaited(_prefetch(controller.pageNumber ?? 1));
-              },
-              onPageChanged: (p) {
-                if (p == null) return;
-                setState(() => _page = p);
-                unawaited(_reportProgress(p));
-                unawaited(_prefetch(p));
-                unawaited(_resolveHighlightRects(_highlightsSeen, p));
-              },
-              viewerOverlayBuilder: (ctx, size, _) => [
-                for (final h in highlights)
-                  for (final band in _highlightRects[h.id] ?? const <Rect>[])
-                    Positioned.fromRect(
-                      rect: _docToViewer(band).inflate(1.5),
-                      child: IgnorePointer(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: HighlightPalette.fill(h.color, brightness),
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                        ),
+                  // Our tooltip replaces the OS copy/paste menu entirely.
+                  buildContextMenu: (_, _) => null,
+                  errorBannerBuilder: (ctx, error, stack, ref) => Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Text(
+                        t.pdfOpenFailed,
+                        style: uiBody(hindi: t.isHindi, color: c.inkMuted),
+                        textAlign: TextAlign.center,
                       ),
                     ),
-                ...tooltipOverlays(context: ctx, tooltip: tooltip, link: _link, toLocal: _docToViewer),
-              ],
+                  ),
+                  onGeneralTap: _onTap,
+                  onViewerReady: (doc, controller) {
+                    _cache = PageTextCache(controller);
+                    unawaited(_resolveHighlightRects(_highlightsSeen, controller.pageNumber ?? 1));
+                    unawaited(_checkForTextLayer(doc.pages.length));
+                    unawaited(
+                      ref.read(libraryProvider.notifier).touch(widget.book.id, pageCount: doc.pages.length),
+                    );
+                    setState(() => _page = controller.pageNumber);
+                    unawaited(_prefetch(controller.pageNumber ?? 1));
+                  },
+                  onPageChanged: (p) {
+                    if (p == null) return;
+                    setState(() => _page = p);
+                    unawaited(_reportProgress(p));
+                    unawaited(_prefetch(p));
+                    unawaited(_resolveHighlightRects(_highlightsSeen, p));
+                  },
+                  viewerOverlayBuilder: (ctx, size, _) => [
+                    for (final h in highlights)
+                      for (final band in _highlightRects[h.id] ?? const <Rect>[])
+                        Positioned.fromRect(
+                          rect: _docToViewer(band).inflate(1.5),
+                          child: IgnorePointer(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: HighlightPalette.fill(h.color, brightness),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ...tooltipOverlays(context: ctx, tooltip: tooltip, link: _link, toLocal: _docToViewer),
+                  ],
+                ),
+          ),
             ),
           ),
           OverlayPortal(
@@ -763,6 +1031,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -775,5 +1044,22 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
   void _translateSelection(HighlightBarState s) {
     _portal.show();
     ref.read(readerControllerProvider.notifier).showSentence(text: s.text, anchor: s.anchor, page: s.page);
+  }
+}
+
+/// Book mode's look: the viewer's white pages become the paper (see
+/// _paperFilter), hidden until the first page has been placed.
+class _BookFilter extends StatelessWidget {
+  const _BookFilter({required this.enabled, required this.filter, required this.ready, required this.child});
+
+  final bool enabled;
+  final ColorFilter filter;
+  final bool ready;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!enabled) return child;
+    return Opacity(opacity: ready ? 1 : 0, child: ColorFiltered(colorFilter: filter, child: child));
   }
 }

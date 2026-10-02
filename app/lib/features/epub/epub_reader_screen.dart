@@ -14,6 +14,7 @@
 
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:arth/app/dev_hooks.dart';
 import 'package:arth/app/feel.dart';
@@ -31,11 +32,13 @@ import 'package:arth/features/cards/card_editor.dart';
 import 'package:arth/features/cards/deck_screen.dart';
 import 'package:arth/features/epub/epub_paragraph.dart';
 import 'package:arth/features/reader/bookmarks_sheet.dart';
+import 'package:arth/features/reader/curl/book_pager.dart';
 import 'package:arth/features/reader/details_sheet.dart';
 import 'package:arth/features/reader/flick_physics.dart';
 import 'package:arth/features/reader/highlights/highlight_colors.dart';
 import 'package:arth/features/reader/highlights/highlights_sheet.dart';
 import 'package:arth/features/reader/reader_controller.dart';
+import 'package:arth/features/reader/reader_guide.dart';
 import 'package:arth/features/reader/reader_menu.dart';
 import 'package:arth/features/reader/tooltip/tooltip_layer.dart';
 import 'package:arth/features/settings/reading_settings_sheet.dart';
@@ -43,6 +46,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class EpubReaderScreen extends ConsumerStatefulWidget {
   const EpubReaderScreen({required this.book, required this.filePath, super.key, this.initialPlace});
@@ -230,6 +234,175 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
     });
   }
 
+  // ---- book mode ----
+
+  final _bookPager = BookPagerController();
+
+  /// The page showing in [_chapter], and the scroll offset it starts at (kept
+  /// so a change of size can find the same place again).
+  int _bookPage = 0;
+  double _bookOffset = 0;
+  final Map<int, _ChapterPages> _paging = {};
+  String? _pagingKey;
+  bool _pagingBusy = false;
+  bool _bookPlaced = false;
+
+  /// The area a page's text fills (the body less the space above and below).
+  Size _viewport = Size.zero;
+
+  bool get _bookMode => ref.read(settingsProvider).bookPages;
+
+  /// Throws away the pages if the size or text scale they were cut for changed.
+  void _syncPagingKey(Size viewport, TextScaler scaler) {
+    _viewport = viewport;
+    final key = '${viewport.width}x${viewport.height}@${scaler.scale(10)}';
+    if (_pagingKey == key) return;
+    _pagingKey = key;
+    _paging.clear();
+  }
+
+  Future<_ChapterPages?> _pagesOf(int chapter) async {
+    final epub = _epub;
+    if (epub == null || _viewport.isEmpty) return null;
+    final known = _paging[chapter];
+    if (known != null) return known;
+    final scaler = MediaQuery.textScalerOf(context);
+    final c = context.colors;
+    final viewport = _viewport;
+    final key = _pagingKey;
+    final blocks = await epub.chapter(chapter);
+    // Measuring before the book font has loaded would use a stand-in's metrics.
+    await GoogleFonts.pendingFonts();
+    if (!mounted) return null;
+    final pages = _paginate(blocks, width: viewport.width, height: viewport.height, scaler: scaler, c: c);
+    // Don't keep pages cut for a size that has since changed.
+    if (_pagingKey == key) _paging[chapter] = pages;
+    return pages;
+  }
+
+  /// Cut the current chapter into pages (once the body has a size) and put
+  /// the reader on the right one.
+  void _ensurePaging() {
+    if (_pagingBusy || _epub == null || _viewport.isEmpty || _paging[_chapter] != null) return;
+    _pagingBusy = true;
+    unawaited(() async {
+      try {
+        final chapter = _chapter;
+        final pages = await _pagesOf(chapter);
+        if (!mounted || pages == null || chapter != _chapter) return;
+        final page = _bookPlaced ? pages.pageAt(_bookOffset) : await _firstBookPage(chapter, pages);
+        _bookPlaced = true;
+        setState(() {
+          _bookPage = page;
+          _bookOffset = pages.starts[page];
+        });
+      } finally {
+        _pagingBusy = false;
+      }
+    }());
+  }
+
+  /// Where to open: a bookmark or highlight's block, or where the reader left off.
+  Future<int> _firstBookPage(int chapter, _ChapterPages pages) async {
+    final jump = _jumpChapter == chapter ? _jumpBlock : null;
+    if (_jumpChapter == chapter) {
+      _jumpChapter = null;
+      _jumpBlock = null;
+    }
+    if (jump != null) return _pageOfBlock(chapter, jump, pages);
+    if (_restoreChapter == chapter) return pages.pageAt(_restoreOffset);
+    return 0;
+  }
+
+  Future<int> _pageOfBlock(int chapter, int block, _ChapterPages pages) async {
+    final epub = _epub;
+    if (epub == null) return 0;
+    final scaler = MediaQuery.textScalerOf(context);
+    final c = context.colors;
+    final blocks = await epub.chapter(chapter);
+    if (block >= blocks.length) return 0;
+    final y = _offsetOfBlock(blocks, block, width: _viewport.width, scaler: scaler, c: c);
+    return pages.pageAt(y + _styleFor(blocks[block], first: block == 0, c: c).padding.top + 1);
+  }
+
+  /// The page after (or before) the one showing, possibly in another chapter.
+  Future<({int chapter, int page})?> _neighbourPage({required bool next}) async {
+    final epub = _epub;
+    final here = _paging[_chapter];
+    if (epub == null || here == null) return null;
+    if (next) {
+      if (_bookPage + 1 < here.count) return (chapter: _chapter, page: _bookPage + 1);
+      if (_chapter + 1 >= epub.chapterCount) return null;
+      return (chapter: _chapter + 1, page: 0);
+    }
+    if (_bookPage > 0) return (chapter: _chapter, page: _bookPage - 1);
+    if (_chapter == 0) return null;
+    final before = await _pagesOf(_chapter - 1);
+    return before == null ? null : (chapter: _chapter - 1, page: before.count - 1);
+  }
+
+  Future<void> _goToBookPage(int chapter, int page) async {
+    _dismiss();
+    final pages = await _pagesOf(chapter);
+    if (!mounted || pages == null) return;
+    final p = page.clamp(0, pages.count - 1);
+    final changed = chapter != _chapter;
+    setState(() {
+      _chapter = chapter;
+      _bookPage = p;
+      _bookOffset = pages.starts[p];
+      _visible = null;
+    });
+    if (changed) {
+      _mounted.clear();
+      _pager?.jumpToPage(chapter);
+    }
+    // Let the page be placed and painted before the curl lets go.
+    for (var i = 0; i < 3; i++) {
+      await WidgetsBinding.instance.endOfFrame;
+    }
+    if (mounted) _updateVisible();
+  }
+
+  Future<void> _turnBook({required bool next}) async {
+    final target = await _neighbourPage(next: next);
+    if (target != null) await _goToBookPage(target.chapter, target.page);
+  }
+
+  Future<void> _jumpToBook(int chapter, int? block) async {
+    final pages = await _pagesOf(chapter);
+    if (pages == null) return;
+    await _goToBookPage(chapter, block == null ? 0 : await _pageOfBlock(chapter, block, pages));
+  }
+
+  /// A picture of the page next to this one, drawn the way the live page is.
+  Future<ui.Image?> _bookSnapshot({required bool next, required Size size}) async {
+    final epub = _epub;
+    final target = await _neighbourPage(next: next);
+    if (epub == null || target == null) return null;
+    final pages = await _pagesOf(target.chapter);
+    if (pages == null || !mounted) return null;
+    final blocks = await epub.chapter(target.chapter);
+    if (!mounted) return null;
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final c = context.colors;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder)
+      ..drawColor(c.paper, BlendMode.src)
+      ..scale(dpr);
+    _paintPage(
+      canvas,
+      blocks: blocks,
+      pages: pages,
+      page: target.page,
+      width: _viewport.width,
+      origin: const Offset(0, _pageTopInset),
+      scaler: MediaQuery.textScalerOf(context),
+      c: c,
+    );
+    return recorder.endRecording().toImage(size.width.toInt(), size.height.toInt());
+  }
+
   // ---- position ----
 
   void _savePosition(double offset) {
@@ -260,16 +433,30 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
   }
 
   void _onScrollEnd(ScrollMetrics m) {
-    _savePosition(m.pixels);
-    unawaited(_reportProgress(m.maxScrollExtent <= 0 ? 1 : m.pixels / m.maxScrollExtent));
+    final pages = _bookMode ? _paging[_chapter] : null;
+    if (pages != null) {
+      final page = _bookPage.clamp(0, pages.count - 1);
+      _savePosition(pages.starts[page]);
+      unawaited(_reportProgress((page + 1) / pages.count));
+    } else {
+      _savePosition(m.pixels);
+      unawaited(_reportProgress(m.maxScrollExtent <= 0 ? 1 : m.pixels / m.maxScrollExtent));
+    }
     _updateVisible();
   }
 
   /// Which blocks are on screen, from the mounted blocks' positions.
   void _updateVisible() {
     if (!mounted) return;
-    final top = MediaQuery.paddingOf(context).top + kToolbarHeight;
-    final bottom = MediaQuery.sizeOf(context).height;
+    var top = MediaQuery.paddingOf(context).top + kToolbarHeight;
+    var bottom = MediaQuery.sizeOf(context).height;
+    final pages = _bookMode ? _paging[_chapter] : null;
+    if (pages != null) {
+      // Only the page's own window counts; the rest of the column is clipped.
+      final page = _bookPage.clamp(0, pages.count - 1);
+      top += _pageTopInset;
+      bottom = top + pages.ends[page] - pages.starts[page];
+    }
     int? first;
     int? last;
     for (final block in _mounted.keys.toList()..sort()) {
@@ -321,6 +508,10 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
   /// Jumps to a chapter and block (a bookmark, a highlight).
   void _jumpTo(int chapter, int? block) {
     _dismiss();
+    if (_bookMode) {
+      unawaited(_jumpToBook(chapter, block));
+      return;
+    }
     _jumpChapter = chapter;
     _jumpBlock = block;
     if (chapter != _chapter) {
@@ -649,7 +840,13 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
         ),
       ),
     );
-    if (picked != null && picked != _chapter) _pager?.jumpToPage(picked);
+    if (picked != null && picked != _chapter) {
+      if (_bookMode) {
+        unawaited(_goToBookPage(picked, 0));
+      } else {
+        _pager?.jumpToPage(picked);
+      }
+    }
   }
 
   @override
@@ -664,6 +861,7 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
       });
     }
     final epub = _epub;
+    final bookMode = ref.watch(settingsProvider.select((s) => s.bookPages));
 
     return Scaffold(
       appBar: AppBar(
@@ -699,7 +897,8 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
           ),
         ],
       ),
-      body: epub == null
+      body: ReaderGuide(
+        child: epub == null
           ? Center(
               child: _openFailed
                   ? Padding(
@@ -708,9 +907,17 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
                     )
                   : const CircularProgressIndicator(),
             )
-          : Stack(
-              children: [
-                NotificationListener<ScrollNotification>(
+          : LayoutBuilder(
+              builder: (ctx, box) {
+                if (bookMode) {
+                  _syncPagingKey(Size(box.maxWidth, math.max(0, box.maxHeight - _pageTopInset - _pageBottomInset)), MediaQuery.textScalerOf(ctx));
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) _ensurePaging();
+                  });
+                }
+                final here = _paging[_chapter];
+                final pageView =
+                    NotificationListener<ScrollNotification>(
                   onNotification: (n) {
                     if (n is ScrollEndNotification && n.metrics.axis == Axis.vertical) _onScrollEnd(n.metrics);
                     // The follower's above/below decision tracks the anchor.
@@ -719,6 +926,7 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
                   },
                   child: PageView.builder(
                     controller: _pager,
+                    physics: bookMode ? const NeverScrollableScrollPhysics() : null,
                     itemCount: epub.chapterCount,
                     onPageChanged: _onChapterChanged,
                     itemBuilder: (_, i) => _ChapterView(
@@ -726,7 +934,7 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
                       epub: epub,
                       chapter: i,
                       initialOffset: i == _restoreChapter ? _restoreOffset : 0,
-                      jumpToBlock: i == _jumpChapter ? _jumpBlock : null,
+                      jumpToBlock: !bookMode && i == _jumpChapter ? _jumpBlock : null,
                       onJumped: () {
                         _jumpChapter = null;
                         _jumpBlock = null;
@@ -747,9 +955,33 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
                       onPressEnd: _onPressEnd,
                       onTapOutside: _dismiss,
                       onActiveUnmounted: _onActiveBlockUnmounted,
+                      book: bookMode
+                          ? (pages: _paging[i], page: i == _chapter ? _bookPage : 0, height: _viewport.height, onEdgeTap: ({required next}) => unawaited(_bookPager.turn(forward: next)))
+                          : null,
                     ),
                   ),
-                ),
+                )
+                ;
+                return Stack(
+                  children: [
+                    if (bookMode)
+                      BookPager(
+                        controller: _bookPager,
+                        enabled: here != null,
+                        position: (_chapter, _bookPage),
+                        hasNext: here != null && (_bookPage + 1 < here.count || _chapter + 1 < epub.chapterCount),
+                        hasPrevious: here != null && (_bookPage > 0 || _chapter > 0),
+                        paper: c.paper,
+                        snapshot: _bookSnapshot,
+                        onTurn: _turnBook,
+                        canStart: () => _selection == null && _editing == null,
+                        child: ColoredBox(
+                          color: c.paper,
+                          child: Padding(padding: const EdgeInsets.only(top: _pageTopInset, bottom: _pageBottomInset), child: pageView),
+                        ),
+                      )
+                    else
+                      pageView,
                 OverlayPortal(
                   controller: _portal,
                   overlayChildBuilder: (_) => TooltipFollower(
@@ -770,8 +1002,11 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
                     onMakeCard: (d) => unawaited(_makeCard(d)),
                   ),
                 ),
-              ],
+                  ],
+                );
+              },
             ),
+      ),
     );
   }
 }
@@ -840,6 +1075,167 @@ double _offsetOfBlock(List<EpubBlock> blocks, int target, {required double width
   return y;
 }
 
+
+// ---- pages (book mode) ----
+//
+// Book mode cuts each chapter into screen-sized pages at line boundaries. A
+// page is a window onto the chapter's own scrolling column: the column is
+// moved (by jumping its scroll offset) to where the page starts and clipped
+// where it ends, so everything built for scrolling — tapping words, the
+// tooltip, highlights — works unchanged.
+
+/// Where each page of a chapter starts and ends, as scroll offsets.
+class _ChapterPages {
+  const _ChapterPages(this.starts, this.ends);
+
+  final List<double> starts;
+  final List<double> ends;
+
+  int get count => starts.length;
+
+  /// The page showing scroll offset [y].
+  int pageAt(double y) {
+    var page = 0;
+    for (var i = 0; i < starts.length; i++) {
+      if (starts[i] <= y + 0.5) page = i;
+    }
+    return page;
+  }
+}
+
+/// Space above and below the text of a page.
+const double _pageTopInset = 12;
+const double _pageBottomInset = 24;
+
+/// A page window is lifted this much so the first line's tallest letters
+/// aren't clipped and none of the next line's show.
+const double _windowLift = 1.5;
+
+/// Each line of a laid-out painter: its line box (extra line height
+/// included, so boxes tile exactly; for choosing where to break) and the
+/// tight span of its glyphs (so a page window shows no sliver of the line
+/// above or below).
+typedef _Line = ({double top, double bottom, double inkTop, double inkBottom});
+
+List<_Line> _lineBoxes(TextPainter painter) {
+  final metrics = painter.computeLineMetrics();
+  final length = painter.text?.toPlainText().length ?? 0;
+  final out = <_Line>[];
+  var pos = 0;
+  while (pos < length) {
+    final end = math.min(math.max(painter.getLineBoundary(TextPosition(offset: pos)).end, pos + 1), length);
+    final boxes = painter.getBoxesForSelection(TextSelection(baseOffset: pos, extentOffset: end), boxHeightStyle: ui.BoxHeightStyle.max);
+    pos = end;
+    if (boxes.isEmpty) continue;
+    var top = double.infinity;
+    var bottom = -double.infinity;
+    for (final box in boxes) {
+      top = math.min(top, box.top);
+      bottom = math.max(bottom, box.bottom);
+    }
+    final i = out.length;
+    final m = i < metrics.length ? metrics[i] : null;
+    out.add((top: top, bottom: bottom, inkTop: m == null ? top : m.baseline - m.ascent, inkBottom: m == null ? bottom : m.baseline + m.descent));
+  }
+  if (out.isEmpty) return [(top: 0, bottom: painter.height, inkTop: 0, inkBottom: painter.height)];
+  final first = out.first;
+  final last = out.last;
+  // The block's first line starts at its top and its last ends at its bottom.
+  out[0] = (top: 0, bottom: first.bottom, inkTop: math.min(first.inkTop, 0), inkBottom: first.inkBottom);
+  out[out.length - 1] = (top: last.top, bottom: painter.height, inkTop: last.inkTop, inkBottom: math.max(last.inkBottom, painter.height));
+  return out;
+}
+
+/// Cuts [blocks] into pages of [height], at the top of the first line that
+/// doesn't fit. Lays the text out as the render objects will.
+_ChapterPages _paginate(List<EpubBlock> blocks, {required double width, required double height, required TextScaler scaler, required ArthColors c}) {
+  final starts = <double>[0];
+  final ends = <double>[];
+  var y = _pagePadding.top;
+  var lastInkBottom = y;
+  final painter = TextPainter(textDirection: TextDirection.ltr, textScaler: scaler);
+  for (var i = 0; i < blocks.length; i++) {
+    final b = blocks[i];
+    final s = _styleFor(b, first: i == 0, c: c);
+    painter
+      ..text = _spanFor(b, s.base)
+      ..textAlign = s.align
+      ..layout(maxWidth: width - _pagePadding.horizontal - s.padding.horizontal - (b.kind == BlockKind.listItem ? _bulletWidth : 0));
+    final top = y + s.padding.top;
+    for (final line in _lineBoxes(painter)) {
+      if (top + line.bottom > starts.last + height + 0.5 && top + line.top > starts.last + 0.5) {
+        ends.add(lastInkBottom - _windowLift);
+        starts.add(top + line.inkTop - _windowLift);
+      }
+      lastInkBottom = top + line.inkBottom;
+    }
+    y = top + painter.height + s.padding.bottom;
+  }
+  painter.dispose();
+  ends.add(math.min(math.max(lastInkBottom, y - 1), starts.last + height));
+  return _ChapterPages(starts, ends);
+}
+
+/// Draws page [page] of a chapter the way the live column shows it, for the
+/// curl's picture of a page that isn't on screen. [origin] is where the
+/// viewport sits in the picture.
+void _paintPage(
+  Canvas canvas, {
+  required List<EpubBlock> blocks,
+  required _ChapterPages pages,
+  required int page,
+  required double width,
+  required Offset origin,
+  required TextScaler scaler,
+  required ArthColors c,
+}) {
+  final start = pages.starts[page];
+  final end = pages.ends[page];
+  canvas
+    ..save()
+    ..clipRect(Rect.fromLTWH(origin.dx, origin.dy, width, end - start));
+  var y = _pagePadding.top;
+  final painter = TextPainter(textDirection: TextDirection.ltr, textScaler: scaler);
+  for (var i = 0; i < blocks.length; i++) {
+    final b = blocks[i];
+    final s = _styleFor(b, first: i == 0, c: c);
+    final bullet = b.kind == BlockKind.listItem ? _bulletWidth : 0.0;
+    painter
+      ..text = _spanFor(b, s.base)
+      ..textAlign = s.align
+      ..layout(maxWidth: width - _pagePadding.horizontal - s.padding.horizontal - bullet);
+    final top = y;
+    y += s.padding.vertical + painter.height;
+    if (y < start) continue;
+    if (top > end) break;
+    final dy = origin.dy + top + s.padding.top - start;
+    painter.paint(canvas, Offset(origin.dx + _pagePadding.left + s.padding.left + bullet, dy));
+    if (bullet > 0) {
+      TextPainter(text: TextSpan(text: '•', style: s.base), textDirection: TextDirection.ltr, textScaler: scaler)
+        ..layout()
+        ..paint(canvas, Offset(origin.dx + _pagePadding.left + s.padding.left, dy))
+        ..dispose();
+    }
+  }
+  painter.dispose();
+  canvas.restore();
+}
+
+class _PageClip extends CustomClipper<Rect> {
+  const _PageClip(this.height);
+
+  final double height;
+
+  @override
+  Rect getClip(Size size) => Rect.fromLTWH(0, 0, size.width, height);
+
+  @override
+  bool shouldReclip(_PageClip old) => old.height != height;
+}
+
+/// What the chapter view needs to show a page rather than a scrolling column.
+typedef _BookView = ({_ChapterPages? pages, int page, double height, void Function({required bool next}) onEdgeTap});
+
 class _ChapterView extends ConsumerStatefulWidget {
   const _ChapterView({
     required this.epub,
@@ -859,9 +1255,12 @@ class _ChapterView extends ConsumerStatefulWidget {
     required this.onPressEnd,
     required this.onTapOutside,
     required this.onActiveUnmounted,
+    required this.book,
     super.key,
   });
 
+  /// Non-null in book mode.
+  final _BookView? book;
   final ReflowBook epub;
   final int chapter;
   final double initialOffset;
@@ -885,9 +1284,14 @@ class _ChapterView extends ConsumerStatefulWidget {
 }
 
 class _ChapterViewState extends ConsumerState<_ChapterView> {
-  late final ScrollController _scroll = ScrollController(initialScrollOffset: widget.initialOffset);
+  late final ScrollController _scroll = ScrollController(initialScrollOffset: widget.book == null ? widget.initialOffset : 0);
   List<EpubBlock>? _blocks;
   bool _failed = false;
+
+  /// Book mode: the offset the column has been moved to, and whether the
+  /// first page has been placed yet (until then nothing shows).
+  double? _placedAt;
+  bool _revealed = false;
 
   @override
   void initState() {
@@ -921,6 +1325,24 @@ class _ChapterViewState extends ConsumerState<_ChapterView> {
     });
   }
 
+  /// Book mode: move the column so [page] is at the top.
+  void _place(_ChapterPages pages, int page) {
+    final target = pages.starts[page];
+    if (_placedAt == target) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!_scroll.hasClients || !_scroll.position.hasContentDimensions) {
+        setState(() {}); // not laid out yet: look again next frame
+        return;
+      }
+      _scroll.jumpTo(target.clamp(0.0, _scroll.position.maxScrollExtent));
+      setState(() {
+        _placedAt = target;
+        _revealed = true;
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -942,8 +1364,70 @@ class _ChapterViewState extends ConsumerState<_ChapterView> {
     final scaler = MediaQuery.textScalerOf(context);
     final brightness = Theme.of(context).brightness;
     final sel = widget.selection;
+    final book = widget.book;
+
+    Widget blockAt(int i) {
+      final at = (chapter: widget.chapter, block: i);
+      final isActive = widget.active == at;
+      final ranges = [
+        for (final h in widget.highlights)
+          if (h.block == i) PaintedRange(startWord: h.startWord, endWord: h.endWord, color: HighlightPalette.fill(h.color, brightness)),
+        if (sel != null && sel.at == at) PaintedRange(startWord: sel.start, endWord: sel.end, color: c.highlight),
+      ];
+      return _Block(
+        key: ValueKey(i),
+        block: blocks[i],
+        first: i == 0,
+        textScaler: scaler,
+        ranges: ranges,
+        tooltip: isActive ? widget.tooltip : null,
+        link: widget.link,
+        registry: widget.mounted,
+        registryIndex: i,
+        onTap: (render, local) => widget.onTap(at, render, local),
+        onPressStart: (render, local) => widget.onPressStart(at, render, local),
+        onPressMove: (render, local) => widget.onPressMove(at, render, local),
+        onPressEnd: (render) => widget.onPressEnd(at, render),
+        onUnmounted: isActive ? widget.onActiveUnmounted : null,
+      );
+    }
+
     return LayoutBuilder(
       builder: (_, constraints) {
+        if (book != null) {
+          // A page at a time: the whole column is built (so its extents are
+          // exact), moved to the page's start and clipped at its end.
+          final pages = book.pages;
+          final page = pages == null ? 0 : book.page.clamp(0, pages.count - 1);
+          if (pages != null) _place(pages, page);
+          final window = pages == null ? book.height : pages.ends[page] - pages.starts[page];
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            // Empty space beside the text turns the page; the middle lets go.
+            onTapUp: (d) {
+              final x = d.localPosition.dx / constraints.maxWidth;
+              if (x < 0.22) {
+                book.onEdgeTap(next: false);
+              } else if (x > 0.78) {
+                book.onEdgeTap(next: true);
+              } else {
+                widget.onTapOutside();
+              }
+            },
+            child: Opacity(
+              opacity: _revealed ? 1 : 0,
+              child: ClipRect(
+                clipper: _PageClip(window),
+                child: SingleChildScrollView(
+                  controller: _scroll,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(_pagePadding.left, _pagePadding.top, _pagePadding.right, book.height),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [for (var i = 0; i < blocks.length; i++) blockAt(i)]),
+                ),
+              ),
+            ),
+          );
+        }
         final jump = widget.jumpToBlock;
         if (jump != null) _jump(blocks, jump, constraints.maxWidth);
         return GestureDetector(
@@ -954,31 +1438,7 @@ class _ChapterViewState extends ConsumerState<_ChapterView> {
             physics: const FlickBoostPhysics(),
             padding: _pagePadding,
             itemCount: blocks.length,
-            itemBuilder: (_, i) {
-              final at = (chapter: widget.chapter, block: i);
-              final isActive = widget.active == at;
-              final ranges = [
-                for (final h in widget.highlights)
-                  if (h.block == i) PaintedRange(startWord: h.startWord, endWord: h.endWord, color: HighlightPalette.fill(h.color, brightness)),
-                if (sel != null && sel.at == at) PaintedRange(startWord: sel.start, endWord: sel.end, color: c.highlight),
-              ];
-              return _Block(
-                key: ValueKey(i),
-                block: blocks[i],
-                first: i == 0,
-                textScaler: scaler,
-                ranges: ranges,
-                tooltip: isActive ? widget.tooltip : null,
-                link: widget.link,
-                registry: widget.mounted,
-                registryIndex: i,
-                onTap: (render, local) => widget.onTap(at, render, local),
-                onPressStart: (render, local) => widget.onPressStart(at, render, local),
-                onPressMove: (render, local) => widget.onPressMove(at, render, local),
-                onPressEnd: (render) => widget.onPressEnd(at, render),
-                onUnmounted: isActive ? widget.onActiveUnmounted : null,
-              );
-            },
+            itemBuilder: (_, i) => blockAt(i),
           ),
         );
       },

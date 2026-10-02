@@ -3,6 +3,7 @@
 
 import 'dart:async';
 
+import 'package:arth/app/feel.dart';
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/theme.dart';
 import 'package:arth/core/models/contracts.dart';
@@ -124,8 +125,6 @@ class _DictionaryScreenState extends ConsumerState<DictionaryScreen> {
               decoration: InputDecoration(
                 hintText: t.searchHint,
                 hintStyle: t.isHindi ? h.body(c.inkMuted).copyWith(fontSize: 20) : EnglishText.body(c.inkMuted, size: 20),
-                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: c.ink, width: 1.5)),
-                focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: c.accent, width: 2)),
                 prefixIcon: Icon(Icons.search_rounded, color: c.inkMuted),
                 suffixIcon: _busy
                     ? const Padding(
@@ -160,18 +159,10 @@ class _DictionaryScreenState extends ConsumerState<DictionaryScreen> {
               ],
               if (wotd != null) ...[
                 SectionLabel(t.wordOfTheDay),
-                Material(
-                  color: c.card,
-                  borderRadius: BorderRadius.circular(16),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(16),
-                    onTap: () => context.push('/word/${wotd.word}'),
-                    child: Container(
+                Pressable.card(
+                  onTap: () => context.push('/word/${wotd.word}'),
+                  child: Padding(
                       padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: c.rule),
-                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -190,7 +181,6 @@ class _DictionaryScreenState extends ConsumerState<DictionaryScreen> {
                         ],
                       ),
                     ),
-                  ),
                 ),
               ],
             ],

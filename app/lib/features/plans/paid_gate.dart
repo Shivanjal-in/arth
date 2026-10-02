@@ -81,7 +81,7 @@ class PaidTag extends ConsumerWidget {
     final t = ref.watch(stringsProvider);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-      decoration: BoxDecoration(color: c.marigold.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(color: c.marigold.withValues(alpha: 0.18), border: Border.all(color: c.ink, width: 1.5)),
       child: Text(t.tierPro, style: EnglishText.label(c.ink, size: 11.5)),
     );
   }

@@ -160,9 +160,6 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                 prefixIcon: Icon(Icons.search_rounded, color: c.inkMuted),
                 filled: true,
                 fillColor: c.card,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: c.rule)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: c.rule)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: c.accent)),
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
@@ -249,7 +246,7 @@ class PublishedDeckTile extends ConsumerWidget {
       scale: 0.985,
       child: Container(
         padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: c.card, borderRadius: BorderRadius.circular(16), border: Border.all(color: c.rule)),
+        decoration: BoxDecoration(color: c.card, border: Border.all(color: c.ink, width: 2), boxShadow: [BoxShadow(color: c.shadow, offset: const Offset(4, 4))]),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -343,7 +340,7 @@ class AuthorLine extends ConsumerWidget {
           const SizedBox(width: 6),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-            decoration: BoxDecoration(color: c.marigold.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(8)),
+            decoration: BoxDecoration(color: c.marigold.withValues(alpha: 0.16), border: Border.all(color: c.ink, width: 1.5)),
             child: Text(tierLabel(author.tier, t), style: EnglishText.label(c.ink, size: 10.5)),
           ),
         ],

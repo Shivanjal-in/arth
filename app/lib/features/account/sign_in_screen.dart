@@ -137,9 +137,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 label: Text(t.continueWithGoogle, style: uiLabel(hindi: t.isHindi, color: c.ink, scale: scale).copyWith(fontSize: 15.5)),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(54),
-                  side: BorderSide(color: c.rule),
-                  backgroundColor: c.card,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
               ),
               if (kPhoneSignIn) ...[

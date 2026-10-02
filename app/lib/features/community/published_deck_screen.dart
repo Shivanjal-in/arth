@@ -316,7 +316,7 @@ class _PublishedDeckScreenState extends ConsumerState<PublishedDeckScreen> {
                     Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: c.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12)),
+                      decoration: BoxDecoration(color: c.accent.withValues(alpha: 0.08), border: Border.all(color: c.ink, width: 1.5)),
                       child: Text(t.heldForReview, style: uiBody(hindi: t.isHindi, color: c.ink, scale: scale, size: 14)),
                     ),
                   if (s.blurb.isNotEmpty) ...[
@@ -508,7 +508,7 @@ class _Action extends StatelessWidget {
       child: Container(
         height: 46,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(color: c.card, borderRadius: BorderRadius.circular(12), border: Border.all(color: c.rule)),
+        decoration: BoxDecoration(color: c.card, border: Border.all(color: c.ink, width: 2), boxShadow: [BoxShadow(color: c.shadow, offset: const Offset(4, 4))]),
         child: Row(
           children: [
             AnimatedSwitcher(

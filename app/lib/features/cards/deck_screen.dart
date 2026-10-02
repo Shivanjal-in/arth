@@ -327,15 +327,12 @@ class _Actions extends ConsumerWidget {
     final primaryFill = dark ? Color.lerp(c.card, ink, 0.55)! : c.ink;
     final onPrimary = dark ? c.ink : c.paper;
     Widget action({required IconData icon, required String title, required String hint, required String mode, required bool primary}) => Expanded(
-          child: Material(
-            color: primary ? primaryFill : c.card,
-            borderRadius: BorderRadius.circular(16),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: () => context.push(reviewRoute(deck, mode: mode)),
-              child: Container(
+          child: Pressable.card(
+            depth: 4,
+            color: primary ? primaryFill : null,
+            onTap: () => context.push(reviewRoute(deck, mode: mode)),
+            child: Container(
                 padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: primary ? null : Border.all(color: c.rule)),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -347,7 +344,6 @@ class _Actions extends ConsumerWidget {
                   ],
                 ),
               ),
-            ),
           ),
         );
     return Padding(

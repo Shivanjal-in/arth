@@ -123,13 +123,11 @@ class SentenceTooltip extends ConsumerWidget {
                     children: [
                       for (final w in state.difficultWords ?? const <BilingualPair>[])
                         InkWell(
-                          borderRadius: BorderRadius.circular(8),
                           onTap: () => onTapWord(w.en),
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              border: Border.all(color: c.rule),
-                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: c.ink, width: 1.5),
                             ),
                             child: RichText(
                               text: TextSpan(

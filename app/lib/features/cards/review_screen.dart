@@ -327,9 +327,7 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> with TickerProvider
                 label: Text(strings.tapToFlip, style: label),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: c.ink,
-                  side: BorderSide(color: c.rule),
                   minimumSize: const Size.fromHeight(56),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
               ),
             ),
@@ -361,10 +359,8 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> with TickerProvider
                     icon: Icon(Icons.replay_rounded, size: 18, color: c.accent),
                     label: Text(strings.again, style: label.copyWith(color: c.accent)),
                     style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: c.accent.withValues(alpha: 0.6)),
                       minimumSize: const Size.fromHeight(56),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
+                        ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -372,13 +368,11 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> with TickerProvider
                   child: FilledButton.icon(
                     onPressed: shown ? () => _advance(1, knewIt: true) : _toggleFlip,
                     icon: const Icon(Icons.check_rounded, size: 18),
-                    label: Text(strings.gotIt, style: label.copyWith(color: c.paper)),
+                    label: Text(strings.gotIt, style: label.copyWith(color: c.onButton)),
                     style: FilledButton.styleFrom(
-                      backgroundColor: c.ink,
-                      foregroundColor: c.paper,
+                      foregroundColor: c.onButton,
                       minimumSize: const Size.fromHeight(56),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
+                        ),
                   ),
                 ),
               ],
@@ -405,7 +399,7 @@ class _Stamp extends StatelessWidget {
           angle: -0.12,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(border: Border.all(color: color, width: 2.5), borderRadius: BorderRadius.circular(8)),
+            decoration: BoxDecoration(border: Border.all(color: color, width: 3)),
             child: Text(text, style: EnglishText.heading(color)),
           ),
         ),

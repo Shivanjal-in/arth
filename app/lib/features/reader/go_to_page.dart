@@ -30,7 +30,6 @@ class PageCounter extends StatelessWidget {
     return Tooltip(
       message: tooltip ?? '',
       child: InkWell(
-        borderRadius: BorderRadius.circular(8),
         onTap: total == null
             ? null
             : () async {

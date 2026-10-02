@@ -1,50 +1,48 @@
 #!/usr/bin/env python3
 """Generate the Play Store feature graphic (1024x500) for Arth.
 
-Reuses the app's own design tokens (light theme) and the app icon's Devanagari
-"अ" mark, plus a small mock of the in-app word card, so the graphic is drawn
-from the product itself rather than generic stock design.
+Drawn from the app itself, in its neo-brutalist look: sage paper, the app icon
+as an outlined tile on a hard shadow, a condensed bold title, and a mock of the
+in-app word card (ink outline, hard maroon shadow, the word highlighted).
 
-Run from app/:  python3 tool/make_feature_graphic.py     (needs Pillow; macOS system fonts)
+Run from app/:  python3 tool/make_feature_graphic.py     (needs Pillow)
 """
 from pathlib import Path
+import sys
+
 from PIL import Image, ImageDraw, ImageFont
+
+sys.path.insert(0, str(Path(__file__).parent))
+from make_icon import draw_icon  # noqa: E402
 
 FONTS = Path("assets/google_fonts")
 
-PAPER = (244, 238, 227)      # ArthColors.light.paper
-CARD = (252, 249, 242)       # ArthColors.light.card
-INK = (27, 34, 51)           # ArthColors.light.ink
-INK_MUTED = (107, 113, 128)  # ArthColors.light.inkMuted
-ACCENT = (163, 39, 31)       # ArthColors.light.accent
-RULE = (220, 210, 193)       # ArthColors.light.rule
-BRICK = (155, 58, 49)        # icon glyph colour (tool/make_icon.py)
-CREAM = (243, 237, 227)      # icon tile background
+PAPER = (228, 229, 218)  # ArthColors.light.paper
+CARD = (247, 247, 242)   # ArthColors.light.card
+INK = (16, 32, 29)       # ArthColors.light.ink
+INK_MUTED = (82, 99, 95) # ArthColors.light.inkMuted
+ACCENT = (179, 40, 28)   # ArthColors.light.accent
+MARIGOLD = (245, 183, 38)
+SHADOW = (103, 25, 18)   # the hard shadow
 
 W, H = 1024, 500
-S = 4  # supersample
+S = 3  # supersample
 
 
-def font(path, size):
-    return ImageFont.truetype(str(FONTS / path), size)
+def font(name, size):
+    return ImageFont.truetype(str(FONTS / name), size)
 
 
-def devanagari_font(size):
-    # The अ glyph itself (no conjuncts/matras) renders fine without shaping.
-    return ImageFont.truetype("/System/Library/Fonts/Supplemental/ITFDevanagari.ttc", size, index=1)
-
-
-def measure(draw, text, f):
-    l, t, r, b = draw.textbbox((0, 0), text, font=f)
+def measure(d, text, f):
+    l, t, r, b = d.textbbox((0, 0), text, font=f)
     return r - l, b - t, l, t
 
 
-def wrap(draw, text, f, max_w):
-    words, lines, line = text.split(" "), [], ""
-    for word in words:
+def wrap(d, text, f, max_w):
+    lines, line = [], ""
+    for word in text.split(" "):
         trial = (line + " " + word).strip()
-        tw, *_ = measure(draw, trial, f)
-        if tw > max_w and line:
+        if measure(d, trial, f)[0] > max_w and line:
             lines.append(line)
             line = word
         else:
@@ -53,24 +51,11 @@ def wrap(draw, text, f, max_w):
     return lines
 
 
-def icon_tile(d, tx, ty, tile):
-    d.rounded_rectangle((tx, ty, tx + tile, ty + tile), radius=int(tile * 0.22), fill=CREAM)
-    target = tile * 0.60
-    f = devanagari_font(int(target))
-    bbox = f.getbbox("अ")
-    ink_h = bbox[3] - bbox[1]
-    f = devanagari_font(int(target * target / ink_h))
-    left, top, right, bottom = f.getbbox("अ")
-    ink_w, ink_h = right - left, bottom - top
-    gx = tx + (tile - ink_w) / 2 - left
-    gy = ty + (tile - ink_h) / 2 - top - tile * 0.04
-    d.text((gx, gy), "अ", font=f, fill=BRICK)
-    ul_w = ink_w * 0.42
-    ul_h = tile * 0.018
-    ul_y = gy + top + ink_h + tile * 0.075
-    d.rounded_rectangle(
-        (tx + tile / 2 - ul_w / 2, ul_y, tx + tile / 2 + ul_w / 2, ul_y + ul_h), radius=ul_h / 2, fill=BRICK
-    )
+def boxed(d, x0, y0, x1, y1, *, fill, border, shadow, off):
+    """An outlined box on a hard shadow."""
+    d.rectangle((x0 + off, y0 + off, x1 + off, y1 + off), fill=SHADOW)
+    d.rectangle((x0, y0, x1, y1), fill=INK)
+    d.rectangle((x0 + border, y0 + border, x1 - border, y1 - border), fill=fill)
 
 
 def make():
@@ -78,68 +63,66 @@ def make():
     img = Image.new("RGB", (w, h), PAPER)
     d = ImageDraw.Draw(img)
 
-    tile = 340 * S
-    tx = 64 * S
-    icon_tile(d, tx, (h - tile) // 2, tile)
+    # --- icon tile ---
+    tile = 330 * S
+    tx, ty = 70 * S, (h - tile) // 2 - 8 * S
+    off = 16 * S
+    d.rectangle((tx + off, ty + off, tx + tile + off, ty + tile + off), fill=SHADOW)
+    img.paste(draw_icon(tile, card=0.595).convert("RGB"), (tx, ty))
+    d.rectangle((tx, ty, tx + tile, ty + tile), outline=INK, width=6 * S)
 
-    rx = tx + tile + 56 * S
+    rx = tx + tile + off + 52 * S
     max_w = w - rx - 56 * S
 
-    f_word = font("Montserrat-Bold.ttf", 104 * S)
-    f_tag = font("Literata-Regular.ttf", 38 * S)
-    f_label = font("Literata-SemiBold.ttf", 21 * S)
-    f_en = font("Literata-SemiBold.ttf", 38 * S)
-    f_hi = font("Mukta-Regular.ttf", 30 * S)
-    f_gloss = font("Mukta-Regular.ttf", 23 * S)
+    f_title = font("BarlowSemiCondensed-ExtraBold.ttf", 150 * S)
+    f_tag = font("Inter-SemiBold.ttf", 34 * S)
+    f_label = font("MartianMono-Medium.ttf", 17 * S)
+    f_en = font("Inter-Bold.ttf", 40 * S)
+    f_hi = font("Mukta-SemiBold.ttf", 34 * S)
+    f_gloss = font("Inter-Medium.ttf", 21 * S)
 
-    tag_lines = wrap(d, "Read English books, meaning in Hindi", f_tag, max_w)
+    tag_lines = ["Read English books,", "meaning in Hindi"]
 
-    # --- measure the whole right column so it can be centred vertically ---
-    _, word_h, _, word_top = measure(d, "Arth", f_word)
-    gap_word_tag = 20 * S
-    tag_line_h, tag_gap = measure(d, "Ag", f_tag)[1], 6 * S
-    tag_block_h = len(tag_lines) * tag_line_h + (len(tag_lines) - 1) * tag_gap
-    gap_tag_card = 34 * S
-
-    card_pad_v = 22 * S
-    label_h = measure(d, "Word", f_label)[1]
+    title_h, title_top = measure(d, "Arth", f_title)[1], measure(d, "Arth", f_title)[3]
+    gap_title_tag = 8 * S
+    tag_line_h, tag_gap = measure(d, "Ag", f_tag)[1], 8 * S
+    tag_block = len(tag_lines) * tag_line_h + (len(tag_lines) - 1) * tag_gap
+    gap_tag_card = 30 * S
+    pad_v = 20 * S
+    label_h = measure(d, "WORD", f_label)[1]
     en_h = measure(d, "solitude", f_en)[1]
     gloss_h = measure(d, "being alone, often by choice", f_gloss)[1]
-    inner_gap = 10 * S
-    card_h = card_pad_v * 2 + label_h + inner_gap + en_h + inner_gap + gloss_h
-    card_w = max_w
+    inner = 10 * S
+    card_h = pad_v * 2 + label_h + inner + en_h + inner + gloss_h
+    card_w = max_w - 14 * S  # leave room for the shadow
 
-    total_h = word_h + gap_word_tag + tag_block_h + gap_tag_card + card_h
-    y = (h - total_h) / 2 - word_top
+    total = title_h + gap_title_tag + tag_block + gap_tag_card + card_h
+    y = (h - total) / 2 - title_top - 6 * S
 
-    d.text((rx, y), "Arth", font=f_word, fill=INK)
-    y += word_h + word_top + gap_word_tag
-
+    d.text((rx, y), "Arth", font=f_title, fill=INK)
+    y += title_h + title_top + gap_title_tag
     for line in tag_lines:
         d.text((rx, y), line, font=f_tag, fill=INK_MUTED)
         y += tag_line_h + tag_gap
     y += gap_tag_card - tag_gap
 
-    bar_w = 7 * S
-    d.rounded_rectangle((rx, y, rx + card_w, y + card_h), radius=18 * S, fill=CARD, outline=RULE, width=2 * S)
-    d.rounded_rectangle((rx, y, rx + bar_w, y + card_h), radius=bar_w / 2, fill=ACCENT)
+    boxed(d, rx, y, rx + card_w, y + card_h, fill=CARD, border=4 * S, shadow=SHADOW, off=12 * S)
+    cx, cy = rx + 26 * S, y + pad_v
+    d.text((cx, cy), "WORD", font=f_label, fill=ACCENT)
+    cy += label_h + inner
 
-    cx = rx + bar_w + 26 * S
-    cy = y + card_pad_v
-    d.text((cx, cy), "Word", font=f_label, fill=INK_MUTED)
-    cy += label_h + inner_gap
-
+    en_w, _, en_left, en_top = measure(d, "solitude", f_en)
+    # the tapped word, highlighted like in the reader
+    d.rectangle((cx - 6 * S, cy + en_top - 3 * S, cx + en_w + 8 * S, cy + en_top + en_h + 5 * S), fill=MARIGOLD)
     d.text((cx, cy), "solitude", font=f_en, fill=INK)
-    en_w, _, _, en_top = measure(d, "solitude", f_en)
     hi_top = measure(d, "एकांत", f_hi)[3]
-    d.text((cx + en_w + 20 * S, cy + en_top - hi_top), "एकांत", font=f_hi, fill=ACCENT)
-    cy += en_h + inner_gap
-
+    d.text((cx + en_w + 28 * S, cy + en_top - hi_top + 2 * S), "एकांत", font=f_hi, fill=ACCENT)
+    cy += en_h + inner + 6 * S
     d.text((cx, cy), "being alone, often by choice", font=f_gloss, fill=INK_MUTED)
 
     img = img.resize((W, H), Image.LANCZOS)
     out = Path("tool/feature-graphic.png")
-    img.save(out, "PNG")
+    img.save(out, "PNG", optimize=True)
     print(f"feature graphic -> {out} ({img.size[0]}x{img.size[1]})")
 
 

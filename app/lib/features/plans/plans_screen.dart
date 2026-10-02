@@ -236,7 +236,7 @@ class _PeriodSwitch extends ConsumerWidget {
           child: AnimatedContainer(
             duration: Motion.of(context, Motion.quick),
             padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(color: on ? c.ink : Colors.transparent, borderRadius: BorderRadius.circular(10)),
+            decoration: BoxDecoration(color: on ? c.ink : Colors.transparent),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -245,7 +245,7 @@ class _PeriodSwitch extends ConsumerWidget {
                   const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                    decoration: BoxDecoration(color: c.marigold, borderRadius: BorderRadius.circular(8)),
+                    decoration: BoxDecoration(color: c.marigold, border: Border.all(color: c.ink, width: 1.5)),
                     child: Text(badge, style: EnglishText.label(const Color(0xFF1B2233), size: 11)),
                   ),
                 ],
@@ -258,7 +258,7 @@ class _PeriodSwitch extends ConsumerWidget {
 
     return Container(
       padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: c.card, borderRadius: BorderRadius.circular(14), border: Border.all(color: c.rule)),
+      decoration: BoxDecoration(color: c.card, border: Border.all(color: c.ink, width: 2), boxShadow: [BoxShadow(color: c.shadow, offset: const Offset(4, 4))]),
       child: Row(
         children: [
           side(isYearly: true, label: t.yearly, badge: saving == null ? null : t.saveUpTo(saving!)),
@@ -298,7 +298,7 @@ class _Price extends ConsumerWidget {
                 const SizedBox(width: 10),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(color: c.marigold.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(8)),
+                  decoration: BoxDecoration(color: c.marigold.withValues(alpha: 0.2), border: Border.all(color: c.ink, width: 1.5)),
                   child: Text(badge!, style: uiLabel(hindi: t.isHindi, color: c.ink, scale: scale).copyWith(fontSize: 12)),
                 ),
               ],
@@ -329,7 +329,7 @@ class _Meter extends ConsumerWidget {
     final limit = usage.limit;
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: c.card, borderRadius: BorderRadius.circular(14), border: Border.all(color: c.rule)),
+      decoration: BoxDecoration(color: c.card, border: Border.all(color: c.ink, width: 2), boxShadow: [BoxShadow(color: c.shadow, offset: const Offset(4, 4))]),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -369,8 +369,8 @@ class _PlanCard extends ConsumerWidget {
     return Container(
       decoration: BoxDecoration(
         color: c.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: current ? ink : c.rule, width: current ? 2 : 1),
+        border: Border.all(color: current ? ink : c.ink, width: 2),
+        boxShadow: [BoxShadow(color: current ? ink : c.shadow, offset: const Offset(5, 5))],
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -389,7 +389,7 @@ class _PlanCard extends ConsumerWidget {
                     if (current)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(color: ink.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
+                        decoration: BoxDecoration(color: ink.withValues(alpha: 0.15), border: Border.all(color: c.ink, width: 1.5)),
                         child: Text(t.currentPlan, style: uiLabel(hindi: t.isHindi, color: c.ink, scale: scale).copyWith(fontSize: 12)),
                       ),
                   ],

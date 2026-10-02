@@ -25,6 +25,10 @@ final localStoreProvider = Provider<LocalStore>((_) => throw UnimplementedError(
 /// silently break.
 final documentsDirProvider = Provider<String>((_) => throw UnimplementedError());
 
+/// Asks the open reader to show its first-time gesture guide (see
+/// features/reader/reader_guide.dart); the settings sheet sets it.
+final readerGuideRequestProvider = StateProvider<bool>((_) => false);
+
 final settingsProvider = NotifierProvider<SettingsNotifier, Settings>(SettingsNotifier.new);
 
 class SettingsNotifier extends Notifier<Settings> {

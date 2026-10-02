@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:arth/app/account_providers.dart';
+import 'package:arth/app/feel.dart';
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/theme.dart';
 import 'package:arth/data/seed_loader.dart';
@@ -65,7 +66,7 @@ class SettingsScreen extends ConsumerWidget {
                 padding: const EdgeInsets.only(top: 10),
                 child: ListTile(
                   onTap: () => context.push('/admin'),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: c.rule)),
+                  shape: RoundedRectangleBorder(side: BorderSide(color: c.ink, width: 2)),
                   tileColor: c.card,
                   leading: Icon(Icons.admin_panel_settings_outlined, color: c.accent),
                   title: Text(t.adminTitle, style: uiLabel(hindi: t.isHindi, color: c.ink, scale: s.hindiScale).copyWith(fontSize: 15)),
@@ -110,6 +111,12 @@ class SettingsScreen extends ConsumerWidget {
               onChanged: (v) => unawaited(setAiLookup(context, ref, on: v)),
             ),
             SettingsSwitch(
+              title: t.bookPages,
+              subtitle: t.bookPagesHelp,
+              value: s.bookPages,
+              onChanged: (v) => n.update((s) => s.copyWith(bookPages: v)),
+            ),
+            SettingsSwitch(
               title: t.prefetch,
               subtitle: t.prefetchHelp,
               value: s.prefetch,
@@ -130,7 +137,6 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 12),
             if (seed.phase == SeedPhase.downloading)
               ClipRRect(
-                borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
                   value: seed.fraction,
                   minHeight: 6,
@@ -144,13 +150,10 @@ class SettingsScreen extends ConsumerWidget {
               SettingsCaption(seed.message!),
 
             const SizedBox(height: 28),
-            Material(
-              color: c.card,
-              borderRadius: BorderRadius.circular(14),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(14),
-                onTap: () => context.push('/about'),
-                child: Padding(
+            Pressable.card(
+              depth: 4,
+              onTap: () => context.push('/about'),
+              child: Padding(
                   padding: const EdgeInsets.fromLTRB(18, 14, 12, 14),
                   child: Row(
                     children: [
@@ -173,7 +176,6 @@ class SettingsScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
-              ),
             ),
           ],
         ),

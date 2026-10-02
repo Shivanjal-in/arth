@@ -115,7 +115,7 @@ class _ReportsState extends ConsumerState<_Reports> {
                 final r = items[i];
                 return Container(
                   padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(color: c.card, borderRadius: BorderRadius.circular(14), border: Border.all(color: r.status == 'hidden' ? c.accent : c.rule)),
+                  decoration: BoxDecoration(color: c.card, border: Border.all(color: r.status == 'hidden' ? c.accent : c.ink, width: 2), boxShadow: [BoxShadow(color: c.shadow, offset: const Offset(4, 4))]),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -130,7 +130,7 @@ class _ReportsState extends ConsumerState<_Reports> {
                             const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                              decoration: BoxDecoration(color: c.accent.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
+                              decoration: BoxDecoration(color: c.accent.withValues(alpha: 0.12), border: Border.all(color: c.ink, width: 1.5)),
                               child: Text(t.hiddenBadge, style: EnglishText.label(c.accent, size: 11)),
                             ),
                           ],
@@ -286,7 +286,7 @@ class _ReadersState extends ConsumerState<_Readers> {
                             ],
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(border: Border.all(color: c.rule), borderRadius: BorderRadius.circular(10)),
+                              decoration: BoxDecoration(border: Border.all(color: c.ink, width: 1.5)),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [

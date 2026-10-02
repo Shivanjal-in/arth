@@ -69,10 +69,69 @@ abstract final class Motion {
   static Duration of(BuildContext context, Duration d) => reduced(context) ? Duration.zero : d;
 }
 
+/// An outlined face on a hard, unblurred shadow [depth] down and to the
+/// right. The shadow sits inside the widget's own bounds so clipping parents
+/// don't cut it, and the overall size never changes. [pressed] pushes the
+/// face into the shadow, leaving a sliver of it.
+class HardShadow extends StatelessWidget {
+  const HardShadow({required this.child, super.key, this.pressed = false, this.depth = 5, this.color, this.border, this.shadow});
+
+  final Widget child;
+  final bool pressed;
+  final double depth;
+
+  /// Face fill; the card colour by default.
+  final Color? color;
+
+  /// Outline; ink by default.
+  final Color? border;
+
+  /// Shadow; the theme's shadow by default.
+  final Color? shadow;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final sink = pressed && depth > 1 ? depth - 1 : 0.0;
+    // passthrough: a tight width (a full-width button) stretches the face too,
+    // not just the shadow behind it.
+    return Stack(
+      fit: StackFit.passthrough,
+      children: [
+        if (depth > 0)
+          Positioned(
+            left: depth,
+            top: depth,
+            right: 0,
+            bottom: 0,
+            child: ColoredBox(color: shadow ?? c.shadow),
+          ),
+        AnimatedPadding(
+          padding: EdgeInsets.fromLTRB(sink, sink, depth - sink, depth - sink),
+          duration: Motion.of(context, Motion.press),
+          curve: Motion.change,
+          child: Container(
+            decoration: BoxDecoration(
+              color: color ?? c.card,
+              border: Border.all(color: border ?? c.ink, width: 2),
+            ),
+            clipBehavior: Clip.hardEdge,
+            child: child,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// A surface that sinks a little under the finger and springs back, with
 /// an optional haptic. Wrap tiles and cards that open something.
 class Pressable extends StatefulWidget {
-  const Pressable({required this.child, super.key, this.onTap, this.onLongPress, this.haptic = Haptics.open, this.scale = 0.97});
+  const Pressable({required this.child, super.key, this.onTap, this.onLongPress, this.haptic = Haptics.open, this.scale = 0.97}) : depth = null, color = null;
+
+  /// An outlined card on a [HardShadow] that the finger pushes it into.
+  const Pressable.card({required this.child, super.key, this.onTap, this.onLongPress, this.haptic = Haptics.open, double this.depth = 5, this.color})
+    : scale = 1;
 
   final Widget child;
   final VoidCallback? onTap;
@@ -83,6 +142,12 @@ class Pressable extends StatefulWidget {
 
   /// How far it sinks.
   final double scale;
+
+  /// Shadow depth, for [Pressable.card]; null for a plain surface.
+  final double? depth;
+
+  /// Card fill, for [Pressable.card].
+  final Color? color;
 
   @override
   State<Pressable> createState() => _PressableState();
@@ -116,12 +181,14 @@ class _PressableState extends State<Pressable> {
               Haptics.commit();
               widget.onLongPress!();
             },
-      child: AnimatedScale(
-        scale: _down ? widget.scale : 1,
-        duration: Motion.of(context, Motion.press),
-        curve: Motion.change,
-        child: widget.child,
-      ),
+      child: widget.depth != null
+          ? HardShadow(pressed: _down, depth: widget.depth!, color: widget.color, child: widget.child)
+          : AnimatedScale(
+              scale: _down ? widget.scale : 1,
+              duration: Motion.of(context, Motion.press),
+              curve: Motion.change,
+              child: widget.child,
+            ),
     );
   }
 }
@@ -192,8 +259,7 @@ class ReadingBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(height),
+    return ClipRect(
       child: TweenAnimationBuilder<double>(
         tween: Tween(begin: 0, end: value.clamp(0, 1)),
         duration: Motion.of(context, const Duration(milliseconds: 700)),

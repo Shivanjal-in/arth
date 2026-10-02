@@ -28,15 +28,12 @@ class TooltipCard extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (!above) arrow,
-        Material(
+        DecoratedBox(
+          decoration: BoxDecoration(boxShadow: [BoxShadow(color: c.shadow, offset: const Offset(4, 4))]),
+          child: Material(
           color: c.card,
-          elevation: 10,
-          shadowColor: Colors.black.withValues(alpha: 0.35),
           clipBehavior: Clip.antiAlias,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: BorderSide(color: c.rule),
-          ),
+          shape: RoundedRectangleBorder(side: BorderSide(color: c.ink, width: 2)),
           child: ConstrainedBox(
             constraints: BoxConstraints(maxHeight: maxHeight - 9, maxWidth: width),
             child: SingleChildScrollView(
@@ -49,6 +46,7 @@ class TooltipCard extends StatelessWidget {
                 child: child,
               ),
             ),
+          ),
           ),
         ),
         if (above) arrow,

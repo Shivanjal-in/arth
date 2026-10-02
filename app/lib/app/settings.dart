@@ -15,12 +15,13 @@ enum CardFont { montserrat, quintessential, bricolage }
 
 class Settings {
   const Settings({
-    this.themeMode = ThemeMode.system,
+    this.themeMode = ThemeMode.light,
     this.tooltipDetail = TooltipDetail.compact,
     this.hindiSize = HindiSize.medium,
     this.ttsEnabled = true,
     this.aiLookup = true,
     this.prefetch = true,
+    this.bookPages = true,
     this.haptics = true,
     this.language = UiLanguage.en,
     this.cardReminders = true,
@@ -39,6 +40,10 @@ class Settings {
 
   /// Resolve hard words on the current and next page in the background.
   final bool prefetch;
+
+  /// Read a PDF a page at a time and turn pages with a curl, instead of
+  /// scrolling (see features/reader/curl).
+  final bool bookPages;
 
   /// Vibration feedback on taps (see app/feel.dart).
   final bool haptics;
@@ -68,6 +73,7 @@ class Settings {
     bool? ttsEnabled,
     bool? aiLookup,
     bool? prefetch,
+    bool? bookPages,
     bool? haptics,
     UiLanguage? language,
     bool? cardReminders,
@@ -81,6 +87,7 @@ class Settings {
         ttsEnabled: ttsEnabled ?? this.ttsEnabled,
         aiLookup: aiLookup ?? this.aiLookup,
         prefetch: prefetch ?? this.prefetch,
+        bookPages: bookPages ?? this.bookPages,
         haptics: haptics ?? this.haptics,
         language: language ?? this.language,
         cardReminders: cardReminders ?? this.cardReminders,
@@ -89,7 +96,7 @@ class Settings {
       );
 
   static Future<Settings> load(LocalStore store) async => Settings(
-        themeMode: ThemeMode.values.byName(await store.get('theme') ?? 'system'),
+        themeMode: ThemeMode.values.byName(await store.get('theme') ?? 'light'),
         tooltipDetail: TooltipDetail.values.byName(
           await store.get('tooltip_detail') ?? 'compact',
         ),
@@ -97,6 +104,7 @@ class Settings {
         ttsEnabled: (await store.get('tts') ?? 'true') == 'true',
         aiLookup: (await store.get('ai_lookup') ?? 'true') == 'true',
         prefetch: (await store.get('prefetch') ?? 'true') == 'true',
+        bookPages: (await store.get('book_pages') ?? 'true') == 'true',
         haptics: (await store.get('haptics') ?? 'true') == 'true',
         language: UiLanguage.values.byName(await store.get('language') ?? 'en'),
         cardReminders: (await store.get('card_reminders') ?? 'true') == 'true',
@@ -116,6 +124,7 @@ class Settings {
     await store.set('tts', ttsEnabled.toString());
     await store.set('ai_lookup', aiLookup.toString());
     await store.set('prefetch', prefetch.toString());
+    await store.set('book_pages', bookPages.toString());
     await store.set('haptics', haptics.toString());
     await store.set('language', language.name);
     await store.set('card_reminders', cardReminders.toString());

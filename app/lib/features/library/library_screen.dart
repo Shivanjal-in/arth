@@ -170,14 +170,14 @@ class LibraryScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: c.accent,
-        foregroundColor: c.paper,
-        onPressed: () {
-          Haptics.open();
-          unawaited(_addMenu(context, ref));
-        },
-        child: const Icon(Icons.add_rounded),
+      floatingActionButton: SizedBox(
+        width: 60,
+        height: 60,
+        child: Pressable.card(
+          color: c.button,
+          onTap: () => unawaited(_addMenu(context, ref)),
+          child: Center(child: Icon(Icons.add_rounded, color: c.onButton, size: 28)),
+        ),
       ),
       body: books.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -595,81 +595,72 @@ class _ContinueCard extends ConsumerWidget {
     final ink = coverInk(book.title);
     return Stack(
       children: [
-        Pressable(
+        Pressable.card(
           onTap: () => context.push(routeFor(book)),
           onLongPress: () => showBookMenu(context, ref, book),
-          scale: 0.985,
-          child: Container(
-            decoration: BoxDecoration(
-              color: c.card,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: c.rule),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Stack(
-              children: [
-                // The book's own print, faint, across the card: this card is that book.
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: BlockPrintPainter(motif: motifOf(book.title), color: ink.withValues(alpha: 0.035), cell: 40),
-                  ),
+          child: Stack(
+            children: [
+              // The book's own print, faint, across the card: this card is that book.
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: BlockPrintPainter(motif: motifOf(book.title), color: ink.withValues(alpha: 0.035), cell: 40),
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                  child: Row(
-                    children: [
-                      BookCover(title: book.title, width: 76),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 28),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                t.continueReading,
-                                style: uiLabel(hindi: t.isHindi, color: c.accent, scale: scale),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                child: Row(
+                  children: [
+                    BookCover(title: book.title, width: 76),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 28),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              t.continueReading,
+                              style: uiLabel(hindi: t.isHindi, color: c.accent, scale: scale),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(book.title, style: EnglishText.word(c.ink, size: 21), maxLines: 2, overflow: TextOverflow.ellipsis),
+                            if (BookCategory.resolve(book.categoryGroup, book.category) case final category?)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Text(
+                                  category.label(hindi: t.isHindi),
+                                  style: uiLabel(hindi: t.isHindi, color: c.inkMuted, scale: scale).copyWith(fontSize: 12.5),
+                                ),
                               ),
+                            if (where != null) ...[
                               const SizedBox(height: 4),
-                              Text(book.title, style: EnglishText.word(c.ink, size: 21), maxLines: 2, overflow: TextOverflow.ellipsis),
-                              if (BookCategory.resolve(book.categoryGroup, book.category) case final category?)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 2),
-                                  child: Text(
-                                    category.label(hindi: t.isHindi),
-                                    style: uiLabel(hindi: t.isHindi, color: c.inkMuted, scale: scale).copyWith(fontSize: 12.5),
-                                  ),
-                                ),
-                              if (where != null) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  where,
-                                  style: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: scale, size: 13),
-                                ),
-                              ],
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: ReadingBar(value: progress, height: 6),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Text('${(progress * 100).round()}%', style: EnglishText.label(c.ink)),
-                                ],
+                              Text(
+                                where,
+                                style: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: scale, size: 13),
                               ),
-                              if (cardCount > 0) _CardsChip(book: book, count: cardCount),
                             ],
-                          ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ReadingBar(value: progress, height: 6),
+                                ),
+                                const SizedBox(width: 10),
+                                Text('${(progress * 100).round()}%', style: EnglishText.label(c.ink)),
+                              ],
+                            ),
+                            if (cardCount > 0) _CardsChip(book: book, count: cardCount),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-        Positioned(top: 4, right: 4, child: _BookMenuButton(book: book)),
+        Positioned(top: 4, right: 9, child: _BookMenuButton(book: book)),
       ],
     );
   }
@@ -690,7 +681,6 @@ class _CardsChip extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 6),
       child: InkWell(
-        borderRadius: BorderRadius.circular(8),
         onTap: () => context.push(deckRoute((bookId: book.id, bookTitle: book.title))),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 2),

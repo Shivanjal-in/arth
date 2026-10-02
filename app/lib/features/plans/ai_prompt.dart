@@ -49,7 +49,6 @@ class AiPrompt extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(12, 10, 8, 6),
       decoration: BoxDecoration(
         color: c.accent.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(10),
         border: Border(left: BorderSide(color: c.accent, width: 3)),
       ),
       child: Column(

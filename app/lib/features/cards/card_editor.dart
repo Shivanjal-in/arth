@@ -303,12 +303,10 @@ class _KindChip extends ConsumerWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 160),
       decoration: BoxDecoration(
-        color: selected ? tint.withValues(alpha: 0.14) : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: selected ? tint : c.rule, width: selected ? 1.5 : 1),
+        color: selected ? tint.withValues(alpha: 0.22) : c.card,
+        border: Border.all(color: selected ? tint : c.ink, width: 2),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 10),

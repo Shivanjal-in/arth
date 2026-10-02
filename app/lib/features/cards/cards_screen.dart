@@ -30,7 +30,8 @@ class CardsScreen extends ConsumerWidget {
           title: Text(t.cardsTitle, style: uiTitle(hindi: t.isHindi, color: c.ink, scale: scale).copyWith(fontSize: 26)),
           toolbarHeight: 64,
           bottom: TabBar(
-            labelStyle: uiLabel(hindi: t.isHindi, color: c.ink, scale: scale).copyWith(fontSize: 15),
+            labelStyle: uiLabel(hindi: t.isHindi, color: c.ink, scale: scale).copyWith(fontSize: 13),
+            labelPadding: const EdgeInsets.symmetric(horizontal: 6),
             unselectedLabelColor: c.inkMuted,
             labelColor: c.ink,
             indicatorColor: c.accent,
@@ -106,8 +107,7 @@ class DeckTile extends ConsumerWidget {
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: Color.lerp(c.card, ink, dark ? alpha * 1.8 : alpha),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: dark ? Color.lerp(c.rule, ink, 0.4)! : c.rule),
+              border: Border.all(color: c.ink, width: 2),
             ),
           ),
         );
@@ -141,7 +141,7 @@ class DeckTile extends ConsumerWidget {
                           if (deck.due > 0)
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                              decoration: BoxDecoration(color: c.marigold.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(20)),
+                              decoration: BoxDecoration(color: c.marigold.withValues(alpha: 0.35), border: Border.all(color: c.ink, width: 1.5)),
                               child: Text(t.dueCount(deck.due), style: uiLabel(hindi: t.isHindi, color: c.ink, scale: scale).copyWith(fontSize: 12)),
                             ),
                           if (deck.bookId == null)

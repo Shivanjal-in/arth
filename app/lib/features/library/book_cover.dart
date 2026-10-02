@@ -129,21 +129,8 @@ class BookCover extends StatelessWidget {
       height: height,
       decoration: BoxDecoration(
         color: ink,
-        borderRadius: BorderRadius.horizontal(left: Radius.circular(width * 0.05), right: Radius.circular(width * 0.12)),
-        boxShadow: elevation == 0
-            ? null
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.22 * elevation),
-                  blurRadius: 8 * elevation,
-                  offset: Offset(2 * elevation, 4 * elevation),
-                ),
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.10 * elevation),
-                  blurRadius: 1.5,
-                  offset: const Offset(0, 1),
-                ),
-              ],
+        border: Border.all(color: c.ink, width: 2),
+        boxShadow: elevation == 0 ? null : [BoxShadow(color: c.shadow, offset: Offset(3 * elevation, 3 * elevation))],
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(

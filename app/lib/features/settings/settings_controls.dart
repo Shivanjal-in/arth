@@ -62,7 +62,9 @@ class LanguageTiles extends ConsumerWidget {
     final s = ref.watch(settingsProvider);
     final t = ref.watch(stringsProvider);
     final n = ref.read(settingsProvider.notifier);
-    return Row(
+    return IntrinsicHeight(
+      child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
           child: _LanguageTile(
@@ -86,6 +88,7 @@ class LanguageTiles extends ConsumerWidget {
           ),
         ),
       ],
+      ),
     );
   }
 }
@@ -111,22 +114,18 @@ class _LanguageTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final fg = selected ? c.onAccent : c.ink;
-    return Material(
-      color: selected ? c.accent : c.card,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: () {
-          Haptics.choose();
-          onTap();
-        },
-        borderRadius: BorderRadius.circular(14),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        Haptics.choose();
+        onTap();
+      },
+      // The chosen tile is the one pushed into its shadow.
+      child: HardShadow(
+        pressed: selected,
+        color: selected ? c.accent : c.card,
+        child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: selected ? c.accent : c.rule, width: 1.5),
-          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -186,24 +185,23 @@ class _PageThumb extends ConsumerWidget {
     final c = context.colors;
     final t = ref.watch(stringsProvider);
     final scale = ref.watch(settingsProvider).hindiScale;
-    return InkWell(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () {
         Haptics.choose();
         onTap();
       },
-      borderRadius: BorderRadius.circular(12),
       child: Column(
         children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            height: 84,
+          SizedBox(
+            height: 92,
             width: double.infinity,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: selected ? c.accent : c.rule, width: selected ? 2 : 1),
+            child: HardShadow(
+              pressed: selected,
+              depth: 4,
+              border: selected ? c.accent : c.ink,
+              child: CustomPaint(painter: _PagePainter(mode: mode)),
             ),
-            clipBehavior: Clip.antiAlias,
-            child: CustomPaint(painter: _PagePainter(mode: mode)),
           ),
           const SizedBox(height: 8),
           Row(
@@ -307,30 +305,24 @@ class InkSegmented<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: c.card,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: c.rule),
-      ),
+    return HardShadow(
+      depth: 4,
       child: Row(
         children: [
-          for (final (value, child) in options)
+          for (final (i, (value, child)) in options.indexed) ...[
+            if (i > 0) Container(width: 2, height: 44, color: c.ink),
             Expanded(
               child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: () {
                   Haptics.choose();
                   onChanged(value);
                 },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 160),
-                  height: 40,
+                  height: 44,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: value == selected ? c.ink : Colors.transparent,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
+                  color: value == selected ? c.ink : Colors.transparent,
                   child: DefaultTextStyle.merge(
                     style: TextStyle(color: value == selected ? c.paper : c.ink),
                     child: IconTheme.merge(
@@ -341,6 +333,7 @@ class InkSegmented<T> extends StatelessWidget {
                 ),
               ),
             ),
+          ],
         ],
       ),
     );
@@ -564,21 +557,18 @@ class CardFontPicker extends ConsumerWidget {
         for (final (i, font) in CardFont.values.indexed) ...[
           if (i > 0) const SizedBox(width: 10),
           Expanded(
-            child: Pressable(
-              onTap: () {
-                if (font == s.cardFont) return;
-                Haptics.choose();
-                unawaited(n.update((s) => s.copyWith(cardFont: font)));
-              },
-              child: AnimatedContainer(
-                duration: Motion.of(context, Motion.quick),
-                height: 104,
-                padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
-                decoration: BoxDecoration(
-                  color: c.card,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: font == s.cardFont ? c.accent : c.rule, width: font == s.cardFont ? 2 : 1),
-                ),
+            child: SizedBox(
+              height: 112,
+              child: Pressable.card(
+                depth: 4,
+                onTap: () {
+                  if (font == s.cardFont) return;
+                  Haptics.choose();
+                  unawaited(n.update((s) => s.copyWith(cardFont: font)));
+                },
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+                  color: font == s.cardFont ? c.marigold.withValues(alpha: 0.22) : null,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -596,6 +586,7 @@ class CardFontPicker extends ConsumerWidget {
                     ),
                   ],
                 ),
+              ),
               ),
             ),
           ),

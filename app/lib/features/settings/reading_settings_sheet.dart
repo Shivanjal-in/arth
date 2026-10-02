@@ -41,9 +41,22 @@ class ReadingSettings extends ConsumerWidget {
           onChanged: (v) => n.update((s) => s.copyWith(ttsEnabled: v)),
         ),
         SettingsSwitch(
+          title: t.bookPages,
+          value: s.bookPages,
+          onChanged: (v) => n.update((s) => s.copyWith(bookPages: v)),
+        ),
+        SettingsSwitch(
           title: t.prefetch,
           value: s.prefetch,
           onChanged: (v) => n.update((s) => s.copyWith(prefetch: v)),
+        ),
+        TextButton.icon(
+          onPressed: () {
+            Navigator.of(context).pop();
+            ref.read(readerGuideRequestProvider.notifier).state = true;
+          },
+          icon: const Icon(Icons.help_outline_rounded, size: 20),
+          label: Text(t.showGuideAgain),
         ),
       ],
     );

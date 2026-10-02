@@ -92,9 +92,8 @@ class CommunityLock extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(22, 22, 22, 16),
               decoration: BoxDecoration(
                 color: c.card,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: c.rule),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 24, offset: const Offset(0, 8))],
+                border: Border.all(color: c.ink, width: 2),
+                boxShadow: [BoxShadow(color: c.shadow, offset: const Offset(6, 6))],
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,

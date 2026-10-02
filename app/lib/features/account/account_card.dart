@@ -90,7 +90,6 @@ class AccountCard extends ConsumerWidget {
         SyncPhase.idle => sync.lastSyncedAt == null ? t.notSyncedYet : t.syncedAgo(DateTime.now().difference(sync.lastSyncedAt!)),
       };
       body = InkWell(
-        borderRadius: BorderRadius.circular(14),
         onTap: () => context.push('/profile'),
         child: Row(
           children: [
@@ -141,7 +140,7 @@ class AccountCard extends ConsumerWidget {
       padding: const EdgeInsets.only(top: 22),
       child: Container(
         padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: c.card, borderRadius: BorderRadius.circular(16), border: Border.all(color: c.rule)),
+        decoration: BoxDecoration(color: c.card, border: Border.all(color: c.ink, width: 2), boxShadow: [BoxShadow(color: c.shadow, offset: const Offset(4, 4))]),
         child: Column(
           children: [
             body,
@@ -179,7 +178,7 @@ class _Chip extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-        decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(10)),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.14), border: Border.all(color: color, width: 1.5)),
         child: Text(label, style: EnglishText.label(color, size: 11.5)),
       );
 }

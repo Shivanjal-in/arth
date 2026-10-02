@@ -124,7 +124,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               if (paid) ...[
                 Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: c.marigold.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
+                  decoration: BoxDecoration(color: c.marigold.withValues(alpha: 0.15), border: Border.all(color: c.ink, width: 1.5)),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [

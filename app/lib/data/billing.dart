@@ -110,7 +110,11 @@ enum BuyOutcome { bought, cancelled, failed }
 
 class Billing {
   /// Whether this build can sell plans (it was given a RevenueCat key).
-  bool get available => (Platform.isAndroid && _androidKey.isNotEmpty) || (Platform.isIOS && _iosKey.isNotEmpty);
+  /// RevenueCat's `test_…` keys only work in debug builds: in a release build
+  /// the SDK closes the app, so there they count as no key at all.
+  bool get available => _usable(Platform.isAndroid ? _androidKey : (Platform.isIOS ? _iosKey : ''));
+
+  static bool _usable(String key) => key.isNotEmpty && (kDebugMode || !key.startsWith('test_'));
 
   bool _ready = false;
 
