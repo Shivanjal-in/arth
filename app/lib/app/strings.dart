@@ -219,17 +219,11 @@ enum AppStrings {
   }
   String get guideTitle => _('How to read here', 'यहाँ पढ़ने का तरीका');
   String get guideSwipe => _('Swipe sideways to turn the page. A tap on the edge of the page turns it too.', 'पन्ना पलटने के लिए साइड में स्वाइप करें। पन्ने के किनारे पर टैप करने से भी पन्ना पलटता है।');
-  String get guideScroll => _('Scroll up and down to read. Swipe sideways to move between chapters.', 'पढ़ने के लिए ऊपर-नीचे स्क्रॉल करें। अध्याय बदलने के लिए साइड में स्वाइप करें।');
   String get guideTap => _('Tap a word for its Hindi meaning and how it is used in this sentence.', 'किसी शब्द पर टैप करें, उसका हिंदी अर्थ और इस वाक्य में प्रयोग दिखेगा।');
   String get guideHold => _('Press and hold a word, then drag to select a sentence. Highlight it, translate it or save it as a card.', 'किसी शब्द को दबाकर रखें, फिर खींचकर वाक्य चुनें। उसे हाइलाइट करें, अनुवाद करें या कार्ड बनाएँ।');
   String get guideBookmark => _('Tap the ribbon at the top to bookmark a page. Find it again in the ⋮ menu.', 'पन्ना सहेजने के लिए ऊपर रिबन पर टैप करें। उसे ⋮ मेन्यू में फिर पाएँ।');
   String get guideGotIt => _('Got it', 'समझ गया');
   String get showGuideAgain => _('Show the reading guide again', 'पढ़ने का गाइड फिर दिखाएँ');
-  String get bookPages => _('Turn pages like a book', 'किताब की तरह पन्ने पलटें');
-  String get bookPagesHelp => _(
-        'PDFs show one page at a time and curl as you swipe. Off, they scroll.',
-        'PDF एक बार में एक पन्ना दिखता है और स्वाइप पर मुड़ता है। बंद करने पर स्क्रॉल होता है।',
-      );
   String get prefetch => _('Prefetch meanings while reading', 'पढ़ते समय अर्थ पहले से लाएँ');
   String get prefetchHelp => _(
         'Resolves hard words on the next page in the background. Uses data.',

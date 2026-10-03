@@ -8,7 +8,7 @@ import type { FastifyPluginAsync } from 'fastify';
 
 const CONTACT = 'ekansha13@gmail.com';
 const OPERATOR = 'Akshat Jaiswal (Zethyst)';
-const UPDATED = '27 September 2026';
+const UPDATED = '3 October 2026';
 
 function page(title: string, body: string): string {
   return `<!doctype html>
@@ -52,6 +52,7 @@ const privacy = page(
 <h2>What we collect, and why</h2>
 <ul>
   <li><strong>Your account</strong> (if you sign in): your name, email address and profile photo from Google, and anything you add to your profile (a photo, a short bio). Used to run your account and show your name on what you share.</li>
+  <li><strong>Book covers</strong>: to show a real cover, Arth sends a book’s title, taken from its file name, to our server, which asks Open Library for a matching cover and keeps the answer. The file itself, and anything inside it, is never sent. Titles are not linked to you or your account.</li>
   <li><strong>Your cards and bookmarks</strong> (if you sign in): the cards you make (their text, your notes, the book’s title and a fingerprint of the book file, not the file) and your bookmarks, so they sync to your other phones.</li>
   <li><strong>AI answers you ask for</strong>: when you ask for a word’s meaning in a sentence, or a sentence’s translation, the word and the sentence (and, for words like “he” or “it”, the sentence before) are sent to our server and to OpenAI to produce the answer. Answers are stored so the next reader asking about the same sentence gets it instantly; stored answers are not linked to you or your account.</li>
   <li><strong>How much AI you’ve used</strong>: a count per account and per phone, to apply your plan’s allowance. The phone is identified by a code derived from its device identifier; the identifier itself isn’t sent.</li>
@@ -71,6 +72,7 @@ const privacy = page(
   <li><strong>MongoDB Atlas</strong>: our database (accounts, synced cards, community, stored AI answers).</li>
   <li><strong>Render</strong>: hosts our server.</li>
   <li><strong>OpenAI</strong>: produces AI answers from the words and sentences you ask about. It isn’t told who you are.</li>
+  <li><strong>Open Library</strong> (Internet Archive): finds book covers from a title. It isn’t told who you are, and your phone then downloads the cover image from it.</li>
   <li><strong>Cloudinary</strong>: stores profile photos you upload.</li>
   <li><strong>Google AdMob</strong>: ads, for readers without a paid plan.</li>
   <li><strong>RevenueCat, Google Play and the App Store</strong>: subscriptions.</li>

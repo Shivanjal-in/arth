@@ -103,14 +103,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
   void initState() {
     super.initState();
     _controller.addListener(_onViewerChanged);
-    // Flipping book mode re-lays the pages out (pdfrx doesn't notice by itself).
-    ref.listenManual(settingsProvider.select((s) => s.bookPages), (_, _) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !_controller.isReady) return;
-        _controller.invalidate();
-        if (_bookMode) unawaited(_applyBookView(_page ?? 1));
-      });
-    });
     _registerDevHooks();
   }
 
@@ -343,7 +335,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
   /// beside the one being read.
   static PdfPageLayout _bookLayout(List<PdfPage> pages, PdfViewerParams params) {
     final height = pages.fold<double>(0, (m, p) => math.max(m, p.height));
-    final gap = pages.fold<double>(0, (m, p) => math.max(m, p.width));
+    // Wide enough that no neighbour shows however the phone is held: in
+    // landscape the view is several page-widths across.
+    final gap = 5 * pages.fold<double>(0, (m, p) => math.max(m, p.width));
     final layouts = <Rect>[];
     var x = 0.0;
     for (final page in pages) {
@@ -368,7 +362,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
   }
 
   /// Pages are read one at a time and turned with a curl.
-  bool get _bookMode => ref.read(settingsProvider).bookPages;
+  bool get _bookMode => kBookPages;
 
   /// A tap in the margin beside the text turns the page.
   bool _turnFromEdge(Offset docPos) {
@@ -414,11 +408,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
   }
 
   /// The block of text on [page], in page points; null on a page without text.
-  Future<Rect?> _textBoxOf(int page) async {
+  /// Waits up to [wait] for the page to load (long PDFs load their pages
+  /// progressively); null then, and nothing is remembered about it.
+  Future<Rect?> _textBoxOf(int page, {Duration wait = const Duration(seconds: 2)}) async {
     if (_textBoxes.containsKey(page)) return _textBoxes[page];
     final layout = _layoutOrNull;
     if (layout == null) return null;
-    final loaded = await _controller.pages[page - 1].waitForLoaded(timeout: const Duration(seconds: 10));
+    final pdfPage = _controller.pages[page - 1];
+    final loaded = pdfPage.isLoaded && wait == Duration.zero ? pdfPage : await pdfPage.waitForLoaded(timeout: wait);
     if (loaded == null) return null;
     final text = await loaded.loadStructuredText();
     final origin = layout.pageLayouts[page - 1].topLeft;
@@ -447,26 +444,31 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
 
   /// How wide a column of text usually is in this book, and where it sits:
   /// the median over a spread of pages, so zoom is the same on every page.
+  /// Uses only pages that are already loaded; it never waits, so a jump deep
+  /// into a long PDF isn't held up. Remembered once enough pages back it.
   Future<({double width, double centerX})?> _bookRefOf() async {
     final known = _bookRef;
     if (known != null) return known;
     final n = _controller.pageCount;
-    final sample = {for (var i = 0; i < 9; i++) 1 + (n - 1) * i ~/ 8};
+    final sample = {for (var i = 0; i < 9; i++) 1 + (n - 1) * i ~/ 8, _page ?? 1};
     final boxes = <Rect>[];
     for (final page in sample) {
-      final box = await _textBoxOf(page);
+      if (!_textBoxes.containsKey(page) && !_controller.pages[page - 1].isLoaded) continue;
+      final box = await _textBoxOf(page, wait: Duration.zero);
       if (box != null) boxes.add(box);
     }
     if (boxes.isEmpty) return null;
     double median(List<double> v) => (v..sort())[v.length ~/ 2];
-    return _bookRef = (width: median([for (final b in boxes) b.width]), centerX: median([for (final b in boxes) b.center.dx]));
+    final ref = (width: median([for (final b in boxes) b.width]), centerX: median([for (final b in boxes) b.center.dx]));
+    if (boxes.length >= math.min(sample.length, 5)) _bookRef = ref;
+    return ref;
   }
 
   /// The zoom, and the point of the page (in page points) at the middle of the
   /// view, that put [page]'s text across a [view]-sized screen.
-  Future<({double zoom, Offset center})> _bookViewOf(int page, Size view) async {
+  Future<({double zoom, Offset center})> _bookViewOf(int page, Size view, {Duration wait = const Duration(seconds: 2)}) async {
     final pdfPage = _controller.document.pages[page - 1];
-    final box = await _textBoxOf(page);
+    final box = await _textBoxOf(page, wait: wait);
     final ref = await _bookRefOf();
     if (box == null || ref == null) {
       final zoom = math.min(view.width / pdfPage.width, view.height / pdfPage.height);
@@ -505,10 +507,33 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
       if (!mounted) return;
       final at = layout.pageLayouts[page - 1].topLeft + v.center;
       await _controller.goTo(_controller.calcMatrixFor(at, zoom: v.zoom, viewSize: box.size), duration: Duration.zero);
+      // A page that hadn't loaded yet was placed to fit; once its text is
+      // there, place it properly if the reader is still on it.
+      if (!_textBoxes.containsKey(page)) unawaited(_refineBookView(page));
     } finally {
       // Never leave the reader hidden, whatever went wrong placing the text.
       if (mounted && !_bookViewSet) setState(() => _bookViewSet = true);
     }
+  }
+
+  int _settleGeneration = 0;
+
+  /// After the view changes size (a rotation): pdfrx lays the pages out
+  /// again on its own schedule, after this is told, so place the page again
+  /// as the new size settles rather than once.
+  void _settleBookView() {
+    if (!_bookMode || _page == null) return;
+    final generation = ++_settleGeneration;
+    for (final ms in const [0, 250, 700, 1500]) {
+      Future<void>.delayed(Duration(milliseconds: ms), () {
+        if (mounted && generation == _settleGeneration && _bookMode && _page != null) unawaited(_applyBookView(_page!));
+      });
+    }
+  }
+
+  Future<void> _refineBookView(int page) async {
+    if (await _textBoxOf(page, wait: const Duration(seconds: 30)) == null) return;
+    if (mounted && _bookMode && _page == page) unawaited(_applyBookView(page));
   }
 
   /// Go to [page]: in book mode by placing its text, else as pdfrx does.
@@ -879,7 +904,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
       unawaited(_resolveHighlightRects(highlights, _page ?? 1));
     }
     final brightness = Theme.of(context).brightness;
-    final bookMode = ref.watch(settingsProvider.select((s) => s.bookPages));
+    const bookMode = kBookPages;
 
     return Scaffold(
       appBar: AppBar(
@@ -944,9 +969,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
                   // go through the paper filter, which turns the white to paper.
                   backgroundColor: bookMode ? Colors.white : c.paper,
                   boundaryMargin: bookMode ? const EdgeInsets.all(100000) : null,
-                  onViewSizeChanged: (_, _, _) {
-                    if (_bookMode && _page != null) WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_applyBookView(_page!)));
-                  },
+                  onViewSizeChanged: (_, _, _) => _settleBookView(),
                   margin: bookMode ? 0 : 8,
                   layoutPages: bookMode ? _bookLayout : null,
                   sizeDelegateProvider: bookMode ? const PdfViewerSizeDelegateProviderLegacy(calculateInitialZoom: _fitPage) : null,

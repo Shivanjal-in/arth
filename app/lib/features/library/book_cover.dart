@@ -9,10 +9,13 @@
 //   jaal      a diamond lattice with a dot in every cell
 //   leheriya  diagonal waves, the Rajasthani tie-dye stripe
 
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:arth/app/theme.dart';
+import 'package:arth/data/covers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// FNV-1a over the title's code units: stable across runs and devices
 /// (String.hashCode makes no such promise).
@@ -101,8 +104,32 @@ class BlockPrintPainter extends CustomPainter {
 
 /// A cover: dyed cloth, the title's motif, a spine, and a printed label
 /// with the initial (or a camera, for a scan).
-class BookCover extends StatelessWidget {
+class BookCover extends ConsumerWidget {
   const BookCover({required this.title, required this.width, super.key, this.scan = false, this.elevation = 1, this.read = false});
+
+  final String title;
+  final double width;
+  final bool scan;
+  final bool read;
+  final double elevation;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => CoverArt(
+        title: title,
+        width: width,
+        scan: scan,
+        elevation: elevation,
+        read: read,
+        // A real cover, when one has been found for this title.
+        photo: scan ? null : ref.watch(coverFileProvider(title)).valueOrNull,
+      );
+}
+
+/// The cover itself, drawn from what it is given: dyed cloth with the title's
+/// motif, a spine and a printed label, or a photo of the real cover. Needs
+/// no app services, so it also draws in the deck PDF.
+class CoverArt extends StatelessWidget {
+  const CoverArt({required this.title, required this.width, super.key, this.scan = false, this.elevation = 1, this.read = false, this.photo});
 
   final String title;
   final double width;
@@ -114,11 +141,15 @@ class BookCover extends StatelessWidget {
   /// 0: flat (inside a card); 1: resting on the page.
   final double elevation;
 
+  /// The real cover, if there is one.
+  final File? photo;
+
   static const _scanInk = Color(0xFF4A5A6A);
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final photo = this.photo;
     final ink = scan ? _scanInk : coverInk(title);
     final height = width * 1.38;
     final initial = title.trim().isEmpty ? '?' : title.trim().characters.first.toUpperCase();
@@ -136,9 +167,24 @@ class BookCover extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          CustomPaint(
-            painter: BlockPrintPainter(motif: scan ? BlockMotif.jaal : motifOf(title), color: print, cell: width * 0.34),
-          ),
+          if (photo == null)
+            CustomPaint(
+              painter: BlockPrintPainter(motif: scan ? BlockMotif.jaal : motifOf(title), color: print, cell: width * 0.34),
+            )
+          else
+            Image.file(
+              photo,
+              fit: BoxFit.cover,
+              // Sized to what's drawn, not to the file's pixels.
+              cacheWidth: (width * 3).round(),
+              gaplessPlayback: true,
+              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              frameBuilder: (_, child, frame, sync) => AnimatedOpacity(
+                opacity: frame == null && !sync ? 0 : 1,
+                duration: const Duration(milliseconds: 220),
+                child: child,
+              ),
+            ),
           // Spine: a darker band with a highlight where the cover bends.
           Positioned(
             left: 0,
@@ -154,7 +200,9 @@ class BookCover extends StatelessWidget {
               ),
             ),
           ),
-          // The label: a paper cartouche the way a printer stamps a mark.
+          // The label: a paper cartouche the way a printer stamps a mark
+          // (a real cover has its own).
+          if (photo == null)
           Center(
             child: Padding(
               padding: EdgeInsets.only(left: width * 0.08),

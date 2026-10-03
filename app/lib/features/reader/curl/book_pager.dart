@@ -22,6 +22,9 @@ import 'package:flutter/rendering.dart';
 /// reader would show it, [size] pixels; null if there is no such page.
 typedef PageSnapshot = Future<ui.Image?> Function({required bool next, required Size size});
 
+/// Pages are turned with a curl, a page at a time (no setting: always on).
+const bool kBookPages = true;
+
 class BookPagerController {
   _BookPagerState? _state;
 

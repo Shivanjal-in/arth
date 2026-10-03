@@ -332,6 +332,18 @@ class ApiClient {
     }
   }
 
+  /// A cover image URL for a book of this title (and author, if known), or
+  /// null when none matches well. Throws [ApiFailure] if the server can't be
+  /// reached, so a caller can tell "no cover" from "try again later".
+  Future<String?> coverUrl({required String title, String? author}) async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>('/cover', queryParameters: {'title': title, 'author': ?author});
+      return _data(res)['url'] as String?;
+    } on DioException catch (e) {
+      throw _failure(e);
+    }
+  }
+
   Future<PhraseMatch?> matchPhrase({
     required List<String> tokens,
     required int index,

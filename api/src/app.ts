@@ -11,6 +11,7 @@ import { adminRoutes } from './routes/admin.js';
 import { aiGate, openGate } from './auth/ai-gate.js';
 import { defaultLimits, type Limits } from './services/quota.js';
 import { contextRoutes } from './routes/context.js';
+import { coverRoutes } from './routes/cover.js';
 import { healthRoutes } from './routes/health.js';
 import { lookupRoutes } from './routes/lookup.js';
 import { phraseRoutes } from './routes/phrases.js';
@@ -38,6 +39,7 @@ export type RequestMeta = {
   context?: { lemma: string; mode: string; senseIndex: number; clamped: boolean; llmMs: number };
   prefetch?: boolean;
   translate?: { chars: number; retried: boolean };
+  cover?: { found: boolean };
 };
 
 declare module 'fastify' {
@@ -52,6 +54,8 @@ export type AppOptions = {
   cache: CacheStore;
   llm: LLMProvider;
   rateLimits?: { lookups: number; llm: number; prefetch: number };
+  /** Open Library fetcher for /cover; tests pass a fake. */
+  coverFetch?: import('./services/cover.js').CoverFetch;
   /** Sign-in, profile and sync. Omitted: those routes answer 503. */
   accounts?: AccountDeps;
   /** Require sign-in and count AI uses against the tier's allowance. */
@@ -178,6 +182,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
           gate,
         });
         await dbRoutes.register(phraseRoutes, { store: opts.store });
+        await dbRoutes.register(coverRoutes, { cache: opts.cache, ...(opts.coverFetch ? { fetchJson: opts.coverFetch } : {}) });
       });
       await v1.register(seedRoutes, { defaultLimit: opts.seedLimit });
       await v1.register(contextRoutes, {

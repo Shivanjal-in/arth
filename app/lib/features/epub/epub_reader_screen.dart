@@ -250,7 +250,7 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
   /// The area a page's text fills (the body less the space above and below).
   Size _viewport = Size.zero;
 
-  bool get _bookMode => ref.read(settingsProvider).bookPages;
+  bool get _bookMode => kBookPages;
 
   /// Throws away the pages if the size or text scale they were cut for changed.
   void _syncPagingKey(Size viewport, TextScaler scaler) {
@@ -861,7 +861,7 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
       });
     }
     final epub = _epub;
-    final bookMode = ref.watch(settingsProvider.select((s) => s.bookPages));
+    const bookMode = kBookPages;
 
     return Scaffold(
       appBar: AppBar(

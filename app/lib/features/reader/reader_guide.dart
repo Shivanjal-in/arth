@@ -70,7 +70,7 @@ class _Guide extends ConsumerWidget {
     final s = ref.watch(settingsProvider);
     final scale = s.hindiScale;
     final rows = <(IconData, String)>[
-      if (s.bookPages) (Icons.swipe_rounded, t.guideSwipe) else (Icons.swap_vert_rounded, t.guideScroll),
+      (Icons.swipe_rounded, t.guideSwipe),
       (Icons.touch_app_rounded, t.guideTap),
       (Icons.ads_click_rounded, t.guideHold),
       (Icons.bookmark_border_rounded, t.guideBookmark),

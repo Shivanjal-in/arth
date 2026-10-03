@@ -111,12 +111,6 @@ class SettingsScreen extends ConsumerWidget {
               onChanged: (v) => unawaited(setAiLookup(context, ref, on: v)),
             ),
             SettingsSwitch(
-              title: t.bookPages,
-              subtitle: t.bookPagesHelp,
-              value: s.bookPages,
-              onChanged: (v) => n.update((s) => s.copyWith(bookPages: v)),
-            ),
-            SettingsSwitch(
               title: t.prefetch,
               subtitle: t.prefetchHelp,
               value: s.prefetch,

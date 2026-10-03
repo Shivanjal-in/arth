@@ -7,7 +7,7 @@ import { Schema, model, type InferSchemaType } from 'mongoose';
 const cacheSchema = new Schema(
   {
     _id: { type: String, required: true },
-    kind: { type: String, enum: ['context', 'sentence'], required: true },
+    kind: { type: String, enum: ['context', 'sentence', 'cover'], required: true },
     data: { type: Schema.Types.Mixed, required: true },
     hits: { type: Number, default: 0 },
     createdAt: { type: Date, default: () => new Date() },

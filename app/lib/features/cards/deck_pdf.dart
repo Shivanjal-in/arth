@@ -209,7 +209,7 @@ class _Header extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          BookCover(title: bookTitle, width: 58, elevation: 0),
+          CoverArt(title: bookTitle, width: 58, elevation: 0),
           const SizedBox(width: 18),
           Expanded(
             child: Column(
