@@ -266,6 +266,14 @@ enum AppStrings {
       );
   String get notFound => _('Not in the dictionary.', 'यह शब्द शब्दकोश में नहीं मिला।');
   String get lookingUp => _('Looking this up…', 'अर्थ ढूँढ रहे हैं…');
+  String get meaning => _('Meaning', 'अर्थ');
+  String get copy => _('Copy', 'कॉपी करें');
+  String get copied => _('Copied', 'कॉपी हो गया');
+  String get search => _('Search', 'खोजें');
+  String get searchInBook => _('Search in this book', 'इस किताब में खोजें');
+  String get searchHelp => _('Type a word or phrase to find it in the book.', 'किताब में ढूँढने के लिए कोई शब्द या वाक्यांश लिखें।');
+  String get noMatches => _('No matches found.', 'कोई मेल नहीं मिला।');
+  String get searchTruncated => _('Showing the first 300 matches. Try a longer phrase.', 'पहले 300 नतीजे दिखा रहे हैं। थोड़ा लंबा वाक्यांश आज़माएँ।');
   String get translateSentence => _('Translate this sentence', 'यह वाक्य अनुवाद करें');
   String get rateLimited => _(
         'Too many requests. Wait a minute and try again.',
@@ -381,14 +389,18 @@ enum AppStrings {
   String get continueReading => _('Continue reading', 'पढ़ना जारी रखें');
   // ---- vocabulary ----
   String get vocabulary => _('Vocabulary', 'शब्द भंडार');
-  String get wordsFromBook => _('Words from this book', 'इस किताब के शब्द');
+  String get wordsFromBook => _('Saved words from this book', 'इस किताब के सहेजे शब्द');
+  String get exportWordsPdf => _('Export words as PDF', 'शब्दों का PDF बनाएँ');
+  String wordCount(int n) => _(n == 1 ? '1 word' : '$n words', '$n शब्द');
+  String pdfWordsSubject(String book) => _('My words from $book', '$book से मेरे शब्द');
+  String firstSavedIn(String book) => _('First saved in $book', 'पहली बार सहेजा: $book');
   String lifetimeWords(int words, int books) => _(
         '${words == 1 ? '1 word' : '$words words'} from ${books == 1 ? '1 book' : '$books books'}',
         '$books किताबों से $words शब्द',
       );
   String bookWordsSummary(int all, int fresh) => _(
-        'You looked up ${all == 1 ? '1 word' : '$all words'} in this book; ${fresh == all ? (all == 1 ? 'it was' : 'all were') : '$fresh'} new to you.',
-        'इस किताब में आपने $all शब्द देखे; इनमें से $fresh आपके लिए नए थे।',
+        'You saved ${all == 1 ? '1 word' : '$all words'} in this book; ${fresh == all ? (all == 1 ? 'it is' : 'all are') : '$fresh'} new to you.',
+        'इस किताब में आपने $all शब्द सहेजे; इनमें से $fresh आपके लिए नए हैं।',
       );
   String newToYou(int n) => _('New to you  $n', 'नए  $n');
   String allWords(int n) => _('All  $n', 'सभी  $n');
@@ -400,12 +412,12 @@ enum AppStrings {
   String get searchWords => _('Search your words', 'अपने शब्द खोजें');
   String get removeFromVocabulary => _('Remove from vocabulary', 'शब्द भंडार से हटाएँ');
   String get vocabularyEmpty => _(
-        'Words you tap while reading gather here, with the book you met them in.',
-        'पढ़ते समय जिन शब्दों पर आप टैप करते हैं, वे उस किताब के नाम के साथ यहाँ जमा होते हैं।',
+        'Words you save while reading gather here by themselves, with the book you saved them in.',
+        'पढ़ते समय जो शब्द आप सहेजते हैं, वे अपने-आप उस किताब के नाम के साथ यहाँ जमा होते हैं।',
       );
   String get bookVocabularyEmpty => _(
-        'No words looked up in this book yet. Tap any word while reading to see its meaning; it will be kept here.',
-        'इस किताब में अभी कोई शब्द नहीं देखा। पढ़ते समय किसी शब्द पर टैप करें; वह यहाँ रखा जाएगा।',
+        'No words saved from this book yet. Tap a word while reading, then tap 🔖 on its card to save it here.',
+        'इस किताब से अभी कोई शब्द नहीं सहेजा। पढ़ते समय किसी शब्द पर टैप करें, फिर उसके कार्ड पर 🔖 दबाकर यहाँ सहेजें।',
       );
   String get seeAllWords => _('All your words', 'आपके सारे शब्द');
 

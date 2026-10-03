@@ -1,23 +1,30 @@
-// Vocabulary: the words a reader has looked up while reading. For one book,
-// the words met there — first the ones new to the reader (never looked up
-// in an earlier book); for a lifetime, every word once, with the book it
-// was first met in.
+// Vocabulary: the words a reader has saved while reading. For one book,
+// the words saved there — first the ones new to the reader (never saved
+// from an earlier book); for a lifetime, every word once, with the book it
+// was first saved in.
 
 import 'package:arth/app/feel.dart';
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/theme.dart';
 import 'package:arth/data/local_store.dart';
+import 'package:arth/features/cards/deck_pdf.dart' show exportWordsPdf;
 import 'package:arth/features/community/community_screen.dart' show ago;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 final AutoDisposeFutureProvider<List<VocabWord>> lifetimeVocabularyProvider = FutureProvider.autoDispose<List<VocabWord>>(
-  (ref) => ref.watch(localStoreProvider).lifetimeVocabulary(),
+  (ref) {
+    ref.watch(savedWordsProvider); // a save or un-save refreshes the list
+    return ref.watch(localStoreProvider).lifetimeVocabulary();
+  },
 );
 
 final AutoDisposeFutureProviderFamily<List<VocabWord>, int> bookVocabularyProvider = FutureProvider.autoDispose.family<List<VocabWord>, int>(
-  (ref, bookId) => ref.watch(localStoreProvider).bookVocabulary(bookId),
+  (ref, bookId) {
+    ref.watch(savedWordsProvider);
+    return ref.watch(localStoreProvider).bookVocabulary(bookId);
+  },
 );
 
 /// `/vocabulary` (every book) or `/vocabulary?book=ID&title=…` (one book).
@@ -36,6 +43,24 @@ class VocabularyScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(id == null ? t.vocabulary : (bookTitle ?? t.wordsFromBook), maxLines: 1, overflow: TextOverflow.ellipsis),
         actions: [
+          if (id != null)
+            Builder(
+              builder: (button) => IconButton(
+                icon: const Icon(Icons.picture_as_pdf_outlined),
+                tooltip: t.exportWordsPdf,
+                onPressed: () async {
+                  final box = button.findRenderObject() as RenderBox?;
+                  final origin = box == null ? null : box.localToGlobal(Offset.zero) & box.size;
+                  final words = await ref.read(localStoreProvider).savedWords(bookId: id);
+                  if (!button.mounted) return;
+                  if (words.isEmpty) {
+                    ScaffoldMessenger.maybeOf(button)?.showSnackBar(SnackBar(content: Text(t.bookVocabularyEmpty)));
+                    return;
+                  }
+                  await exportWordsPdf(button, ref, bookTitle: bookTitle ?? t.wordsFromBook, words: words, origin: origin);
+                },
+              ),
+            ),
           if (id != null)
             TextButton(
               onPressed: () => context.push('/vocabulary'),
@@ -80,7 +105,7 @@ class _LifetimeVocabularyState extends ConsumerState<LifetimeVocabulary> {
         final q = _search.text.trim().toLowerCase();
         final shown = [for (final w in all) if (q.isEmpty || w.lemma.toLowerCase().contains(q) || w.meaning.contains(q)) w];
         if (_az) shown.sort((a, b) => a.lemma.toLowerCase().compareTo(b.lemma.toLowerCase()));
-        final books = {for (final w in all) w.bookId}.length;
+        final books = {for (final w in all) if (w.bookId != null) w.bookId}.length;
         return RefreshIndicator(
           onRefresh: () async => ref.invalidate(lifetimeVocabularyProvider),
           child: ListView(
@@ -121,9 +146,8 @@ class _LifetimeVocabularyState extends ConsumerState<LifetimeVocabulary> {
                 _WordRow(
                   word: w,
                   meta: [
-                    t.firstMetIn(w.bookTitle),
+                    if (w.bookTitle.isNotEmpty) t.firstSavedIn(w.bookTitle),
                     if (w.books > 1) t.inBooks(w.books),
-                    t.lookedUpTimes(w.lookups),
                   ],
                   trailing: ago(w.firstAt, t),
                 ),
@@ -186,7 +210,7 @@ class _BookVocabularyState extends ConsumerState<_BookVocabulary> {
             for (final w in shown)
               _WordRow(
                 word: w,
-                meta: [if (!w.isNew) t.metBefore, t.lookedUpTimes(w.lookups)],
+                meta: [if (!w.isNew) t.metBefore],
                 trailing: ago(w.firstAt, t),
                 bookId: widget.bookId,
               ),
@@ -230,7 +254,7 @@ class _WordRow extends ConsumerWidget {
             ),
             if (word.meaning.isNotEmpty) Text(word.meaning, style: HindiText(scale).meaning(c.ink)),
             const SizedBox(height: 2),
-            Text(meta.join('  ·  '), style: EnglishText.label(c.inkMuted, size: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
+            if (meta.isNotEmpty) Text(meta.join('  ·  '), style: EnglishText.label(c.inkMuted, size: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
           ],
         ),
       ),
@@ -254,10 +278,7 @@ class _WordRow extends ConsumerWidget {
       ),
     );
     if (ok != true || !context.mounted) return;
-    await ref.read(localStoreProvider).removeVocabulary(word.lemma, bookId: bookId);
-    ref
-      ..invalidate(lifetimeVocabularyProvider)
-      ..invalidate(bookVocabularyProvider);
+    await ref.read(savedWordsProvider.notifier).unsave(word.lemma, bookId: bookId, everywhere: bookId == null);
   }
 }
 

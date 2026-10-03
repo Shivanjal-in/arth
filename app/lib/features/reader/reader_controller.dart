@@ -209,17 +209,6 @@ class ReaderController extends AutoDisposeNotifier<ReaderTooltip?> {
     }
     if (outcome is LookupFound) {
       unawaited(ref.read(localStoreProvider).addRecentLookup(outcome.lemma));
-      // Vocabulary: this word was met in this book.
-      if (book != null) {
-        unawaited(
-          ref.read(localStoreProvider).recordWord(
-                lemma: outcome.lemma,
-                bookId: book.id,
-                bookTitle: book.title,
-                meaning: outcome.entry.senses.firstOrNull?.meaning ?? '',
-              ),
-        );
-      }
       // Step 4: context, in parallel with showing the entry. Single-sense
       // entries have nothing to disambiguate.
       if (outcome.entry.senses.length > 1) {

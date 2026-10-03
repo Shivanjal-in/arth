@@ -33,7 +33,37 @@ const _pixelRatio = 2.0;
 
 /// Builds the PDF for [cards] of [bookTitle] and opens the share sheet.
 /// [origin] is where the share sheet points from on an iPad.
-Future<void> exportDeckPdf(BuildContext context, WidgetRef ref, {required String bookTitle, required List<Flashcard> cards, Rect? origin}) async {
+Future<void> exportDeckPdf(BuildContext context, WidgetRef ref, {required String bookTitle, required List<Flashcard> cards, Rect? origin}) =>
+    _exportPdf(
+      context,
+      ref,
+      bookTitle: bookTitle,
+      suffix: 'cards',
+      subject: ref.read(stringsProvider).pdfSubject(bookTitle),
+      origin: origin,
+      build: (t, settings) => buildDeckPdf(bookTitle: bookTitle, cards: cards, strings: t, scale: settings.hindiScale, font: settings.cardFont),
+    );
+
+/// A book's saved words as a PDF to share or print.
+Future<void> exportWordsPdf(BuildContext context, WidgetRef ref, {required String bookTitle, required List<SavedWord> words, Rect? origin}) => _exportPdf(
+      context,
+      ref,
+      bookTitle: bookTitle,
+      suffix: 'words',
+      subject: ref.read(stringsProvider).pdfWordsSubject(bookTitle),
+      origin: origin,
+      build: (t, settings) => buildWordsPdf(bookTitle: bookTitle, words: words, strings: t, scale: settings.hindiScale),
+    );
+
+Future<void> _exportPdf(
+  BuildContext context,
+  WidgetRef ref, {
+  required String bookTitle,
+  required String suffix,
+  required String subject,
+  required Future<Uint8List> Function(AppStrings t, Settings settings) build,
+  Rect? origin,
+}) async {
   final t = ref.read(stringsProvider);
   final messenger = ScaffoldMessenger.maybeOf(context);
   final navigator = Navigator.of(context, rootNavigator: true);
@@ -58,10 +88,10 @@ Future<void> exportDeckPdf(BuildContext context, WidgetRef ref, {required String
   File? file;
   try {
     final settings = ref.read(settingsProvider);
-    final bytes = await buildDeckPdf(bookTitle: bookTitle, cards: cards, strings: t, scale: settings.hindiScale, font: settings.cardFont);
+    final bytes = await build(t, settings);
     final dir = await getTemporaryDirectory();
     final name = bookTitle.replaceAll(RegExp(r'[\\/:*?"<>|]+'), ' ').trim();
-    file = File('${dir.path}/${name.isEmpty ? 'Arth' : name} - cards.pdf');
+    file = File('${dir.path}/${name.isEmpty ? 'Arth' : name} - $suffix.pdf');
     await file.writeAsBytes(bytes, flush: true);
   } on Exception catch (e) {
     debugPrint('pdf export failed: $e');
@@ -73,7 +103,7 @@ Future<void> exportDeckPdf(BuildContext context, WidgetRef ref, {required String
     return;
   }
   await SharePlus.instance.share(
-    ShareParams(files: [XFile(file.path, mimeType: 'application/pdf')], subject: t.pdfSubject(bookTitle), sharePositionOrigin: origin),
+    ShareParams(files: [XFile(file.path, mimeType: 'application/pdf')], subject: subject, sharePositionOrigin: origin),
   );
 }
 
@@ -86,9 +116,28 @@ Future<Uint8List> buildDeckPdf({
   CardFont font = CardFont.montserrat,
 }) async {
   Widget page(Widget child) => _PrintFrame(strings: strings, child: child);
-  final header = page(_Header(bookTitle: bookTitle, count: cards.length, strings: strings));
+  final header = page(_Header(bookTitle: bookTitle, countLabel: strings.cardCount(cards.length), strings: strings));
   final tiles = [for (final card in cards) page(_PrintCard(card: card, strings: strings, scale: scale, font: font))];
+  return _layoutPdf(bookTitle: bookTitle, header: header, tiles: tiles);
+}
 
+/// The PDF of a book's saved words: a title block, then each word with its
+/// meaning and the sentence it was met in.
+Future<Uint8List> buildWordsPdf({
+  required String bookTitle,
+  required List<SavedWord> words,
+  required AppStrings strings,
+  required double scale,
+}) {
+  Widget page(Widget child) => _PrintFrame(strings: strings, child: child);
+  return _layoutPdf(
+    bookTitle: bookTitle,
+    header: page(_Header(bookTitle: bookTitle, countLabel: strings.wordCount(words.length), strings: strings)),
+    tiles: [for (final w in words) page(_PrintWord(word: w, scale: scale))],
+  );
+}
+
+Future<Uint8List> _layoutPdf({required String bookTitle, required Widget header, required List<Widget> tiles}) async {
   // Styles ask Google Fonts for their files on first use: draw once to ask,
   // wait for them, then draw for real.
   await _capture(header);
@@ -194,10 +243,10 @@ class _PrintFrame extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.bookTitle, required this.count, required this.strings});
+  const _Header({required this.bookTitle, required this.countLabel, required this.strings});
 
   final String bookTitle;
-  final int count;
+  final String countLabel;
   final AppStrings strings;
 
   @override
@@ -218,7 +267,7 @@ class _Header extends StatelessWidget {
                 Text(bookTitle, style: EnglishText.title(c.ink, size: 26)),
                 const SizedBox(height: 4),
                 Text(
-                  '${strings.cardCount(count)}  ·  ${now.day}/${now.month}/${now.year}',
+                  '$countLabel  ·  ${now.day}/${now.month}/${now.year}',
                   style: uiBody(hindi: strings.isHindi, color: c.inkMuted, size: 13),
                 ),
               ],
@@ -305,6 +354,39 @@ class _PrintCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A saved word in full: the word, its meaning, the sentence it came from.
+class _PrintWord extends StatelessWidget {
+  const _PrintWord({required this.word, required this.scale});
+
+  final SavedWord word;
+  final double scale;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final sentence = word.sentence;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+      decoration: BoxDecoration(
+        color: c.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: c.rule),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(word.lemma, style: EnglishText.word(c.ink, size: 20)),
+          if (word.meaning.isNotEmpty) Text(word.meaning, style: HindiText(scale).meaning(c.ink)),
+          if (sentence != null && sentence.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(sentence, style: EnglishText.italic(c.inkMuted, size: 12.5)),
+          ],
+        ],
       ),
     );
   }

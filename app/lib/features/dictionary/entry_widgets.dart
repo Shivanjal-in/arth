@@ -53,11 +53,11 @@ class SaveWordButton extends ConsumerWidget {
     final c = context.colors;
     final settings = ref.watch(settingsProvider);
     final t = ref.watch(stringsProvider);
-    final saved = ref.watch(savedWordsProvider).valueOrNull?.any((w) => w.lemma == entry.word) ?? false;
+    final saved = ref.watch(savedWordsProvider).valueOrNull?.any((w) => w.lemma == entry.word && w.bookId == bookId) ?? false;
     void toggle() {
       final notifier = ref.read(savedWordsProvider.notifier);
       if (saved) {
-        unawaited(notifier.unsave(entry.word));
+        unawaited(notifier.unsave(entry.word, bookId: bookId));
       } else {
         unawaited(
           notifier.save(

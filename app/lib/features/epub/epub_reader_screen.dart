@@ -35,11 +35,13 @@ import 'package:arth/features/reader/bookmarks_sheet.dart';
 import 'package:arth/features/reader/curl/book_pager.dart';
 import 'package:arth/features/reader/details_sheet.dart';
 import 'package:arth/features/reader/flick_physics.dart';
+import 'package:arth/features/reader/highlights/highlight_bar.dart';
 import 'package:arth/features/reader/highlights/highlight_colors.dart';
 import 'package:arth/features/reader/highlights/highlights_sheet.dart';
 import 'package:arth/features/reader/reader_controller.dart';
 import 'package:arth/features/reader/reader_guide.dart';
 import 'package:arth/features/reader/reader_menu.dart';
+import 'package:arth/features/reader/search_sheet.dart';
 import 'package:arth/features/reader/tooltip/tooltip_layer.dart';
 import 'package:arth/features/settings/reading_settings_sheet.dart';
 import 'package:flutter/material.dart';
@@ -760,7 +762,14 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
     if (mounted) _dismiss();
   }
 
+  /// One selected word gets its meaning card; more gets the translation.
   void _translateSelection(HighlightBarState s) {
+    final sel = _selection;
+    final render = _activeRender;
+    if (isSingleWord(s.text) && sel != null && render != null && render.attached && sel.start == sel.end && sel.start < render.index.words.length) {
+      unawaited(_openWord(sel.at, render, render.index.words[sel.start]));
+      return;
+    }
     _sentenceRange = _selection;
     _portal.show();
     ref.read(readerControllerProvider.notifier).showSentence(text: s.text, anchor: s.anchor, page: s.page);
@@ -779,6 +788,28 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
       textOf: (a, b) => _textOf(render.index, a, b),
     );
     if (mounted) _dismiss();
+  }
+
+  Future<void> _showSearch() async {
+    final epub = _epub;
+    if (epub == null) return;
+    _dismiss();
+    final t = ref.read(stringsProvider);
+    await showSearchSheet(
+      context,
+      search: (query, add, cancelled) async {
+        for (var ch = 0; ch < epub.chapterCount && !cancelled(); ch++) {
+          final blocks = await epub.chapter(ch);
+          final label = epub.titleOf(ch) ?? t.section(ch + 1);
+          for (var b = 0; b < blocks.length && !cancelled(); b++) {
+            for (final hit in hitsIn(blocks[b].text, query, label: label, page: ch + 1, block: b)) {
+              add(hit);
+            }
+          }
+        }
+      },
+      onJump: (h) => _jumpTo(h.page - 1, h.block),
+    );
   }
 
   Future<void> _showHighlights() async {
@@ -872,6 +903,11 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Center(child: Text('${_chapter + 1} / ${epub.chapterCount}', style: EnglishText.label(c.inkMuted))),
             ),
+          IconButton(
+            icon: const Icon(Icons.search_rounded),
+            tooltip: t.search,
+            onPressed: epub == null ? null : () => unawaited(_showSearch()),
+          ),
           BookmarkButton(
             marked: _bookmarksHere(ref.watch(bookmarksProvider(widget.book.id)).valueOrNull ?? const []).isNotEmpty,
             onPressed: epub == null ? null : () => unawaited(_toggleBookmark()),
@@ -997,6 +1033,7 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
                       onColor: _pickColor,
                       onRemove: _removeHighlight,
                       onTranslate: _translateSelection,
+                      onCopied: (_) => _dismiss(),
                       onSentenceColor: _highlightSentence,
                     ),
                     onMakeCard: (d) => unawaited(_makeCard(d)),

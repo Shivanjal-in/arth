@@ -15,17 +15,18 @@ void main() {
 
   DateTime day(int d) => DateTime(2026, 9, d);
 
-  test('a word is new in the book where it was first looked up, and met before in later ones', () async {
+  SavedWord word(String lemma, String meaning, int bookId, String title, int d) =>
+      SavedWord(lemma: lemma, meaning: meaning, bookId: bookId, bookTitle: title, savedAt: day(d));
+
+  test('a word is new in the book where it was first saved, and met before in later ones', () async {
     final store = await fresh();
-    await store.recordWord(lemma: 'solitude', bookId: 1, bookTitle: 'Emma', meaning: 'एकांत', at: day(1));
-    await store.recordWord(lemma: 'solitude', bookId: 1, bookTitle: 'Emma', meaning: '', at: day(2)); // blank keeps the meaning
-    await store.recordWord(lemma: 'solitude', bookId: 2, bookTitle: 'Kim', meaning: 'अकेलापन', at: day(5));
-    await store.recordWord(lemma: 'bazaar', bookId: 2, bookTitle: 'Kim', meaning: 'बाज़ार', at: day(6));
+    await store.saveWord(word('solitude', 'एकांत', 1, 'Emma', 1));
+    await store.saveWord(word('solitude', 'अकेलापन', 2, 'Kim', 5));
+    await store.saveWord(word('bazaar', 'बाज़ार', 2, 'Kim', 6));
 
     final emma = await store.bookVocabulary(1);
     expect(emma.single.lemma, 'solitude');
     expect(emma.single.isNew, isTrue);
-    expect(emma.single.lookups, 2);
     expect(emma.single.meaning, 'एकांत');
 
     final kim = {for (final w in await store.bookVocabulary(2)) w.lemma: w};
@@ -33,19 +34,28 @@ void main() {
     expect(kim['solitude']!.isNew, isFalse);
   });
 
-  test('lifetime lists each word once: first book, total lookups, books, latest meaning', () async {
+  test('saving again in the same book replaces it; other books keep theirs', () async {
     final store = await fresh();
-    await store.recordWord(lemma: 'solitude', bookId: 1, bookTitle: 'Emma', meaning: 'एकांत', at: day(1));
-    await store.recordWord(lemma: 'solitude', bookId: 2, bookTitle: 'Kim', meaning: 'अकेलापन', at: day(5));
-    await store.recordWord(lemma: 'bazaar', bookId: 2, bookTitle: 'Kim', meaning: 'बाज़ार', at: day(6));
+    await store.saveWord(word('solitude', 'एकांत', 1, 'Emma', 1));
+    await store.saveWord(word('solitude', 'अकेलापन', 1, 'Emma', 2));
+    await store.saveWord(word('solitude', 'तनहाई', 2, 'Kim', 3));
+    expect((await store.savedWords(bookId: 1)).single.meaning, 'अकेलापन');
+    await store.unsaveWord('solitude', bookId: 1);
+    expect(await store.savedWords(bookId: 1), isEmpty);
+    expect(await store.savedWords(bookId: 2), hasLength(1));
+  });
+
+  test('vocabulary collects every saved word once: first book, books, latest meaning', () async {
+    final store = await fresh();
+    await store.saveWord(word('solitude', 'एकांत', 1, 'Emma', 1));
+    await store.saveWord(word('solitude', 'अकेलापन', 2, 'Kim', 5));
+    await store.saveWord(word('bazaar', 'बाज़ार', 2, 'Kim', 6));
 
     final all = await store.lifetimeVocabulary();
-    expect(all.map((w) => w.lemma), ['bazaar', 'solitude']); // most recently first met first
+    expect(all.map((w) => w.lemma), ['bazaar', 'solitude']); // most recently first saved first
     final solitude = all.last;
     expect(solitude.bookTitle, 'Emma');
     expect(solitude.books, 2);
-    expect(solitude.lookups, 2);
     expect(solitude.meaning, 'अकेलापन');
-    expect(solitude.lastAt, day(5));
   });
 }
