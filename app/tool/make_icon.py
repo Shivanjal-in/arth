@@ -19,7 +19,7 @@ from PIL import Image, ImageDraw, ImageFilter
 
 APP = Path(__file__).resolve().parents[1]
 SOURCE = APP / "tool/icon-source.png"
-CROP = (24, 15, 354, 340)  # the purple square within the source picture
+CROP = (48, 31, 709, 679)  # the purple square within the source picture
 INSET = 24  # px of the 1024 master trimmed off every edge
 SCALE = 0.95  # how much of the canvas the trimmed artwork fills
 RADIUS = 150  # corner radius of the source's rounded square, in master px
