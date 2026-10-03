@@ -284,13 +284,19 @@ class SavedWordsNotifier extends AsyncNotifier<List<SavedWord>> {
     ref.invalidateSelf();
   }
 
-  Future<void> unsave(String lemma) async {
-    await ref.read(localStoreProvider).unsaveWord(lemma);
+  /// [everywhere] drops the word from every book (the Vocabulary list).
+  Future<void> unsave(String lemma, {int? bookId, bool everywhere = false}) async {
+    final store = ref.read(localStoreProvider);
+    if (everywhere) {
+      await store.removeVocabulary(lemma);
+    } else {
+      await store.unsaveWord(lemma, bookId: bookId);
+    }
     ref.invalidateSelf();
   }
 
-  bool contains(String lemma) =>
-      state.valueOrNull?.any((w) => w.lemma == lemma) ?? false;
+  bool contains(String lemma, {int? bookId}) =>
+      state.valueOrNull?.any((w) => w.lemma == lemma && w.bookId == bookId) ?? false;
 }
 
 /// A book's highlights, in reading order.

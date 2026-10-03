@@ -370,7 +370,7 @@ class Bookmark {
 class LocalStore {
   LocalStore._(this._db);
 
-  static const _schemaVersion = 8;
+  static const _schemaVersion = 9;
 
   final Database _db;
 
@@ -426,6 +426,18 @@ class LocalStore {
             await db.execute('ALTER TABLE books ADD COLUMN category_group TEXT');
             await db.execute('ALTER TABLE books ADD COLUMN category TEXT');
           }
+          if (from < 9) {
+            // A word can be saved in several books: one row per (word, book).
+            final old = await db.rawQuery("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'saved_words'");
+            if (old.isNotEmpty) await db.execute('ALTER TABLE saved_words RENAME TO saved_words_v8');
+            await _createSavedWords(db);
+            if (old.isNotEmpty) {
+              await db.execute('''
+                INSERT INTO saved_words (lemma, meaning, sentence, book_id, book_title, saved_at)
+                SELECT lemma, meaning, sentence, book_id, book_title, saved_at FROM saved_words_v8''');
+              await db.execute('DROP TABLE saved_words_v8');
+            }
+          }
         },
       ),
     );
@@ -467,15 +479,7 @@ class LocalStore {
         category_group TEXT,
         category TEXT
       )''');
-    await db.execute('''
-      CREATE TABLE saved_words (
-        lemma TEXT PRIMARY KEY,
-        meaning TEXT NOT NULL,
-        sentence TEXT,
-        book_id INTEGER,
-        book_title TEXT,
-        saved_at INTEGER NOT NULL
-      )''');
+    await _createSavedWords(db);
     await db.execute('''
       CREATE TABLE recent_lookups (
         word TEXT PRIMARY KEY,
@@ -549,6 +553,20 @@ class LocalStore {
   }
   /// Every word looked up while reading, once per book: when it was first
   /// and last looked up there, and how often.
+  static Future<void> _createSavedWords(Database db) async {
+    await db.execute('''
+      CREATE TABLE saved_words (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        lemma TEXT NOT NULL,
+        meaning TEXT NOT NULL,
+        sentence TEXT,
+        book_id INTEGER,
+        book_title TEXT,
+        saved_at INTEGER NOT NULL
+      )''');
+    await db.execute('CREATE INDEX saved_words_lemma ON saved_words(lemma)');
+  }
+
   static Future<void> _createVocabulary(Database db) async {
     await db.execute('''
       CREATE TABLE vocabulary (
@@ -981,36 +999,36 @@ class LocalStore {
 
   // ---- saved words ----
 
-  Future<List<SavedWord>> savedWords() async {
-    final rows = await _db.query('saved_words', orderBy: 'saved_at DESC');
+  /// Every saved word, newest first; with [bookId], only that book's.
+  Future<List<SavedWord>> savedWords({int? bookId}) async {
+    final rows = await _db.query(
+      'saved_words',
+      where: bookId == null ? null : 'book_id = ?',
+      whereArgs: bookId == null ? null : [bookId],
+      orderBy: 'saved_at DESC, id DESC',
+    );
     return rows.map(SavedWord.fromRow).toList();
   }
 
-  Future<bool> isSaved(String lemma) async {
-    final rows = await _db.query(
-      'saved_words',
-      columns: ['lemma'],
-      where: 'lemma = ?',
-      whereArgs: [lemma],
-    );
-    return rows.isNotEmpty;
+  /// Saved from [bookId] (or from the dictionary, when null).
+  Future<void> saveWord(SavedWord w) async {
+    await unsaveWord(w.lemma, bookId: w.bookId);
+    await _db.insert('saved_words', {
+      'lemma': w.lemma,
+      'meaning': w.meaning,
+      'sentence': w.sentence,
+      'book_id': w.bookId,
+      'book_title': w.bookTitle,
+      'saved_at': w.savedAt.millisecondsSinceEpoch,
+    });
   }
 
-  Future<void> saveWord(SavedWord w) => _db.insert(
+  /// Un-saves [lemma] from [bookId] (or from the dictionary, when null).
+  Future<void> unsaveWord(String lemma, {int? bookId}) => _db.delete(
         'saved_words',
-        {
-          'lemma': w.lemma,
-          'meaning': w.meaning,
-          'sentence': w.sentence,
-          'book_id': w.bookId,
-          'book_title': w.bookTitle,
-          'saved_at': w.savedAt.millisecondsSinceEpoch,
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
+        where: bookId == null ? 'lemma = ? AND book_id IS NULL' : 'lemma = ? AND book_id = ?',
+        whereArgs: bookId == null ? [lemma] : [lemma, bookId],
       );
-
-  Future<void> unsaveWord(String lemma) =>
-      _db.delete('saved_words', where: 'lemma = ?', whereArgs: [lemma]);
 
   // ---- highlights ----
 
@@ -1274,67 +1292,39 @@ class LocalStore {
   Future<void> removeRecentLookup(String word) => _db.delete('recent_lookups', where: 'word = ?', whereArgs: [word]);
 
   // ---- vocabulary ----
+  // The vocabulary is the saved words: every save lands here by itself.
 
-  /// A word looked up while reading [bookId]. (Update, then insert: older
-  /// Android SQLite has no upsert.)
-  Future<void> recordWord({required String lemma, required int bookId, required String bookTitle, required String meaning, DateTime? at}) async {
-    final now = (at ?? DateTime.now()).millisecondsSinceEpoch;
-    await _db.transaction((txn) async {
-      final updated = await txn.rawUpdate(
-        """
-        UPDATE vocabulary SET last_at = ?, lookups = lookups + 1, book_title = ?,
-          meaning = CASE WHEN ? = '' THEN meaning ELSE ? END
-        WHERE lemma = ? AND book_id = ?""",
-        [now, bookTitle, meaning, meaning, lemma, bookId],
-      );
-      if (updated == 0) {
-        await txn.insert('vocabulary', {
-          'lemma': lemma,
-          'book_id': bookId,
-          'book_title': bookTitle,
-          'meaning': meaning,
-          'first_at': now,
-          'last_at': now,
-          'lookups': 1,
-        });
-      }
-    });
-  }
-
-  /// Every word met, once each: where and when it was first met, the latest
-  /// meaning, and lookups across all books. Most recently met first.
+  /// Every saved word, once: where and when it was first saved, the latest
+  /// meaning, and how many books it was saved in. Newest first.
   Future<List<VocabWord>> lifetimeVocabulary() async {
     final rows = await _db.rawQuery('''
-      SELECT v.lemma, v.book_id, v.book_title, v.first_at,
-        (SELECT meaning FROM vocabulary m WHERE m.lemma = v.lemma AND m.meaning != '' ORDER BY m.last_at DESC LIMIT 1) AS meaning,
-        (SELECT SUM(lookups) FROM vocabulary s WHERE s.lemma = v.lemma) AS lookups,
-        (SELECT MAX(last_at) FROM vocabulary l WHERE l.lemma = v.lemma) AS last_at,
-        (SELECT COUNT(*) FROM vocabulary b WHERE b.lemma = v.lemma) AS books
-      FROM vocabulary v
-      WHERE v.first_at = (SELECT MIN(first_at) FROM vocabulary f WHERE f.lemma = v.lemma)
-      GROUP BY v.lemma
-      ORDER BY v.first_at DESC''');
+      SELECT s.lemma, s.book_id, s.book_title, s.saved_at AS first_at, s.saved_at AS last_at, 1 AS lookups,
+        (SELECT meaning FROM saved_words m WHERE m.lemma = s.lemma AND m.meaning != '' ORDER BY m.saved_at DESC LIMIT 1) AS meaning,
+        (SELECT COUNT(*) FROM saved_words b WHERE b.lemma = s.lemma AND b.book_id IS NOT NULL) AS books
+      FROM saved_words s
+      WHERE s.id = (SELECT f.id FROM saved_words f WHERE f.lemma = s.lemma ORDER BY f.saved_at ASC, f.id ASC LIMIT 1)
+      ORDER BY s.saved_at DESC, s.id DESC''');
     return rows.map(VocabWord.fromRow).toList();
   }
 
-  /// The words looked up in [bookId]; [VocabWord.isNew] when this book is
-  /// where the reader first met the word.
+  /// The words saved in [bookId]; [VocabWord.isNew] when this book is where
+  /// the reader first saved the word.
   Future<List<VocabWord>> bookVocabulary(int bookId) async {
     final rows = await _db.rawQuery(
       '''
-      SELECT v.lemma, v.book_id, v.book_title, v.meaning, v.first_at, v.last_at, v.lookups, 1 AS books,
-        (SELECT COUNT(*) FROM vocabulary e WHERE e.lemma = v.lemma AND e.first_at < v.first_at) = 0 AS is_new
-      FROM vocabulary v WHERE v.book_id = ?
-      ORDER BY v.first_at DESC''',
+      SELECT s.lemma, s.book_id, s.book_title, s.meaning, s.saved_at AS first_at, s.saved_at AS last_at, 1 AS lookups, 1 AS books,
+        (SELECT COUNT(*) FROM saved_words e WHERE e.lemma = s.lemma AND e.id != s.id AND e.saved_at <= s.saved_at) = 0 AS is_new
+      FROM saved_words s WHERE s.book_id = ?
+      ORDER BY s.saved_at DESC, s.id DESC''',
       [bookId],
     );
     return rows.map(VocabWord.fromRow).toList();
   }
 
-  /// Drops a word from vocabulary. With [bookId], only that book's meeting
-  /// of it; without, every book.
+  /// Un-saves a word. With [bookId], only from that book; without, from
+  /// every book.
   Future<void> removeVocabulary(String lemma, {int? bookId}) => _db.delete(
-        'vocabulary',
+        'saved_words',
         where: bookId == null ? 'lemma = ?' : 'lemma = ? AND book_id = ?',
         whereArgs: bookId == null ? [lemma] : [lemma, bookId],
       );
@@ -1357,7 +1347,7 @@ class VocabWord {
   factory VocabWord.fromRow(Map<String, Object?> r) => VocabWord(
         lemma: r['lemma']! as String,
         meaning: (r['meaning'] as String?) ?? '',
-        bookId: r['book_id']! as int,
+        bookId: r['book_id'] as int?,
         bookTitle: (r['book_title'] as String?) ?? '',
         firstAt: DateTime.fromMillisecondsSinceEpoch(r['first_at']! as int),
         lastAt: DateTime.fromMillisecondsSinceEpoch(r['last_at']! as int),
@@ -1370,7 +1360,7 @@ class VocabWord {
   final String meaning;
 
   /// For the lifetime list: the book where it was first met.
-  final int bookId;
+  final int? bookId;
   final String bookTitle;
   final DateTime firstAt;
   final DateTime lastAt;
