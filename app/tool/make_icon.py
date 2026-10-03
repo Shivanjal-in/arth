@@ -19,10 +19,10 @@ from PIL import Image, ImageDraw, ImageFilter
 
 APP = Path(__file__).resolve().parents[1]
 SOURCE = APP / "tool/icon-source.png"
-CROP = (48, 31, 709, 679)  # the purple square within the source picture
-INSET = 24  # px of the 1024 master trimmed off every edge
+CROP = (40, 14, 659, 633)  # a square inside the source picture, clear of its side edges
+INSET = 0.025  # share of the crop's width trimmed off every edge
 SCALE = 0.95  # how much of the canvas the trimmed artwork fills
-RADIUS = 150  # corner radius of the source's rounded square, in master px
+RADIUS = 0.13  # the trimmed artwork's corner radius, as a share of its width
 
 
 @lru_cache(maxsize=1)
@@ -30,28 +30,32 @@ def master() -> Image.Image:
     """The artwork as a 1024px opaque square. The source's cream corners and
     pale rim are trimmed off, the rest is set a little smaller on a purple
     field that fades between the colours at its four corners."""
-    src = Image.open(SOURCE).convert("RGB").crop(CROP).resize((1024, 1024), Image.LANCZOS)
-    a = np.array(src).astype(float)
+    crop = Image.open(SOURCE).convert("RGB").crop(CROP)
+    w, h = crop.size
+    inset = round(w * INSET)
+    crop = crop.crop((inset, inset, w - inset, h - inset))
+    w, h = crop.size
+    side = round(1024 * SCALE)
+    art = crop.resize((side, round(side * h / w)), Image.LANCZOS)
+    a = np.array(art).astype(float)
 
     def purple(x: int, y: int) -> np.ndarray:
-        return a[y - 12 : y + 12, x - 12 : x + 12].reshape(-1, 3).mean(axis=0)
+        return a[y - 10 : y + 10, x - 10 : x + 10].reshape(-1, 3).mean(axis=0)
 
-    near, far = 90, 1024 - 90
-    tl, tr, bl, br = purple(near, near), purple(far, near), purple(near, far), purple(far, far)
+    near = 70
+    tl, tr = purple(near, near), purple(art.width - near, near)
+    bl, br = purple(near, art.height - near), purple(art.width - near, art.height - near)
     u = np.linspace(0, 1, 1024)[None, :, None]
     v = np.linspace(0, 1, 1024)[:, None, None]
     field = (tl * (1 - u) + tr * u) * (1 - v) + (bl * (1 - u) + br * u) * v
 
     k = 2
-    art = src.crop((INSET, INSET, 1024 - INSET, 1024 - INSET))
-    side = round(1024 * SCALE)
-    art = art.resize((side, side), Image.LANCZOS)
-    mask = Image.new("L", (side * k, side * k), 0)
-    ImageDraw.Draw(mask).rounded_rectangle((0, 0, side * k - 1, side * k - 1), radius=round((RADIUS - INSET) * side / (1024 - 2 * INSET)) * k, fill=255)
-    mask = mask.resize((side, side), Image.LANCZOS).filter(ImageFilter.GaussianBlur(5))
+    mask = Image.new("L", (art.width * k, art.height * k), 0)
+    radius = round(art.width * RADIUS * k)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, art.width * k - 1, art.height * k - 1), radius=radius, fill=255)
+    mask = mask.resize(art.size, Image.LANCZOS).filter(ImageFilter.GaussianBlur(4))
     out = Image.fromarray(field.round().astype("uint8"), "RGB")
-    off = (1024 - side) // 2
-    out.paste(art, (off, off), mask)
+    out.paste(art, ((1024 - art.width) // 2, (1024 - art.height) // 2), mask)
     return out
 
 
