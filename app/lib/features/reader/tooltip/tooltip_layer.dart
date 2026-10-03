@@ -123,7 +123,6 @@ class TooltipFollower extends StatelessWidget {
           onShowDetails: () => onShowDetails(t),
           onSuggestion: onSuggestion,
           onTranslateSentence: () => onTranslateSentence(t),
-          onMakeCard: onMakeCard == null ? null : () => onMakeCard!(wordDraft(t)),
         ),
       SentenceTooltipState() => SentenceTooltip(
           state: t,
@@ -182,19 +181,6 @@ class TooltipFollower extends StatelessWidget {
       ),
     );
   }
-}
-
-/// A word card from a looked-up word: the word, its meaning in this sentence
-/// (or its first sense), and the sentence.
-CardDraft wordDraft(WordTooltipState s) {
-  final outcome = s.outcome;
-  if (outcome is! LookupFound) return CardDraft(kind: CardKind.word, front: s.token, context: s.sentence);
-  return CardDraft(
-    kind: CardKind.word,
-    front: outcome.entry.word,
-    back: s.context?.meaning ?? outcome.entry.senses.firstOrNull?.meaning ?? '',
-    context: s.sentence,
-  );
 }
 
 /// What makes a tooltip a new one, rather than the same one updating.

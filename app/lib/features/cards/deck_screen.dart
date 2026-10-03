@@ -45,6 +45,9 @@ class _DeckScreenState extends ConsumerState<DeckScreen> {
   /// Two ways to share a recap: a PDF for anyone, or the community.
   Future<void> _share(BuildContext button, {required String title, required String? bookKey, required List<Flashcard> cards}) async {
     final t = ref.read(stringsProvider);
+    // Word cards stay private study aids: they never leave in a share.
+    final shareable = [for (final c in cards) if (c.kind != CardKind.word) c];
+    if (shareable.isEmpty) return;
     final box = button.findRenderObject() as RenderBox?;
     final origin = box == null ? null : box.localToGlobal(Offset.zero) & box.size;
     final choice = await showModalBottomSheet<String>(
@@ -90,9 +93,9 @@ class _DeckScreenState extends ConsumerState<DeckScreen> {
     if (!mounted || choice == null) return;
     Haptics.choose();
     if (choice == 'pdf') {
-      await exportDeckPdf(context, ref, bookTitle: title, cards: cards, origin: origin);
+      await exportDeckPdf(context, ref, bookTitle: title, cards: shareable, origin: origin);
     } else {
-      await shareRecap(context, ref, bookTitle: title, bookKey: bookKey, cards: cards);
+      await shareRecap(context, ref, bookTitle: title, bookKey: bookKey, cards: shareable);
     }
   }
 
