@@ -6,6 +6,7 @@ import 'package:arth/app/theme.dart';
 import 'package:arth/data/local_store.dart';
 import 'package:arth/features/reader/highlights/highlight_colors.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// A row of colour dots. [selected] gets a ring.
@@ -45,14 +46,31 @@ class HighlightColorDots extends StatelessWidget {
   }
 }
 
+/// Whether [text] is one word, which gets its meaning rather than a translation.
+bool isSingleWord(String text) => !text.trim().contains(RegExp(r'\s'));
+
+/// Put [text] on the clipboard and say so.
+Future<void> copyText(BuildContext context, String text) async {
+  await Clipboard.setData(ClipboardData(text: text));
+  if (!context.mounted) return;
+  final t = ProviderScope.containerOf(context).read(stringsProvider);
+  ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(t.copied), duration: const Duration(seconds: 1)));
+}
+
 class HighlightBar extends ConsumerWidget {
   const HighlightBar({
     required this.onColor,
     required this.onTranslate,
+    required this.text,
+    required this.onCopy,
     super.key,
     this.selected,
     this.onRemove,
   });
+
+  /// The selected text: one word offers its meaning, more offers translation.
+  final String text;
+  final VoidCallback onCopy;
 
   final HighlightColor? selected;
   final ValueChanged<HighlightColor> onColor;
@@ -70,9 +88,15 @@ class HighlightBar extends ConsumerWidget {
         HighlightColorDots(selected: selected, onPick: onColor),
         const Spacer(),
         IconButton(
-          tooltip: t.translateSentence,
+          tooltip: t.copy,
           visualDensity: VisualDensity.compact,
-          icon: Icon(Icons.translate_rounded, color: c.accent, size: 20),
+          icon: Icon(Icons.copy_rounded, color: c.accent, size: 20),
+          onPressed: onCopy,
+        ),
+        IconButton(
+          tooltip: isSingleWord(text) ? t.meaning : t.translateSentence,
+          visualDensity: VisualDensity.compact,
+          icon: Icon(isSingleWord(text) ? Icons.menu_book_rounded : Icons.translate_rounded, color: c.accent, size: 20),
           onPressed: onTranslate,
         ),
         if (onRemove != null)

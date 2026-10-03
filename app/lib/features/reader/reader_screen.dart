@@ -33,12 +33,14 @@ import 'package:arth/features/reader/curl/book_pager.dart';
 import 'package:arth/features/reader/details_sheet.dart';
 import 'package:arth/features/reader/flick_physics.dart';
 import 'package:arth/features/reader/go_to_page.dart';
+import 'package:arth/features/reader/highlights/highlight_bar.dart';
 import 'package:arth/features/reader/highlights/highlight_colors.dart';
 import 'package:arth/features/reader/highlights/highlights_sheet.dart';
 import 'package:arth/features/reader/page_text_cache.dart';
 import 'package:arth/features/reader/reader_controller.dart';
 import 'package:arth/features/reader/reader_guide.dart';
 import 'package:arth/features/reader/reader_menu.dart';
+import 'package:arth/features/reader/search_sheet.dart';
 import 'package:arth/features/reader/tooltip/tooltip_layer.dart';
 import 'package:arth/features/settings/reading_settings_sheet.dart';
 import 'package:flutter/material.dart';
@@ -254,6 +256,26 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
   Future<void> _highlightSelection(SentenceTooltipState s, HighlightColor color) => _saveSelectionHighlight(color);
 
   Future<void> _highlightFromBar(HighlightBarState s, HighlightColor color) => _saveSelectionHighlight(color);
+
+  Future<void> _showSearch() async {
+    final cache = _cache;
+    if (cache == null || !_controller.isReady) return;
+    ref.read(readerControllerProvider.notifier).dismiss();
+    final t = ref.read(stringsProvider);
+    final count = _controller.pageCount;
+    await showSearchSheet(
+      context,
+      search: (query, add, cancelled) async {
+        for (var p = 1; p <= count && !cancelled(); p++) {
+          final idx = await cache.page(p);
+          for (final hit in hitsIn(idx.fullText, query, label: t.pageLabel(p), page: p)) {
+            add(hit);
+          }
+        }
+      },
+      onJump: (h) => unawaited(_goToPage(h.page)),
+    );
+  }
 
   Future<void> _showHighlights() async {
     final t = ref.read(stringsProvider);
@@ -919,6 +941,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
                 onGo: (p) => unawaited(_goToPage(p)),
               ),
             ),
+          IconButton(
+            icon: const Icon(Icons.search_rounded),
+            tooltip: t.search,
+            onPressed: _cache == null ? null : () => unawaited(_showSearch()),
+          ),
           BookmarkButton(
             marked: (ref.watch(bookmarksProvider(widget.book.id)).valueOrNull ?? const <Bookmark>[]).any((b) => b.page == (_page ?? 1)),
             onPressed: _page == null ? null : () => unawaited(_toggleBookmark()),
@@ -1047,6 +1074,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
               highlightActions: HighlightActions(
                 onColor: _highlightFromBar,
                 onTranslate: _translateSelection,
+                onCopied: (_) => _releaseSelection(),
                 onSentenceColor: _selectionWords == null ? null : _highlightSelection,
               ),
               onMakeCard: (d) => unawaited(_makeCard(d)),
@@ -1064,7 +1092,23 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
     ref.read(readerControllerProvider.notifier).showSentence(text: s.sentence, anchor: s.anchor, page: s.page);
   }
 
-  void _translateSelection(HighlightBarState s) {
+  void _releaseSelection() {
+    unawaited(_controller.textSelectionDelegate.clearTextSelection());
+    ref.read(readerControllerProvider.notifier).dismiss();
+  }
+
+  /// One selected word gets its meaning card; more gets the translation.
+  Future<void> _translateSelection(HighlightBarState s) async {
+    final words = _selectionWords;
+    final cache = _cache;
+    if (isSingleWord(s.text) && words != null && cache != null) {
+      final idx = await cache.page(words.page);
+      if (!mounted) return;
+      if (words.start == words.end && words.start < idx.words.length) {
+        await _openWord(cache, words.page, idx, idx.words[words.start]);
+        return;
+      }
+    }
     _portal.show();
     ref.read(readerControllerProvider.notifier).showSentence(text: s.text, anchor: s.anchor, page: s.page);
   }

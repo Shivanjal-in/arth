@@ -266,6 +266,14 @@ enum AppStrings {
       );
   String get notFound => _('Not in the dictionary.', 'यह शब्द शब्दकोश में नहीं मिला।');
   String get lookingUp => _('Looking this up…', 'अर्थ ढूँढ रहे हैं…');
+  String get meaning => _('Meaning', 'अर्थ');
+  String get copy => _('Copy', 'कॉपी करें');
+  String get copied => _('Copied', 'कॉपी हो गया');
+  String get search => _('Search', 'खोजें');
+  String get searchInBook => _('Search in this book', 'इस किताब में खोजें');
+  String get searchHelp => _('Type a word or phrase to find it in the book.', 'किताब में ढूँढने के लिए कोई शब्द या वाक्यांश लिखें।');
+  String get noMatches => _('No matches found.', 'कोई मेल नहीं मिला।');
+  String get searchTruncated => _('Showing the first 300 matches. Try a longer phrase.', 'पहले 300 नतीजे दिखा रहे हैं। थोड़ा लंबा वाक्यांश आज़माएँ।');
   String get translateSentence => _('Translate this sentence', 'यह वाक्य अनुवाद करें');
   String get rateLimited => _(
         'Too many requests. Wait a minute and try again.',

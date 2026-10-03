@@ -50,6 +50,12 @@ class SentenceTooltip extends ConsumerWidget {
           children: [
             Text(t.translation, style: label(c.accent)),
             const Spacer(),
+            IconButton(
+              tooltip: t.copy,
+              visualDensity: VisualDensity.compact,
+              icon: Icon(Icons.copy_rounded, color: c.accent, size: 20),
+              onPressed: () => copyText(context, state.text),
+            ),
             if (settings.ttsEnabled && tts.hasHindi && state.hindi != null)
               IconButton(
                 visualDensity: VisualDensity.compact,

@@ -49,11 +49,14 @@ List<Widget> tooltipOverlays({
 /// pass null. A reader that never shows the bar (the PDF reader, which
 /// highlights from the translation card) leaves the bar callbacks null.
 class HighlightActions {
-  const HighlightActions({this.onColor, this.onRemove, this.onTranslate, this.onSentenceColor});
+  const HighlightActions({this.onColor, this.onRemove, this.onTranslate, this.onSentenceColor, this.onCopied});
 
   final void Function(HighlightBarState s, HighlightColor color)? onColor;
   final void Function(HighlightBarState s)? onRemove;
   final void Function(HighlightBarState s)? onTranslate;
+
+  /// The bar's copy button ran; the reader lets go of the selection.
+  final void Function(HighlightBarState s)? onCopied;
 
   /// Highlight the sentence a translation card is showing, when the reader
   /// knows where that sentence is.
@@ -132,6 +135,11 @@ class TooltipFollower extends StatelessWidget {
         ),
       HighlightBarState() => HighlightBar(
           selected: t.existing?.color,
+          text: t.text,
+          onCopy: () async {
+            await copyText(context, t.text);
+            actions?.onCopied?.call(t);
+          },
           onColor: (color) => actions!.onColor!(t, color),
           onTranslate: () => actions!.onTranslate?.call(t),
           onRemove: t.existing == null ? null : () => actions!.onRemove?.call(t),
