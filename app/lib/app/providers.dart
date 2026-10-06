@@ -131,6 +131,7 @@ class LibraryNotifier extends AsyncNotifier<List<Book>> {
 
   Future<Book> add({required String title, required String path, BookKind kind = BookKind.pdf}) async {
     final book = await ref.read(localStoreProvider).addBook(title: title, path: path, kind: kind);
+    ref.read(analyticsProvider).track('Book Added', {'format': kind.name});
     ref.invalidateSelf();
     return book;
   }
@@ -229,6 +230,7 @@ class CardsService {
       block: block,
       location: location,
     );
+    _ref.read(analyticsProvider).track('Card Created', {'kind': kind.name, 'from_book': bookId != null});
     _changed();
     return card;
   }
@@ -246,6 +248,7 @@ class CardsService {
   /// A community deck, copied into this reader's cards.
   Future<int> saveDeck({required String bookTitle, required String? bookKey, required List<({CardKind kind, String front, String back, String note, String? location})> cards}) async {
     final n = await _store.saveDeckCards(bookTitle: bookTitle, bookKey: bookKey, cards: cards);
+    _ref.read(analyticsProvider).track('Deck Saved', {'cards': n});
     _changed();
     return n;
   }

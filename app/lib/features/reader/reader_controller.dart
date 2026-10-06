@@ -197,6 +197,7 @@ class ReaderController extends AutoDisposeNotifier<ReaderTooltip?> {
     );
 
     final outcome = await _repo.lookupAt(tokens, index);
+    _trackLookup(outcome, 'reader');
     if (gen != _generation) return;
     var s = (state! as WordTooltipState).copyWith(outcome: outcome);
     if (outcome is LookupFound && outcome.phrase != null) {
@@ -222,7 +223,7 @@ class ReaderController extends AutoDisposeNotifier<ReaderTooltip?> {
           return;
         }
         // Signed out or out of allowance: say so rather than ask the server.
-        final blocked = _blockedCode();
+        final blocked = _blockedCode('word');
         if (blocked != null) {
           state = s.copyWith(contextErrorCode: blocked);
           return;
@@ -241,7 +242,7 @@ class ReaderController extends AutoDisposeNotifier<ReaderTooltip?> {
   void explainInContext() {
     final s = state;
     if (s is! WordTooltipState || s.outcome is! LookupFound) return;
-    final blocked = _blockedCode();
+    final blocked = _blockedCode('word');
     if (blocked != null) {
       state = s.copyWith(contextOffered: false, contextErrorCode: blocked);
       return;
@@ -251,6 +252,7 @@ class ReaderController extends AutoDisposeNotifier<ReaderTooltip?> {
   }
 
   Future<void> _resolveContext(int gen, String lemma, String sentence) async {
+    ref.read(analyticsProvider).track('AI Lookup', {'kind': 'word'});
     try {
       final r = await _repo.contextFor(word: lemma, sentence: sentence);
       if (gen != _generation) return;
@@ -271,11 +273,23 @@ class ReaderController extends AutoDisposeNotifier<ReaderTooltip?> {
 
   /// `UNAUTHORIZED` / `QUOTA_EXCEEDED` when AI answers aren't available to
   /// this reader right now; null when they are.
-  String? _blockedCode() => switch (ref.read(aiAccessProvider)) {
-        AiAccess.signedOut => 'UNAUTHORIZED',
-        AiAccess.exhausted => (ref.read(usageProvider)?.phone ?? false) ? 'QUOTA_PHONE' : 'QUOTA_EXCEEDED',
-        AiAccess.open || AiAccess.allowed => null,
-      };
+  /// Tracked as an AI request turned away, of [kind] (word / sentence).
+  String? _blockedCode(String kind) {
+    final code = switch (ref.read(aiAccessProvider)) {
+      AiAccess.signedOut => 'UNAUTHORIZED',
+      AiAccess.exhausted => (ref.read(usageProvider)?.phone ?? false) ? 'QUOTA_PHONE' : 'QUOTA_EXCEEDED',
+      AiAccess.open || AiAccess.allowed => null,
+    };
+    if (code != null) ref.read(analyticsProvider).track('AI Blocked', {'kind': kind, 'reason': code});
+    return code;
+  }
+
+  void _trackLookup(LookupOutcome outcome, String from) => ref.read(analyticsProvider).track('Word Looked Up', {
+        'from': from,
+        'found': outcome is LookupFound,
+        if (outcome is LookupFound) 'source': outcome.source.name,
+        if (outcome is LookupFound) 'phrase': outcome.phrase != null,
+      });
 
   /// The server says the allowance ran out (another device used it, say):
   /// refetch the account so every screen shows the real count.
@@ -305,12 +319,13 @@ class ReaderController extends AutoDisposeNotifier<ReaderTooltip?> {
   }) {
     final gen = ++_generation;
     unawaited(_translation?.cancel());
-    final blocked = _blockedCode();
+    final blocked = _blockedCode('sentence');
     if (blocked != null) {
       state = SentenceTooltipState(anchor: anchor, page: page, text: text, error: '', errorCode: blocked, done: true);
       return;
     }
     state = SentenceTooltipState(anchor: anchor, page: page, text: text);
+    ref.read(analyticsProvider).track('AI Lookup', {'kind': 'sentence'});
     _translation = _repo.translate(text: text, context: context).listen(
       (ev) {
         if (gen != _generation) return;

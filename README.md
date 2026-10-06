@@ -234,6 +234,31 @@ runs first where the law requires it; content is capped at PG. Without configura
   `ios/Flutter/Firebase.xcconfig` (overrides the test id in `AdMob.xcconfig`).
 - Play Console: declare that the app contains ads; App Store: the privacy label.
 
+## Analytics
+
+Mixpanel (`app/lib/data/analytics.dart`). Never book titles, words or sentences. Events:
+
+| Event | Properties |
+|---|---|
+| `Screen Viewed` | `screen` (route pattern, e.g. `/word/:lemma`) |
+| `Book Added` / `Book Opened` | `format` (pdf, epub, scan) |
+| `Word Looked Up` | `from` (reader, dictionary), `found`, `source` (local, api), `phrase` |
+| `AI Lookup` | `kind` (word, sentence) |
+| `AI Blocked` | `kind`, `reason` (UNAUTHORIZED, QUOTA_EXCEEDED, QUOTA_PHONE) |
+| `Card Created` | `kind`, `from_book` |
+| `Deck Saved` | `cards` |
+| `Plan Purchase` | `plan`, `yearly`, `outcome` |
+
+Every event carries `plan` and `language`. Signed-in readers are identified by Firebase uid.
+Readers can opt out in Settings → Share usage stats. The project token is built in; debug builds
+send nothing unless `--dart-define=MIXPANEL_DEBUG=true`. Data residency:
+`--dart-define=MIXPANEL_SERVER_URL=https://api-eu.mixpanel.com` (or `api-in`).
+
+- Play Console → Data safety, for **Analytics** (collected, not shared, optional, not ephemeral):
+  *Personal info → User IDs*, *Financial info → Purchase history*, *App activity → App
+  interactions*, *Device or other IDs*. Where a type is already declared (e.g. User IDs for
+  accounts), add the Analytics purpose to it.
+
 ## Push notifications
 
 Firebase Cloud Messaging. What sends one (`api/src/push/notify.ts`), each in the phone's own

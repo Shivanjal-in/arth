@@ -386,6 +386,11 @@ enum AppStrings {
         'Sign in to turn on AI lookup. Your first 100 AI answers are free.',
         'AI अर्थ चालू करने के लिए साइन इन करें। पहले 100 AI जवाब मुफ़्त हैं।',
       );
+  String get usageStats => _('Share usage stats', 'उपयोग के आँकड़े भेजें');
+  String get usageStatsHelp => _(
+        'Which screens and features you use, to help us improve Arth. Never your books or the words you look up.',
+        'आप कौन-सी स्क्रीन और सुविधाएँ इस्तेमाल करते हैं, ताकि हम Arth बेहतर बना सकें। आपकी किताबें या खोजे गए शब्द कभी नहीं।',
+      );
   String get continueReading => _('Continue reading', 'पढ़ना जारी रखें');
   // ---- vocabulary ----
   String get vocabulary => _('Vocabulary', 'शब्द भंडार');
@@ -555,7 +560,7 @@ enum AppStrings {
   String get sortRecent => _('Recent', 'नए');
   String get sortPopular => _('Popular', 'लोकप्रिय');
   String get communityEmpty => _('No recaps yet. When readers share their cards for a book, they appear here.', 'अभी कोई सार नहीं। जब पाठक किसी किताब के अपने कार्ड साझा करेंगे, वे यहाँ दिखेंगे।');
-  String get noMatches => _('No recaps for that book yet.', 'इस किताब का अभी कोई सार नहीं।');
+  String get communityNoMatches => _('No recaps for that book yet.', 'इस किताब का अभी कोई सार नहीं।');
   String byAuthor(String name) => _('by $name', '$name का');
   String likesCount(int n) => _(n == 1 ? '1 like' : '$n likes', '$n पसंद');
   String savesCount(int n) => _(n == 1 ? '1 save' : '$n saves', '$n ने सहेजा');

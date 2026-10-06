@@ -8,7 +8,7 @@ import type { FastifyPluginAsync } from 'fastify';
 
 const CONTACT = 'ekansha13@gmail.com';
 const OPERATOR = 'Akshat Jaiswal (Zethyst)';
-const UPDATED = '3 October 2026';
+const UPDATED = '7 October 2026';
 
 function page(title: string, body: string): string {
   return `<!doctype html>
@@ -59,6 +59,7 @@ const privacy = page(
   <li><strong>Community</strong> (Pro and Super): recaps you publish, comments, likes, saves and reports. Recaps and comments are shown to other members with your name, photo and plan.</li>
   <li><strong>Notifications</strong>: a notification token for each phone you sign in on, and its language, to send you replies, plan changes and reminders. Review reminders are scheduled on your phone.</li>
   <li><strong>Purchases</strong>: if you buy Pro or Super, the app store handles payment; we receive which plan you have and when it renews or ends, through RevenueCat. We never see your card or UPI details.</li>
+  <li><strong>How the app is used</strong>: which screens you open and a few actions (like buying a plan), with your plan, interface language, phone model and app version, through Mixpanel. This tells us which features help readers. It never includes your books, the words or sentences you look up, or your name, email or phone number; if you’re signed in, it carries your account’s ID number. We don’t use your advertising identifier for it, and Mixpanel doesn’t keep your IP address for it. You can turn it off in Arth’s settings (Share usage stats).</li>
   <li><strong>Technical logs</strong>: requests to our server (which feature, when, whether it worked) for a short time, to keep the service running and secure.</li>
 </ul>
 
@@ -74,6 +75,7 @@ const privacy = page(
   <li><strong>OpenAI</strong>: produces AI answers from the words and sentences you ask about. It isn’t told who you are.</li>
   <li><strong>Open Library</strong> (Internet Archive): finds book covers from a title. It isn’t told who you are, and your phone then downloads the cover image from it.</li>
   <li><strong>Cloudinary</strong>: stores profile photos you upload.</li>
+  <li><strong>Mixpanel</strong>: usage analytics (which screens and features are used). It isn’t told your name, email or phone number.</li>
   <li><strong>Google AdMob</strong>: ads, for readers without a paid plan.</li>
   <li><strong>RevenueCat, Google Play and the App Store</strong>: subscriptions.</li>
 </ul>
@@ -88,6 +90,7 @@ const privacy = page(
   <li>Delete your account in the app (You → Profile → Delete account), or see <a href="/legal/delete-account">how to delete it without the app</a>. Deleting your account doesn’t cancel a subscription; cancel that in Google Play or the App Store.</li>
   <li>See, correct or download your data: write to <a href="mailto:${CONTACT}">${CONTACT}</a>.</li>
   <li>Turn off notifications or reminders in Arth’s settings or your phone’s.</li>
+  <li>Turn off usage stats in Arth’s settings.</li>
   <li>Under India’s Digital Personal Data Protection Act, 2023 you may ask to access, correct or erase your data, withdraw consent, and nominate someone to act for you. We answer within 30 days.</li>
 </ul>
 

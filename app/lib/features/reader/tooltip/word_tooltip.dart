@@ -98,6 +98,7 @@ class WordTooltip extends ConsumerWidget {
             EntryHeader(
               entry: entry,
               compact: true,
+              copyable: true,
               sentence: state.sentence,
               bookId: bookId,
               bookTitle: bookTitle,

@@ -62,6 +62,7 @@ Future<void> main() async {
   // Notifications: set up handlers now; the token is registered on sign-in.
   await container.read(localNotificationsProvider).init();
   container.read(cardRemindersProvider); // schedules, and follows card changes
+  await container.read(analyticsProvider).init(optedOut: !container.read(settingsProvider).usageStats);
   // Plans in the app stores; logs in with the account once sign-in is restored.
   await container.read(billingProvider).init();
   final push = container.read(pushServiceProvider);

@@ -82,6 +82,7 @@ class _PlansScreenState extends ConsumerState<PlansScreen> {
     }
     setState(() => _busy = true);
     final outcome = await ref.read(billingProvider).buy(offer);
+    ref.read(analyticsProvider).track('Plan Purchase', {'plan': offer.tier.name, 'yearly': offer.yearly, 'outcome': outcome.name});
     if (outcome == BuyOutcome.bought) {
       unawaited(Haptics.finish());
       await _applyPurchase();

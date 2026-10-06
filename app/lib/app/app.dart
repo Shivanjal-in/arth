@@ -34,6 +34,9 @@ class _ArthAppState extends ConsumerState<ArthApp> {
   @override
   void initState() {
     super.initState();
+    // Screen views, by route pattern (never a word or book id).
+    router.routerDelegate.addListener(_trackScreen);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _trackScreen());
     // A tapped notification opens its screen (the app may have been closed).
     final push = ref.read(pushServiceProvider);
     if (push != null) {
@@ -80,9 +83,23 @@ class _ArthAppState extends ConsumerState<ArthApp> {
 
   @override
   void dispose() {
+    router.routerDelegate.removeListener(_trackScreen);
     unawaited(_pushRoutes?.cancel());
     unawaited(_localRoutes?.cancel());
     super.dispose();
+  }
+
+  void _trackScreen() {
+    final analytics = ref.read(analyticsProvider);
+    final route = router.routerDelegate.currentConfiguration.fullPath;
+    if (!analytics.screen(route)) return;
+    final format = switch (route) {
+      '/read/:id' => 'pdf',
+      '/epub/:id' => 'epub',
+      '/scan/:id' => 'scan',
+      _ => null,
+    };
+    if (format != null) analytics.track('Book Opened', {'format': format});
   }
 
   /// Pull the entry delta quietly once a day so the on-device dictionary

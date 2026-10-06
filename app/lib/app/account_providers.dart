@@ -7,6 +7,7 @@ import 'package:arth/app/providers.dart';
 import 'package:arth/app/reminders.dart';
 import 'package:arth/app/strings.dart';
 import 'package:arth/data/account.dart';
+import 'package:arth/data/analytics.dart';
 import 'package:arth/data/api_client.dart';
 import 'package:arth/data/auth_service.dart';
 import 'package:arth/data/billing.dart';
@@ -92,6 +93,25 @@ final billingProvider = Provider<Billing>((ref) {
     if (uid != prev) unawaited(billing.identify(uid));
   }, fireImmediately: true);
   return billing;
+});
+
+/// Usage analytics (see data/analytics.dart). Follows sign-in, the plan and
+/// the interface language; initialized in main().
+final analyticsProvider = Provider<Analytics>((ref) {
+  final analytics = Analytics();
+  ref
+    ..listen(signedInUidProvider, (prev, uid) {
+      if (uid != null && uid != prev) unawaited(analytics.signedIn(uid));
+      if (uid == null && prev != null) unawaited(analytics.signedOut());
+    }, fireImmediately: true)
+    ..listen(accountProvider.select((a) => a.valueOrNull?.tier), (_, tier) {
+      analytics.describe({'plan': (tier ?? Tier.free).name});
+    }, fireImmediately: true)
+    ..listen(settingsProvider.select((s) => s.language), (_, lang) {
+      analytics.describe({'language': lang.name});
+    }, fireImmediately: true)
+    ..listen(settingsProvider.select((s) => s.usageStats), (_, on) => analytics.allow(on: on));
+  return analytics;
 });
 
 /// AI uses against the allowance: from /me, then kept current by the

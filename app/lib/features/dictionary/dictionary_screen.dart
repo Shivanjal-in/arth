@@ -3,6 +3,7 @@
 
 import 'dart:async';
 
+import 'package:arth/app/account_providers.dart';
 import 'package:arth/app/feel.dart';
 import 'package:arth/app/providers.dart';
 import 'package:arth/app/theme.dart';
@@ -76,6 +77,11 @@ class _DictionaryScreenState extends ConsumerState<DictionaryScreen> {
   Future<void> _open(String word) async {
     setState(() => _busy = true);
     final outcome = await ref.read(dictionaryRepoProvider).lookupWord(word);
+    ref.read(analyticsProvider).track('Word Looked Up', {
+      'from': 'dictionary',
+      'found': outcome is LookupFound,
+      if (outcome is LookupFound) 'source': outcome.source.name,
+    });
     if (!mounted) return;
     setState(() => _busy = false);
     switch (outcome) {

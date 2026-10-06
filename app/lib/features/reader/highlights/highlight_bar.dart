@@ -87,12 +87,14 @@ class HighlightBar extends ConsumerWidget {
       children: [
         HighlightColorDots(selected: selected, onPick: onColor),
         const Spacer(),
-        IconButton(
-          tooltip: t.copy,
-          visualDensity: VisualDensity.compact,
-          icon: Icon(Icons.copy_rounded, color: c.accent, size: 20),
-          onPressed: onCopy,
-        ),
+        // A single word's copy button is beside the speaker in its tooltip.
+        if (!isSingleWord(text))
+          IconButton(
+            tooltip: t.copy,
+            visualDensity: VisualDensity.compact,
+            icon: Icon(Icons.copy_rounded, color: c.accent, size: 20),
+            onPressed: onCopy,
+          ),
         IconButton(
           tooltip: isSingleWord(text) ? t.meaning : t.translateSentence,
           visualDensity: VisualDensity.compact,

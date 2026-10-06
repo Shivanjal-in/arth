@@ -208,7 +208,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                     Icon(Icons.diversity_3_rounded, size: 48, color: c.rule),
                     const SizedBox(height: 12),
                     Text(
-                      _search.text.trim().isEmpty ? t.communityEmpty : t.noMatches,
+                      _search.text.trim().isEmpty ? t.communityEmpty : t.communityNoMatches,
                       style: uiBody(hindi: t.isHindi, color: c.inkMuted, scale: scale),
                       textAlign: TextAlign.center,
                     ),

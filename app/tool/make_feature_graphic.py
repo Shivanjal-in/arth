@@ -68,7 +68,7 @@ def make():
     tx, ty = 70 * S, (h - tile) // 2 - 8 * S
     off = 16 * S
     d.rectangle((tx + off, ty + off, tx + tile + off, ty + tile + off), fill=SHADOW)
-    img.paste(draw_icon(tile, card=0.595).convert("RGB"), (tx, ty))
+    img.paste(draw_icon(tile).convert("RGB"), (tx, ty))
     d.rectangle((tx, ty, tx + tile, ty + tile), outline=INK, width=6 * S)
 
     rx = tx + tile + off + 52 * S

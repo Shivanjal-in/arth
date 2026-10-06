@@ -117,6 +117,12 @@ class SettingsScreen extends ConsumerWidget {
               onChanged: (v) => n.update((s) => s.copyWith(prefetch: v)),
             ),
             const CardReminderControls(),
+            SettingsSwitch(
+              title: t.usageStats,
+              subtitle: t.usageStatsHelp,
+              value: s.usageStats,
+              onChanged: (v) => n.update((s) => s.copyWith(usageStats: v)),
+            ),
 
             SettingsHeading(t.sectionDictionary),
             Text(

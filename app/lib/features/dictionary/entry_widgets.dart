@@ -9,6 +9,7 @@ import 'package:arth/app/strings.dart';
 import 'package:arth/app/theme.dart';
 import 'package:arth/core/models/contracts.dart';
 import 'package:arth/data/local_store.dart';
+import 'package:arth/features/reader/highlights/highlight_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -102,6 +103,7 @@ class EntryHeader extends ConsumerWidget {
     this.bookId,
     this.bookTitle,
     this.compact = false,
+    this.copyable = false,
   });
 
   final DictionaryEntry entry;
@@ -109,6 +111,9 @@ class EntryHeader extends ConsumerWidget {
   final int? bookId;
   final String? bookTitle;
   final bool compact;
+
+  /// A copy button beside the speaker.
+  final bool copyable;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -148,6 +153,12 @@ class EntryHeader extends ConsumerWidget {
             tooltip: t.listen,
             icon: Icon(Icons.volume_up_rounded, color: c.accent),
             onPressed: () => tts.speakEnglish(entry.word),
+          ),
+        if (copyable)
+          IconButton(
+            tooltip: t.copy,
+            icon: Icon(Icons.copy_rounded, color: c.accent),
+            onPressed: () => copyText(context, entry.word),
           ),
         SaveWordButton(entry: entry, sentence: sentence, bookId: bookId, bookTitle: bookTitle),
       ],

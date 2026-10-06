@@ -153,8 +153,12 @@ class Billing {
   Future<List<PlanOffer>?> offers() async {
     if (!_ready) return null;
     try {
-      final current = (await Purchases.getOfferings()).current;
-      if (current == null) return null;
+      final offerings = await Purchases.getOfferings();
+      final current = offerings.current;
+      if (current == null) {
+        debugPrint('billing offers: no current offering (have: ${offerings.all.keys.join(', ')})');
+        return null;
+      }
       final out = <PlanOffer>[];
       for (final (id, tier, yearly) in const [
         ('pro_yearly', Tier.pro, true),
@@ -165,6 +169,7 @@ class Billing {
         final pkg = current.getPackage(id);
         if (pkg != null) out.add(planOfferFrom(pkg.storeProduct, tier: tier, yearly: yearly, package: pkg));
       }
+      if (out.isEmpty) debugPrint('billing offers: "${current.identifier}" has none of the four packages (has: ${current.availablePackages.map((p) => p.identifier).join(', ')})');
       return out.isEmpty ? null : out;
     } on PlatformException catch (e) {
       debugPrint('billing offers failed: $e');
