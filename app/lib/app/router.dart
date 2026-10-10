@@ -17,6 +17,7 @@ import 'package:arth/features/community/published_deck_screen.dart';
 import 'package:arth/features/dictionary/dictionary_screen.dart';
 import 'package:arth/features/dictionary/word_screen.dart';
 import 'package:arth/features/epub/epub_reader_screen.dart';
+import 'package:arth/features/habit/reading_habit_screen.dart';
 import 'package:arth/features/library/library_screen.dart';
 import 'package:arth/features/plans/plans_screen.dart';
 import 'package:arth/features/reader/reader_screen.dart';
@@ -37,6 +38,7 @@ GoRouter buildRouter({required bool needsSeed}) => GoRouter(
         GoRoute(path: '/archive', builder: (_, _) => const ArchiveScreen()),
         GoRoute(path: '/signin', builder: (_, _) => const SignInScreen()),
         GoRoute(path: '/profile', builder: (_, _) => const ProfileScreen()),
+        GoRoute(path: '/habit', builder: (_, _) => const ReadingHabitScreen()),
         GoRoute(path: '/plans', builder: (_, _) => const PlansScreen()),
         GoRoute(path: '/admin', builder: (_, _) => const AdminScreen()),
         GoRoute(path: '/community/deck/:id', builder: (_, s) => PublishedDeckScreen(id: s.pathParameters['id']!)),

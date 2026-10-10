@@ -40,6 +40,7 @@ import 'package:arth/features/reader/page_text_cache.dart';
 import 'package:arth/features/reader/reader_controller.dart';
 import 'package:arth/features/reader/reader_guide.dart';
 import 'package:arth/features/reader/reader_menu.dart';
+import 'package:arth/features/reader/reading_tracking.dart';
 import 'package:arth/features/reader/search_sheet.dart';
 import 'package:arth/features/reader/tooltip/tooltip_layer.dart';
 import 'package:arth/features/settings/reading_settings_sheet.dart';
@@ -69,12 +70,18 @@ class ReaderScreen extends ConsumerStatefulWidget {
   ConsumerState<ReaderScreen> createState() => _ReaderScreenState();
 }
 
-class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose {
+class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose, ReadingTracking {
+  @override
+  int get trackedBookId => widget.book.id;
+
   final _controller = PdfViewerController();
   final _pager = BookPagerController();
   final _link = LayerLink();
   final _portal = OverlayPortalController();
-  final GlobalKey _viewerKey = GlobalKey();
+  GlobalKey _viewerKey = GlobalKey();
+
+  /// Which mode the viewer on screen was built for; a change builds a new one.
+  late bool _modeShown = ref.read(settingsProvider).bookPages;
   PageTextCache? _cache;
   Timer? _selectionDebounce;
   bool _selectionHaptic = false;
@@ -106,6 +113,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
     super.initState();
     _controller.addListener(_onViewerChanged);
     _registerDevHooks();
+    unawaited(_loadZoom());
   }
 
   @override
@@ -257,6 +265,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
 
   Future<void> _highlightFromBar(HighlightBarState s, HighlightColor color) => _saveSelectionHighlight(color);
 
+  /// Reading mode (page turns) ⇄ scrolling mode (an ordinary PDF reader).
+  Future<void> _toggleMode() async {
+    ref.read(readerControllerProvider.notifier).dismiss();
+    unawaited(_controller.textSelectionDelegate.clearTextSelection());
+    Haptics.choose();
+    await ref.read(settingsProvider.notifier).update((s) => s.copyWith(bookPages: !s.bookPages));
+  }
+
   Future<void> _showSearch() async {
     final cache = _cache;
     if (cache == null || !_controller.isReady) return;
@@ -384,7 +400,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
   }
 
   /// Pages are read one at a time and turned with a curl.
-  bool get _bookMode => kBookPages;
+  bool get _bookMode => _modeShown;
 
   /// A tap in the margin beside the text turns the page.
   bool _turnFromEdge(Offset docPos) {
@@ -409,6 +425,31 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
   final Map<int, Rect?> _textBoxes = {};
   ({double width, double centerX})? _bookRef;
   bool _bookViewSet = false;
+
+  /// The reader's own zoom, on top of the zoom that fits the text to the
+  /// screen. Kept across pages, rotation and sessions until zoomed out.
+  static const _zoomSteps = [1.0, 1.25, 1.5, 2.0, 2.5, 3.0];
+  static const _zoomKey = 'reader_zoom';
+  double _userZoom = 1;
+
+  Future<void> _loadZoom() async {
+    final saved = double.tryParse(await ref.read(localStoreProvider).get(_zoomKey) ?? '');
+    if (!mounted || saved == null || saved <= 1 || !_zoomSteps.contains(saved)) return;
+    setState(() => _userZoom = saved);
+    if (_page != null) unawaited(_applyBookView(_page!));
+  }
+
+  void _stepZoom({required bool inward}) {
+    final i = _zoomSteps.indexOf(_userZoom);
+    final next = _zoomSteps[(i + (inward ? 1 : -1)).clamp(0, _zoomSteps.length - 1)];
+    if (next == _userZoom) return;
+    Haptics.choose();
+    ref.read(readerControllerProvider.notifier).dismiss();
+    unawaited(_controller.textSelectionDelegate.clearTextSelection());
+    setState(() => _userZoom = next);
+    unawaited(ref.read(localStoreProvider).set(_zoomKey, next == 1 ? null : '$next'));
+    if (_page != null) unawaited(_applyBookView(_page!));
+  }
 
   /// White → paper, black → ink, in both themes.
   ColorFilter _paperFilter(ArthColors c) {
@@ -493,14 +534,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
     final box = await _textBoxOf(page, wait: wait);
     final ref = await _bookRefOf();
     if (box == null || ref == null) {
-      final zoom = math.min(view.width / pdfPage.width, view.height / pdfPage.height);
+      final zoom = math.min(view.width / pdfPage.width, view.height / pdfPage.height) * _userZoom;
       return (zoom: zoom, center: Offset(pdfPage.width / 2, pdfPage.height / 2));
     }
     const side = 20.0; // logical px kept clear either side of the text
     const top = 16.0;
     final byColumn = (view.width - 2 * side) / ref.width;
     final byThisPage = math.min((view.width - 2 * side) / box.width, (view.height - top - 12) / box.height);
-    final zoom = math.min(byColumn, byThisPage);
+    final zoom = math.min(byColumn, byThisPage) * _userZoom;
     final half = view.width / (2 * zoom);
     final low = box.right + side / zoom - half;
     final high = box.left - side / zoom + half;
@@ -926,7 +967,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
       unawaited(_resolveHighlightRects(highlights, _page ?? 1));
     }
     final brightness = Theme.of(context).brightness;
-    const bookMode = kBookPages;
+    final bookMode = ref.watch(settingsProvider.select((s) => s.bookPages));
+    if (bookMode != _modeShown) {
+      // Reading mode and scrolling mode lay the pages out differently: start a
+      // fresh viewer on the page the reader is on.
+      _modeShown = bookMode;
+      _viewerKey = GlobalKey();
+      _cache = null;
+      _bookViewSet = false;
+      _textBoxes.clear();
+      _bookRef = null;
+      _settleGeneration++;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -955,6 +1007,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
             tooltip: t.readingSettings,
             onPressed: () => showReadingSettingsSheet(context),
           ),
+          const AiLookupButton(),
           ReaderMoreMenu(
             onWords: () => context.push(Uri(path: '/vocabulary', queryParameters: {'book': '${widget.book.id}', 'title': widget.book.title}).toString()),
             onHighlights: _showHighlights,
@@ -965,6 +1018,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
             ),
             onNote: () => unawaited(_makeCard(const CardDraft(kind: CardKind.idea))),
             onCards: () => context.push(deckRoute((bookId: widget.book.id, bookTitle: widget.book.title))),
+            onToggleMode: () => unawaited(_toggleMode()),
           ),
         ],
       ),
@@ -980,7 +1034,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
             paper: c.paper,
             snapshot: ({required next, required size}) => _snapshotPage((_page ?? 1) + (next ? 1 : -1), size),
             onTurn: ({required next}) => _showTurnedPage((_page ?? 1) + (next ? 1 : -1)),
-            canStart: () => !_controller.textSelectionDelegate.hasSelectedText,
+            // Zoomed in, a drag pans the page; zoom out to turn it by swiping.
+            canStart: () => _userZoom == 1 && !_controller.textSelectionDelegate.hasSelectedText,
             child: _BookFilter(
               enabled: bookMode,
               filter: _paperFilter(c),
@@ -989,7 +1044,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
                 widget.filePath,
                 key: _viewerKey,
                 controller: _controller,
-                initialPageNumber: widget.initialPage ?? widget.book.lastPage,
+                initialPageNumber: _page ?? widget.initialPage ?? widget.book.lastPage,
                 params: PdfViewerParams(
                   // Book mode: a page's text fills the view and the pager turns it,
                   // so the viewer neither pans nor zooms by itself. White pages
@@ -1001,7 +1056,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
                   layoutPages: bookMode ? _bookLayout : null,
                   sizeDelegateProvider: bookMode ? const PdfViewerSizeDelegateProviderLegacy(calculateInitialZoom: _fitPage) : null,
                   pageDropShadow: bookMode ? null : const BoxShadow(color: Colors.black54, blurRadius: 4, spreadRadius: 2, offset: Offset(2, 2)),
-                  panEnabled: !bookMode,
+                  panEnabled: !bookMode || _userZoom > 1,
                   scaleEnabled: !bookMode,
                   // Native scrolling (pdfrx's default flings stop short), with
                   // hard flicks carried further.
@@ -1031,11 +1086,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
                       ref.read(libraryProvider.notifier).touch(widget.book.id, pageCount: doc.pages.length),
                     );
                     setState(() => _page = controller.pageNumber);
+                    if (controller.pageNumber != null) trackPage(controller.pageNumber!);
                     unawaited(_prefetch(controller.pageNumber ?? 1));
                   },
                   onPageChanged: (p) {
                     if (p == null) return;
                     setState(() => _page = p);
+                    trackPage(p);
                     unawaited(_reportProgress(p));
                     unawaited(_prefetch(p));
                     unawaited(_resolveHighlightRects(_highlightsSeen, p));
@@ -1060,6 +1117,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
           ),
             ),
           ),
+          if (bookMode && _page != null)
+            Positioned(
+              right: 12,
+              bottom: 16 + MediaQuery.paddingOf(context).bottom,
+              child: _ZoomControls(
+                zoom: _userZoom,
+                canIn: _userZoom < _zoomSteps.last,
+                canOut: _userZoom > 1,
+                onIn: () => _stepZoom(inward: true),
+                onOut: () => _stepZoom(inward: false),
+              ),
+            ),
           OverlayPortal(
             controller: _portal,
             overlayChildBuilder: (ctx) => TooltipFollower(
@@ -1111,6 +1180,46 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with AdBreakOnClose
     }
     _portal.show();
     ref.read(readerControllerProvider.notifier).showSentence(text: s.text, anchor: s.anchor, page: s.page);
+  }
+}
+
+/// Zoom in / out, floating over the page; the level shows between them.
+class _ZoomControls extends ConsumerWidget {
+  const _ZoomControls({required this.zoom, required this.canIn, required this.canOut, required this.onIn, required this.onOut});
+
+  final double zoom;
+  final bool canIn;
+  final bool canOut;
+  final VoidCallback onIn;
+  final VoidCallback onOut;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    final t = ref.watch(stringsProvider);
+    return Material(
+      color: c.card,
+      elevation: 2,
+      borderRadius: BorderRadius.circular(24),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            tooltip: t.zoomOut,
+            icon: const Icon(Icons.remove_rounded),
+            color: c.accent,
+            onPressed: canOut ? onOut : null,
+          ),
+          if (zoom > 1) Text('${(zoom * 100).round()}%', style: EnglishText.label(c.ink, size: 12)),
+          IconButton(
+            tooltip: t.zoomIn,
+            icon: const Icon(Icons.add_rounded),
+            color: c.accent,
+            onPressed: canIn ? onIn : null,
+          ),
+        ],
+      ),
+    );
   }
 }
 

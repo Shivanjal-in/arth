@@ -9,6 +9,8 @@
 import 'dart:convert';
 
 import 'package:arth/core/models/contracts.dart';
+import 'package:arth/core/reading_stats.dart';
+import 'package:arth/core/reading_tracker.dart';
 import 'package:arth/core/uuid.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -370,7 +372,7 @@ class Bookmark {
 class LocalStore {
   LocalStore._(this._db);
 
-  static const _schemaVersion = 9;
+  static const _schemaVersion = 10;
 
   final Database _db;
 
@@ -438,6 +440,7 @@ class LocalStore {
               await db.execute('DROP TABLE saved_words_v8');
             }
           }
+          if (from < 10) await _createReadingLog(db);
         },
       ),
     );
@@ -487,6 +490,7 @@ class LocalStore {
       )''');
     await db.execute('CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT)');
     await _createHighlights(db);
+    await _createReadingLog(db);
     await _createVocabulary(db);
     await _createCardsAndBookmarks(db);
   }
@@ -553,6 +557,29 @@ class LocalStore {
   }
   /// Every word looked up while reading, once per book: when it was first
   /// and last looked up there, and how often.
+  /// How long each page took to read, and the sessions they came in.
+  static Future<void> _createReadingLog(Database db) async {
+    await db.execute('''
+      CREATE TABLE reading_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id INTEGER NOT NULL,
+        started_at INTEGER NOT NULL,
+        ended_at INTEGER NOT NULL,
+        active_ms INTEGER NOT NULL
+      )''');
+    await db.execute('''
+      CREATE TABLE page_reads (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER NOT NULL,
+        book_id INTEGER NOT NULL,
+        page_key INTEGER NOT NULL,
+        read_ms INTEGER NOT NULL,
+        at INTEGER NOT NULL
+      )''');
+    await db.execute('CREATE INDEX page_reads_book ON page_reads(book_id)');
+    await db.execute('CREATE INDEX page_reads_at ON page_reads(at)');
+  }
+
   static Future<void> _createSavedWords(Database db) async {
     await db.execute('''
       CREATE TABLE saved_words (
@@ -1290,6 +1317,74 @@ class LocalStore {
       );
 
   Future<void> removeRecentLookup(String word) => _db.delete('recent_lookups', where: 'word = ?', whereArgs: [word]);
+
+  // ---- reading habit ----
+
+  Future<void> saveReadingSession(ReadingSession session) => _db.transaction((txn) async {
+        final id = await txn.insert('reading_sessions', {
+          'book_id': session.bookId,
+          'started_at': session.startedAt.millisecondsSinceEpoch,
+          'ended_at': session.endedAt.millisecondsSinceEpoch,
+          'active_ms': session.activeMs,
+        });
+        final batch = txn.batch();
+        for (final p in session.pages) {
+          batch.insert('page_reads', {
+            'session_id': id,
+            'book_id': session.bookId,
+            'page_key': p.key,
+            'read_ms': p.ms,
+            'at': p.at.millisecondsSinceEpoch,
+          });
+        }
+        await batch.commit(noResult: true);
+      });
+
+  /// Everything the habit screen shows.
+  Future<ReadingStats> readingStats({DateTime? now}) async {
+    final days = await _db.rawQuery(
+      "SELECT date(at / 1000, 'unixepoch', 'localtime') AS d, SUM(read_ms) AS ms FROM page_reads GROUP BY d",
+    );
+    final hours = await _db.rawQuery(
+      "SELECT CAST(strftime('%H', at / 1000, 'unixepoch', 'localtime') AS INTEGER) AS h, SUM(read_ms) AS ms FROM page_reads GROUP BY h",
+    );
+    final books = await _db.rawQuery('''
+      SELECT b.id, b.title, b.progress, b.finished_at,
+        MIN(p.at) AS first_at, MAX(p.at) AS last_at, SUM(p.read_ms) AS ms,
+        COUNT(DISTINCT p.page_key) AS pages, AVG(p.read_ms) AS avg_ms,
+        COUNT(DISTINCT date(p.at / 1000, 'unixepoch', 'localtime')) AS days
+      FROM page_reads p JOIN books b ON b.id = p.book_id
+      GROUP BY b.id ORDER BY last_at DESC''');
+    final dayMs = <DateTime, int>{};
+    for (final r in days) {
+      final d = DateTime.parse('${r['d']}');
+      dayMs[DateTime(d.year, d.month, d.day)] = (r['ms']! as num).toInt();
+    }
+    final hourMs = List<int>.filled(24, 0);
+    for (final r in hours) {
+      hourMs[(r['h']! as num).toInt().clamp(0, 23)] = (r['ms']! as num).toInt();
+    }
+    return ReadingStats.build(
+      dayMs: dayMs,
+      hourMs: hourMs,
+      now: now ?? DateTime.now(),
+      books: [
+        for (final r in books)
+          BookPace(
+            bookId: r['id']! as int,
+            title: r['title']! as String,
+            activeMs: (r['ms']! as num).toInt(),
+            pagesRead: (r['pages']! as num).toInt(),
+            avgPageMs: (r['avg_ms']! as num).round(),
+            firstAt: DateTime.fromMillisecondsSinceEpoch((r['first_at']! as num).toInt()),
+            lastAt: DateTime.fromMillisecondsSinceEpoch((r['last_at']! as num).toInt()),
+            readingDays: (r['days']! as num).toInt(),
+            progress: (r['progress'] as num?)?.toDouble(),
+            finishedAt: r['finished_at'] == null ? null : DateTime.fromMillisecondsSinceEpoch(r['finished_at']! as int),
+          ),
+      ],
+    );
+  }
 
   // ---- vocabulary ----
   // The vocabulary is the saved words: every save lands here by itself.

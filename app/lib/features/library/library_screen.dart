@@ -164,6 +164,11 @@ class LibraryScreen extends ConsumerWidget {
         toolbarHeight: 64,
         actions: [
           IconButton(
+            tooltip: t.readingHabit,
+            icon: const Icon(Icons.local_fire_department_outlined),
+            onPressed: () => context.push('/habit'),
+          ),
+          IconButton(
             tooltip: t.archive,
             icon: const Icon(Icons.archive_outlined),
             onPressed: () => context.push('/archive'),

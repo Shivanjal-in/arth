@@ -41,6 +41,7 @@ import 'package:arth/features/reader/highlights/highlights_sheet.dart';
 import 'package:arth/features/reader/reader_controller.dart';
 import 'package:arth/features/reader/reader_guide.dart';
 import 'package:arth/features/reader/reader_menu.dart';
+import 'package:arth/features/reader/reading_tracking.dart';
 import 'package:arth/features/reader/search_sheet.dart';
 import 'package:arth/features/reader/tooltip/tooltip_layer.dart';
 import 'package:arth/features/settings/reading_settings_sheet.dart';
@@ -74,7 +75,10 @@ typedef _WordRange = ({_BlockRef at, int start, int end});
 
 const _pagePadding = EdgeInsets.fromLTRB(22, 20, 22, 120);
 
-class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBreakOnClose {
+class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBreakOnClose, ReadingTracking {
+  @override
+  int get trackedBookId => widget.book.id;
+
   final _link = LayerLink();
   final _portal = OverlayPortalController();
   ReflowBook? _epub;
@@ -252,7 +256,7 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
   /// The area a page's text fills (the body less the space above and below).
   Size _viewport = Size.zero;
 
-  bool get _bookMode => kBookPages;
+  bool get _bookMode => ref.read(settingsProvider).bookPages;
 
   /// Throws away the pages if the size or text scale they were cut for changed.
   void _syncPagingKey(Size viewport, TextScaler scaler) {
@@ -790,6 +794,19 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
     if (mounted) _dismiss();
   }
 
+  /// Reading mode (page turns) ⇄ scrolling mode, staying at the same place.
+  Future<void> _toggleMode() async {
+    _updateVisible();
+    final chapter = _chapter;
+    final block = _visible?.first;
+    _dismiss();
+    Haptics.choose();
+    await ref.read(settingsProvider.notifier).update((s) => s.copyWith(bookPages: !s.bookPages));
+    // Let the other layout be built, then go back to where the reader was.
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+    if (mounted) _jumpTo(chapter, block);
+  }
+
   Future<void> _showSearch() async {
     final epub = _epub;
     if (epub == null) return;
@@ -892,7 +909,9 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
       });
     }
     final epub = _epub;
-    const bookMode = kBookPages;
+    final bookMode = ref.watch(settingsProvider.select((s) => s.bookPages));
+    // A page for the habit log: a chapter's page when paged, else the chapter.
+    if (epub != null) trackPage(bookMode ? _chapter * 100000 + _bookPage : _chapter);
 
     return Scaffold(
       appBar: AppBar(
@@ -922,6 +941,7 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
             tooltip: t.readingSettings,
             onPressed: () => showReadingSettingsSheet(context),
           ),
+          const AiLookupButton(),
           ReaderMoreMenu(
             onWords: () => context.push(Uri(path: '/vocabulary', queryParameters: {'book': '${widget.book.id}', 'title': widget.book.title}).toString()),
             onHighlights: epub == null ? null : _showHighlights,
@@ -930,6 +950,7 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> with AdBrea
                 : () => showBookmarksSheet(context, bookId: widget.book.id, onJump: (b) => _jumpTo(b.page - 1, b.block)),
             onNote: () => unawaited(_makeCard(const CardDraft(kind: CardKind.idea))),
             onCards: () => context.push(deckRoute((bookId: widget.book.id, bookTitle: widget.book.title))),
+            onToggleMode: epub == null ? null : () => unawaited(_toggleMode()),
           ),
         ],
       ),

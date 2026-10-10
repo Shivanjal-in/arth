@@ -26,6 +26,7 @@ class Settings {
     this.cardReminders = true,
     this.reminderHours = defaultReminderHours,
     this.cardFont = CardFont.montserrat,
+    this.bookPages = true,
     this.usageStats = true,
   });
 
@@ -58,6 +59,10 @@ class Settings {
 
   final CardFont cardFont;
 
+  /// Reading mode: books show a page at a time with a page-turn curl. Off,
+  /// scrolling mode: a book scrolls like an ordinary PDF reader.
+  final bool bookPages;
+
   /// Share anonymous usage stats (see data/analytics.dart).
   final bool usageStats;
 
@@ -79,6 +84,7 @@ class Settings {
     bool? cardReminders,
     List<int>? reminderHours,
     CardFont? cardFont,
+    bool? bookPages,
     bool? usageStats,
   }) =>
       Settings(
@@ -93,6 +99,7 @@ class Settings {
         cardReminders: cardReminders ?? this.cardReminders,
         reminderHours: reminderHours ?? this.reminderHours,
         cardFont: cardFont ?? this.cardFont,
+        bookPages: bookPages ?? this.bookPages,
         usageStats: usageStats ?? this.usageStats,
       );
 
@@ -110,6 +117,7 @@ class Settings {
         cardReminders: (await store.get('card_reminders') ?? 'true') == 'true',
         reminderHours: _hours(await store.get('reminder_hours')),
         cardFont: CardFont.values.asNameMap()[await store.get('card_font')] ?? CardFont.montserrat,
+        bookPages: (await store.get('book_pages') ?? 'true') == 'true',
         usageStats: (await store.get('usage_stats') ?? 'true') == 'true',
       );
 
@@ -130,6 +138,7 @@ class Settings {
     await store.set('card_reminders', cardReminders.toString());
     await store.set('reminder_hours', reminderHours.join(','));
     await store.set('card_font', cardFont.name);
+    await store.set('book_pages', bookPages.toString());
     await store.set('usage_stats', usageStats.toString());
   }
 }

@@ -45,10 +45,32 @@ class BookmarkButton extends ConsumerWidget {
   }
 }
 
-enum _MenuItem { highlights, bookmarks, note, cards, words, aiLookup }
+/// AI lookup on/off, right in the reader's app bar. Lit when on.
+class AiLookupButton extends ConsumerWidget {
+  const AiLookupButton({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    final t = ref.watch(stringsProvider);
+    final on = ref.watch(settingsProvider.select((s) => s.aiLookup));
+    return IconButton(
+      tooltip: t.aiLookup,
+      isSelected: on,
+      icon: Icon(Icons.auto_awesome_outlined, color: c.inkMuted),
+      selectedIcon: Icon(Icons.auto_awesome_rounded, color: c.accent),
+      onPressed: () {
+        Haptics.choose();
+        unawaited(setAiLookup(context, ref, on: !on));
+      },
+    );
+  }
+}
+
+enum _MenuItem { highlights, bookmarks, note, cards, words, mode }
 
 class ReaderMoreMenu extends ConsumerWidget {
-  const ReaderMoreMenu({required this.onNote, required this.onCards, super.key, this.onHighlights, this.onBookmarks, this.onWords});
+  const ReaderMoreMenu({required this.onNote, required this.onCards, super.key, this.onHighlights, this.onBookmarks, this.onWords, this.onToggleMode});
 
   final VoidCallback? onHighlights;
   final VoidCallback? onBookmarks;
@@ -58,13 +80,16 @@ class ReaderMoreMenu extends ConsumerWidget {
   /// The words looked up in this book (vocabulary).
   final VoidCallback? onWords;
 
+  /// Switch between reading mode (page turns) and scrolling mode; null where
+  /// a reader has only one.
+  final VoidCallback? onToggleMode;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
     final t = ref.watch(stringsProvider);
     final settings = ref.watch(settingsProvider);
     final scale = settings.hindiScale;
-    final ai = settings.aiLookup;
     PopupMenuItem<_MenuItem> item(_MenuItem value, IconData icon, String label, {bool checked = false}) => PopupMenuItem(
           value: value,
           child: Row(
@@ -95,18 +120,20 @@ class ReaderMoreMenu extends ConsumerWidget {
             onCards();
           case _MenuItem.words:
             onWords?.call();
-          case _MenuItem.aiLookup:
-            unawaited(setAiLookup(context, ref, on: !ai));
+          case _MenuItem.mode:
+            onToggleMode?.call();
         }
       },
       itemBuilder: (_) => [
+        if (onToggleMode != null)
+          settings.bookPages
+              ? item(_MenuItem.mode, Icons.swap_vert_rounded, t.scrollingMode)
+              : item(_MenuItem.mode, Icons.auto_stories_outlined, t.readingMode),
         item(_MenuItem.note, Icons.edit_note_rounded, t.addNote),
         item(_MenuItem.cards, Icons.style_outlined, t.cardsForBook),
         if (onWords != null) item(_MenuItem.words, Icons.spellcheck_rounded, t.wordsFromBook),
         if (onBookmarks != null) item(_MenuItem.bookmarks, Icons.bookmarks_outlined, t.bookmarks),
         if (onHighlights != null) item(_MenuItem.highlights, Icons.border_color_outlined, t.highlights),
-        const PopupMenuDivider(),
-        item(_MenuItem.aiLookup, Icons.auto_awesome_outlined, t.aiLookup, checked: ai),
       ],
     );
   }

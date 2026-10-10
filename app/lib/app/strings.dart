@@ -266,6 +266,35 @@ enum AppStrings {
       );
   String get notFound => _('Not in the dictionary.', 'यह शब्द शब्दकोश में नहीं मिला।');
   String get lookingUp => _('Looking this up…', 'अर्थ ढूँढ रहे हैं…');
+  // ---- reading habit ----
+  String get readingHabit => _('Reading habit', 'पढ़ने की आदत');
+  String get readToday => _('Read today', 'आज पढ़ा');
+  String ofGoal(int min) => _('of your $min min goal', '$min मिनट के लक्ष्य में से');
+  String dayStreak(int n) => _(n == 1 ? '1 day streak' : '$n day streak', n == 1 ? '1 दिन लगातार' : '$n दिन लगातार');
+  String bestStreak(int n) => _('Best: $n days', 'सबसे लंबा: $n दिन');
+  String get dailyGoal => _('Daily goal', 'रोज़ का लक्ष्य');
+  String get minShort => _('min', 'मिनट');
+  String get thisWeek => _('This week', 'इस हफ़्ते');
+  String get perPage => _('per page', 'हर पन्ने पर');
+  String get totalReading => _('reading time', 'पढ़ने का समय');
+  String get pagesRead => _('pages read', 'पन्ने पढ़े');
+  String get yourBooks => _('Your books', 'आपकी किताबें');
+  String get habitEmpty => _(
+        'Open a book and read for a few seconds. Your pace per page, and how long each book takes, will show up here.',
+        'कोई किताब खोलकर कुछ देर पढ़ें। हर पन्ने पर आपकी रफ़्तार और किताब पूरी होने का समय यहाँ दिखेगा।',
+      );
+  String get tipGoalMet => _('Goal met today. Well done!', 'आज का लक्ष्य पूरा हुआ। शाबाश!');
+  String tipKeepStreak(int n) => _('Read for a minute today to keep your $n-day streak going.', 'अपनी $n दिन की लकीर बनाए रखने के लिए आज एक मिनट पढ़ें।');
+  String tipToGo(String left) => _('$left more to reach today’s goal.', 'आज के लक्ष्य के लिए $left और पढ़ें।');
+  String tipBestHour(String hour) => _('You read most around $hour. Make it your daily reading slot.', 'आप सबसे ज़्यादा $hour के आसपास पढ़ते हैं। इसे अपना रोज़ का पढ़ने का समय बनाएँ।');
+  String pacePerPage(String d) => _('$d per page', 'हर पन्ने पर $d');
+  String timeAndDays(String d, int days) => _('$d over ${days == 1 ? '1 day' : '$days days'}', '$days दिन में $d');
+  String finishedIn(int days, String d) => _('Finished in ${days == 1 ? '1 day' : '$days days'} ($d of reading)', '${days == 1 ? '1 दिन' : '$days दिन'} में पूरी ($d पढ़ना)');
+  String timeLeft(String d) => _('About $d left at your pace', 'आपकी रफ़्तार से लगभग $d बाकी');
+  String get readingMode => _('Reading mode', 'पढ़ने का मोड');
+  String get scrollingMode => _('Scrolling mode', 'स्क्रॉल मोड');
+  String get zoomIn => _('Zoom in', 'ज़ूम बढ़ाएँ');
+  String get zoomOut => _('Zoom out', 'ज़ूम घटाएँ');
   String get meaning => _('Meaning', 'अर्थ');
   String get copy => _('Copy', 'कॉपी करें');
   String get copied => _('Copied', 'कॉपी हो गया');

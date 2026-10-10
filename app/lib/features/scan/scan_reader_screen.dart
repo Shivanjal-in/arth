@@ -97,6 +97,7 @@ class _ScanReaderScreenState extends ConsumerState<ScanReaderScreen> with AdBrea
             tooltip: t.readingSettings,
             onPressed: () => showReadingSettingsSheet(context),
           ),
+          const AiLookupButton(),
           ReaderMoreMenu(
             onWords: () => context.push(Uri(path: '/vocabulary', queryParameters: {'book': '${widget.book.id}', 'title': widget.book.title}).toString()),
             onNote: () => unawaited(makeScanCard(context, ref, widget.book, _current + 1, const CardDraft(kind: CardKind.idea))),
