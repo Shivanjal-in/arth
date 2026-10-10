@@ -16,6 +16,7 @@ import { healthRoutes } from './routes/health.js';
 import { lookupRoutes } from './routes/lookup.js';
 import { phraseRoutes } from './routes/phrases.js';
 import { seedRoutes } from './routes/seed.js';
+import type { SeedFileCache } from './services/seed-file.js';
 import { legalRoutes } from './routes/legal.js';
 import { billingRoutes } from './routes/billing.js';
 import { accountDeleteRoutes, type LoginRemover } from './routes/account-delete.js';
@@ -69,6 +70,8 @@ export type AppOptions = {
   billing?: { billing: Billing; webhookAuth: string };
   /** Entries in the on-device dictionary (SEED_LIMIT); 20000 when omitted. */
   seedLimit?: number;
+  /** The prebuilt full seed for /v1/seed/file; a 404 there when omitted. */
+  seedFile?: SeedFileCache;
   config: Pick<
     Config,
     | 'CONTEXT_MODE'
@@ -184,7 +187,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
         await dbRoutes.register(phraseRoutes, { store: opts.store });
         await dbRoutes.register(coverRoutes, { cache: opts.cache, ...(opts.coverFetch ? { fetchJson: opts.coverFetch } : {}) });
       });
-      await v1.register(seedRoutes, { defaultLimit: opts.seedLimit });
+      await v1.register(seedRoutes, { defaultLimit: opts.seedLimit, file: opts.seedFile });
       await v1.register(contextRoutes, {
         deps: { config: opts.config, llm: opts.llm, cache: opts.cache, store: opts.store, log },
         spend,

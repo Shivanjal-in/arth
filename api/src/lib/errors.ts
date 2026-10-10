@@ -52,4 +52,5 @@ export const messages = {
   accountsUnavailable: 'खाते अभी उपलब्ध नहीं हैं।',
   uploadsUnavailable: 'तस्वीर अपलोड अभी उपलब्ध नहीं है।',
   pushUnavailable: 'सूचनाएँ अभी उपलब्ध नहीं हैं।',
+  seedFileUnavailable: 'शब्दकोश की फ़ाइल अभी उपलब्ध नहीं है।',
 } as const;

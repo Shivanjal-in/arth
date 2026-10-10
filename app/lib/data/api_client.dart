@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:arth/core/models/contracts.dart';
 import 'package:arth/data/account.dart';
@@ -26,7 +27,7 @@ const String kApiBaseUrl = String.fromEnvironment(
 const aiBlockCodes = {'UNAUTHORIZED', 'QUOTA_EXCEEDED', 'QUOTA_PHONE'};
 
 class ApiFailure implements Exception {
-  const ApiFailure(this.code, this.message, {this.suggestions = const []});
+  const ApiFailure(this.code, this.message, {this.suggestions = const [], this.cause});
 
   /// One of the contract's codes, or `OFFLINE` when the request never got out.
   final String code;
@@ -35,11 +36,15 @@ class ApiFailure implements Exception {
   final String message;
   final List<String> suggestions;
 
+  /// What actually went wrong, for analytics and logs (`connectionTimeout`,
+  /// `http_503`, …); null for the server's own error responses.
+  final String? cause;
+
   bool get isOffline => code == 'OFFLINE';
   bool get isNotFound => code == 'NOT_FOUND';
 
   @override
-  String toString() => 'ApiFailure($code: $message)';
+  String toString() => 'ApiFailure($code${cause == null ? '' : ' [$cause]'}: $message)';
 }
 
 /// One server-sent event from /translate.
@@ -386,12 +391,17 @@ class ApiClient {
     yield* _parseSse(res.data!.stream.cast<List<int>>());
   }
 
-  /// Raw NDJSON lines from /seed. The seed loader parses them.
-  Future<Stream<String>> seedLines({DateTime? since, int? afterRank}) async {
+  /// Raw NDJSON lines from /seed. The seed loader parses them. [extras]
+  /// asks for forms and phrases even with [afterRank] (a resumed download).
+  Future<Stream<String>> seedLines({DateTime? since, int? afterRank, bool extras = false}) async {
     try {
       final res = await _dio.get<ResponseBody>(
         '/seed',
-        queryParameters: {if (since != null) 'since': since.toIso8601String(), 'afterRank': ?afterRank},
+        queryParameters: {
+          if (since != null) 'since': since.toIso8601String(),
+          'afterRank': ?afterRank,
+          if (extras && afterRank != null) 'extras': '1',
+        },
         options: Options(
           responseType: ResponseType.stream,
           receiveTimeout: const Duration(minutes: 10),
@@ -403,6 +413,73 @@ class ApiClient {
           .transform(const LineSplitter());
     } on DioException catch (e) {
       throw _failure(e);
+    }
+  }
+
+  /// Saves the whole seed, gzipped NDJSON from /seed/file, to [path]. When
+  /// [path] already holds the start of the file whose ETag is [etag], only
+  /// the rest is fetched (Range + If-Range); a server whose file has changed
+  /// since sends all of it and the partial file is replaced.
+  ///
+  /// [onStart] hears the file's ETag before any bytes are written, so a
+  /// download cut short (even by the app closing) can be resumed later.
+  /// [onBytes] hears how much of the file is on disk.
+  ///
+  /// Throws an ApiFailure (NOT_FOUND from servers without the file), or the
+  /// socket's own error when the connection drops part-way.
+  Future<void> downloadSeedFile(
+    String path, {
+    String? etag,
+    void Function(String? etag)? onStart,
+    void Function(int received, int total)? onBytes,
+  }) async {
+    final file = File(path);
+    final have = etag != null && file.existsSync() ? file.lengthSync() : 0;
+    Response<ResponseBody> res;
+    try {
+      res = await _dio.get<ResponseBody>(
+        '/seed/file',
+        options: Options(
+          responseType: ResponseType.stream,
+          // Between chunks, not for the whole file.
+          receiveTimeout: const Duration(seconds: 60),
+          headers: {
+            if (have > 0) 'range': 'bytes=$have-',
+            if (have > 0) 'if-range': etag,
+          },
+          validateStatus: (s) => s == 200 || s == 206 || s == 416,
+        ),
+      );
+    } on DioException catch (e) {
+      throw _failure(e);
+    }
+    if (res.statusCode == 416) {
+      // The partial file is no prefix of the server's: start over.
+      await res.data!.stream.drain<void>();
+      if (have == 0) throw const ApiFailure('INTERNAL', 'कुछ गड़बड़ हो गई।', cause: 'http_416');
+      file.deleteSync();
+      return downloadSeedFile(path, onStart: onStart, onBytes: onBytes);
+    }
+    final resumed = res.statusCode == 206;
+    final start = resumed ? have : 0;
+    final total = resumed
+        ? int.tryParse(res.headers.value('content-range')?.split('/').last ?? '') ?? -1
+        : int.tryParse(res.headers.value('content-length') ?? '') ?? -1;
+    onStart?.call(res.headers.value('etag'));
+    final sink = file.openWrite(mode: resumed ? FileMode.append : FileMode.write);
+    var received = start;
+    onBytes?.call(received, total);
+    try {
+      await for (final chunk in res.data!.stream) {
+        sink.add(chunk);
+        received += chunk.length;
+        onBytes?.call(received, total);
+      }
+    } finally {
+      await sink.close();
+    }
+    if (total >= 0 && received != total) {
+      throw HttpException('Seed file ended at $received of $total bytes', uri: res.realUri);
     }
   }
 
@@ -454,9 +531,10 @@ class ApiClient {
       case DioExceptionType.sendTimeout:
       case DioExceptionType.connectionError:
       case DioExceptionType.unknown:
-        return const ApiFailure(
+        return ApiFailure(
           'OFFLINE',
           'और अर्थ देखने के लिए इंटरनेट चाहिए।',
+          cause: e.type == DioExceptionType.unknown ? 'unknown:${e.error.runtimeType}' : e.type.name,
         );
       case DioExceptionType.badResponse:
         if (e.response?.statusCode == 401) return const ApiFailure('UNAUTHORIZED', 'इसके लिए साइन इन करें।');
@@ -469,11 +547,11 @@ class ApiClient {
             'बहुत जल्दी-जल्दी अनुरोध हो रहे हैं। एक मिनट रुककर फिर कोशिश करें।',
           );
         }
-        return const ApiFailure('INTERNAL', 'कुछ गड़बड़ हो गई।');
+        return ApiFailure('INTERNAL', 'कुछ गड़बड़ हो गई।', cause: 'http_${e.response?.statusCode}');
       case DioExceptionType.transformTimeout:
       case DioExceptionType.badCertificate:
       case DioExceptionType.cancel:
-        return const ApiFailure('INTERNAL', 'कुछ गड़बड़ हो गई।');
+        return ApiFailure('INTERNAL', 'कुछ गड़बड़ हो गई।', cause: e.type.name);
     }
   }
 }

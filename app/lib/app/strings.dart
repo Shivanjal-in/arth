@@ -258,6 +258,30 @@ enum AppStrings {
         'आप अभी पढ़ना शुरू कर सकते हैं — डाउनलोड पीछे चलता रहेगा।',
       );
   String get downloadFailed => _('Download failed.', 'डाउनलोड नहीं हो पाया।');
+  String get seedOffline => _(
+        'No internet. The download carries on from where it stopped once you are back online.',
+        'इंटरनेट नहीं है। इंटरनेट लौटते ही डाउनलोड वहीं से आगे चलेगा।',
+      );
+  String get seedServerDown => _(
+        'The dictionary server is not answering. Try again in a little while.',
+        'शब्दकोश का सर्वर अभी जवाब नहीं दे रहा। थोड़ी देर बाद फिर कोशिश करें।',
+      );
+  String get seedNoSpace => _(
+        'Not enough space on this phone. Free up some space and try again.',
+        'फ़ोन में जगह कम है। थोड़ी जगह खाली करके फिर कोशिश करें।',
+      );
+  String get seedWaitingForNetwork => _('Connection lost. Waiting to carry on…', 'इंटरनेट टूट गया। फिर जुड़ने का इंतज़ार है…');
+  String get seedTryingAgain => _('Trying again…', 'फिर कोशिश हो रही है…');
+  String seedDownloading(int bytes, int total) => _(
+        'Downloading: ${_mb(bytes)} of ${_mb(total)} MB',
+        'डाउनलोड: ${_mb(total)} में से ${_mb(bytes)} MB',
+      );
+  String seedSaving(int done, int total) => _(
+        'Saving words: ${_group(done)} of ${_group(total)}',
+        'शब्द सहेजे जा रहे हैं: ${_group(total)} में से ${_group(done)}',
+      );
+
+  static String _mb(int bytes) => (bytes / (1024 * 1024)).toStringAsFixed(1);
 
   // ---- errors (client-side codes; server messages are Hindi) ----
   String get offline => _(

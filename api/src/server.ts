@@ -12,10 +12,16 @@ import { mongoAccountStore } from './services/mongo-accounts.js';
 import { mongoCommunityStore } from './services/mongo-community.js';
 import { disabledBilling, revenueCatBilling } from './billing/revenuecat.js';
 import { firebaseLoginRemover } from './auth/verifier.js';
+import { mongoSeedSource } from './routes/seed.js';
+import { SeedFileCache } from './services/seed-file.js';
 
 const config = loadConfig();
 const serviceAccount = parseServiceAccount(config.FIREBASE_SERVICE_ACCOUNT);
 const fbApp = config.FIREBASE_PROJECT_ID ? firebaseApp(config.FIREBASE_PROJECT_ID, serviceAccount) : null;
+// Built from Mongo on first use; warmed once connected (below).
+const seedFile = new SeedFileCache(mongoSeedSource(config.SEED_LIMIT), {
+  log: { info: (obj, msg) => app.log.info(obj, msg), warn: (obj, msg) => app.log.warn(obj, msg) },
+});
 const app = buildApp({
   logLevel: config.LOG_LEVEL,
   store: mongoStore,
@@ -23,6 +29,7 @@ const app = buildApp({
   llm: new OpenAIProvider(config.OPENAI_API_KEY),
   config,
   seedLimit: config.SEED_LIMIT,
+  seedFile,
   ...(fbApp ? { removeLogin: firebaseLoginRemover(fbApp) } : {}),
   billing: {
     billing: config.REVENUECAT_SECRET_KEY ? revenueCatBilling(config.REVENUECAT_SECRET_KEY) : disabledBilling,
@@ -49,6 +56,7 @@ const app = buildApp({
 try {
   await connectMongo(config.MONGODB_URI);
   app.log.info({ uri: config.MONGODB_URI.replace(/\/\/.*@/, '//***@') }, 'mongo connected');
+  seedFile.warm();
   await app.listen({ port: config.PORT, host: config.HOST });
 } catch (err) {
   app.log.fatal({ err }, 'failed to start');

@@ -7,6 +7,7 @@ import 'package:arth/app/theme.dart';
 import 'package:arth/data/seed_loader.dart';
 import 'package:arth/features/account/account_card.dart';
 import 'package:arth/features/account/ai_lookup_gate.dart';
+import 'package:arth/features/seed/seed_screen.dart';
 import 'package:arth/features/settings/settings_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -146,8 +147,8 @@ class SettingsScreen extends ConsumerWidget {
               ),
             // No update button: the app refreshes the dictionary itself once
             // a day (app.dart), and an unfinished first download resumes.
-            if (seed.phase == SeedPhase.failed && seed.message != null)
-              SettingsCaption(seed.message!),
+            if (seed.phase == SeedPhase.failed || seed.retrying)
+              SettingsCaption(seedStatusText(t, seed)),
 
             const SizedBox(height: 28),
             Pressable.card(

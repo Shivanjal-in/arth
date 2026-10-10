@@ -42,6 +42,8 @@ const entrySchema = new Schema(
   { versionKey: false, collection: 'entries' },
 );
 entrySchema.index({ freqRank: 1 });
+// The daily seed delta (`updatedAt > since`) and the seed file's version check.
+entrySchema.index({ updatedAt: -1 });
 
 export type EntryDoc = InferSchemaType<typeof entrySchema>;
 export const EntryModel = model('Entry', entrySchema);

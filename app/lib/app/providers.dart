@@ -1,5 +1,6 @@
 // App-wide Riverpod providers. Everything below the UI is reachable from here.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -13,6 +14,7 @@ import 'package:arth/data/highlight_plan.dart';
 import 'package:arth/data/local_store.dart';
 import 'package:arth/data/ocr_service.dart';
 import 'package:arth/data/seed_loader.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -110,13 +112,55 @@ final ocrProvider = Provider<OcrService>((ref) {
 final seedProvider = NotifierProvider<SeedNotifier, SeedProgress>(SeedNotifier.new);
 
 class SeedNotifier extends Notifier<SeedProgress> {
-  @override
-  SeedProgress build() => const SeedProgress(phase: SeedPhase.idle);
+  /// One loader for the app's life: a download that gave up is picked up by
+  /// the next run instead of starting over.
+  late final SeedLoader _loader = SeedLoader(
+    ref.read(apiClientProvider),
+    ref.read(localStoreProvider),
+    fileDir: ref.read(documentsDirProvider),
+    networkBack: networkBack,
+    track: (event, props) => ref.read(analyticsProvider).track(event, props),
+  );
+  Future<SeedProgress>? _running;
+  StreamSubscription<void>? _retryWhenOnline;
 
-  Future<SeedProgress> run({bool delta = true}) async {
-    final loader = SeedLoader(ref.read(apiClientProvider), ref.read(localStoreProvider));
-    return loader.run(onProgress: (p) => state = p, delta: delta);
+  @override
+  SeedProgress build() {
+    ref.onDispose(() => unawaited(_retryWhenOnline?.cancel()));
+    return const SeedProgress(phase: SeedPhase.idle);
   }
+
+  /// Downloads the dictionary (or, with [delta], what changed since). A run
+  /// already going is joined, not doubled. A run that fails for want of a
+  /// connection goes again by itself when the phone is back online.
+  Future<SeedProgress> run({bool delta = true}) => _running ??= _run(delta).whenComplete(() => _running = null);
+
+  Future<SeedProgress> _run(bool delta) async {
+    unawaited(_retryWhenOnline?.cancel());
+    _retryWhenOnline = null;
+    final r = await _loader.run(onProgress: (p) => state = p, delta: delta);
+    if (r.phase == SeedPhase.done) ref.invalidate(localEntryCountProvider);
+    if (r.phase == SeedPhase.failed && r.failure == SeedFailure.offline) {
+      _retryWhenOnline = networkBack().listen((_) => unawaited(run(delta: delta)));
+    }
+    return r;
+  }
+}
+
+/// Fires each time the phone goes from no connection to some connection.
+/// A plain filter, not an async* generator: cancelling one of those waits
+/// for the platform stream's next event, which may never come.
+Stream<void> networkBack() {
+  bool offline(List<ConnectivityResult> r) => r.every((c) => c == ConnectivityResult.none);
+  final connectivity = Connectivity();
+  bool? wasOffline;
+  unawaited(connectivity.checkConnectivity().then((r) => wasOffline ??= offline(r), onError: (Object _) => null));
+  return connectivity.onConnectivityChanged.where((r) {
+    final now = offline(r);
+    final back = (wasOffline ?? false) && !now;
+    wasOffline = now;
+    return back;
+  }).map((_) {});
 }
 
 final localEntryCountProvider = FutureProvider<int>(

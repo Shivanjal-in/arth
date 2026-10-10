@@ -1,6 +1,9 @@
 // First launch: download the on-device dictionary with visible progress.
 
+import 'dart:async';
+
 import 'package:arth/app/providers.dart';
+import 'package:arth/app/strings.dart';
 import 'package:arth/app/theme.dart';
 import 'package:arth/data/seed_loader.dart';
 import 'package:flutter/material.dart';
@@ -21,15 +24,9 @@ class _SeedScreenState extends ConsumerState<SeedScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _start());
   }
 
-  Future<void> _start() async {
-    // Keep the notifier: the reader may leave this screen (Skip) before the
-    // download finishes, and `ref` is unusable once it's gone.
-    final seed = ref.read(seedProvider.notifier);
-    final container = ProviderScope.containerOf(context, listen: false);
-    final r = await seed.run(delta: false);
-    container.invalidate(localEntryCountProvider);
-    if (mounted && r.phase == SeedPhase.done) context.go('/');
-  }
+  // The download lives in seedProvider, so it carries on (and retries) after
+  // the reader skips ahead; build() moves on to the library when it's done.
+  void _start() => unawaited(ref.read(seedProvider.notifier).run(delta: false));
 
   @override
   Widget build(BuildContext context) {
@@ -37,6 +34,9 @@ class _SeedScreenState extends ConsumerState<SeedScreen> {
     final scale = ref.watch(settingsProvider).hindiScale;
     final t = ref.watch(stringsProvider);
     final p = ref.watch(seedProvider);
+    ref.listen(seedProvider, (_, next) {
+      if (next.phase == SeedPhase.done) context.go('/');
+    });
     final body = uiBody(hindi: t.isHindi, color: c.inkMuted, scale: scale);
     return Scaffold(
       body: SafeArea(
@@ -61,11 +61,7 @@ class _SeedScreenState extends ConsumerState<SeedScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                p.phase == SeedPhase.failed
-                    ? (p.message ?? t.downloadFailed)
-                    : p.total == 0
-                        ? t.connecting
-                        : '${p.done} / ${p.total}',
+                seedStatusText(t, p),
                 style: uiBody(hindi: t.isHindi, color: p.phase == SeedPhase.failed ? c.accent : c.inkMuted, scale: scale, size: 13),
               ),
               if (p.phase == SeedPhase.failed) ...[
@@ -103,3 +99,18 @@ class _SeedScreenState extends ConsumerState<SeedScreen> {
     );
   }
 }
+
+/// One line on how the download is going; Settings shows it too.
+String seedStatusText(AppStrings t, SeedProgress p) {
+  if (p.phase == SeedPhase.failed) return seedFailureText(t, p.failure);
+  if (p.retrying) return p.failure == SeedFailure.offline ? t.seedWaitingForNetwork : t.seedTryingAgain;
+  if (p.total == 0) return t.connecting;
+  return p.stage == SeedStage.download ? t.seedDownloading(p.done, p.total) : t.seedSaving(p.done, p.total);
+}
+
+String seedFailureText(AppStrings t, SeedFailure? f) => switch (f) {
+      SeedFailure.offline => t.seedOffline,
+      SeedFailure.server => t.seedServerDown,
+      SeedFailure.storage => t.seedNoSpace,
+      SeedFailure.unknown || null => t.downloadFailed,
+    };
